@@ -55,6 +55,10 @@ class Settings:
     db_user: str
     db_password: str = field(repr=False)
 
+    #: The address callers reach this API on, published in the action document. Not a security
+    #: control — the network boundary is — but Onyx cannot dispatch a tool call without it.
+    public_base_url: str = "http://api:8000"
+
     log_level: str = "INFO"
 
     @property
@@ -89,5 +93,6 @@ def load_settings() -> Settings:
         db_name=_require("DATABASE_NAME"),
         db_user=_require("DATABASE_USER"),
         db_password=_read_secret_file("API_DATABASE_SECRET_FILE"),
+        public_base_url=os.environ.get("SUPPORTPILOT_PUBLIC_BASE_URL", "http://api:8000"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
     )

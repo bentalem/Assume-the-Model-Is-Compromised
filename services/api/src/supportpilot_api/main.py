@@ -172,6 +172,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             version=app.version,
             description=app.description,
             routes=app.routes,
+            # Onyx needs a base URL or it cannot dispatch the call at all. This is the API's
+            # address on the internal `app` network — the only route Onyx has to it, since the API
+            # publishes no host port. Overridable so a deployed environment can name its own.
+            servers=[{
+                "url": settings.public_base_url,
+                "description": "SupportPilot API on the internal application network",
+            }],
         )
 
         for path in schema.get("paths", {}).values():

@@ -281,24 +281,15 @@ services:
       - edge
       - app
 
-  # --------------------------------------------------------------------------------------------
-  # Onyx, Lite mode, opt-in profile (ADR-0002).
-  # --------------------------------------------------------------------------------------------
-  onyx:
-    profiles: ["onyx"]
-    image: onyxdotapp/onyx-lite:latest
-    container_name: supportpilot-onyx
-    restart: unless-stopped
-    environment:
-      AUTH_TYPE: ${ONYX_AUTH_TYPE:-oidc}
-      OPENID_CONFIG_URL: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/supportpilot}/.well-known/openid-configuration
-      OAUTH_CLIENT_ID: ${ONYX_OAUTH_CLIENT_ID:-onyx-web}
-      # Public client with PKCE (see the realm import): no client secret exists to mount.
-    ports:
-      - "127.0.0.1:3000:3000"
-    networks:
-      - edge
-      - app
+  # Onyx is NOT defined here.
+  #
+  # It ships as its own compose project (`name: onyx`) built from the upstream base file plus the
+  # onyx-lite overlay, so vendoring a copy of it here would fork someone else's deployment. The
+  # earlier profile in this file referenced an `onyx-lite` image that does not exist — Lite is an
+  # overlay, not an image.
+  #
+  # `python scripts/connect_onyx.py` joins a running Onyx to the `app` network below and configures
+  # the Keycloak client it needs. See docs/runbooks/onyx-integration.md.
 
 # ------------------------------------------------------------------------------------------------
 # Secrets are files outside the repository tree. Each service mounts only its own (SP-DATA-001 §10).

@@ -16,21 +16,36 @@ Two facts from the Onyx documentation decide this:
 1. **Lite mode exists.** It runs the Chat UI and Agents without the Vespa index and background
    workers, in under 1 GB of memory — intended for teams interested only in chat and agents, which
    is exactly SupportPilot's use of it.
-2. **Onyx supports `passthrough_auth` on custom actions**, forwarding the calling user's credentials
-   to the API instead of a fixed credential, for APIs that enforce per-user authentication. This is
-   the mechanism FR-02 and `P1-04` require, and it is a first-class feature rather than a workaround.
+2. **Onyx supports `passthrough_auth` on custom actions.** Confirmed against the running build:
+   `tool_constructor.py` sets `oauth_token_for_tool = user.oauth_accounts[0].access_token` and
+   `custom_tool.py` sends it as `Authorization: Bearer …`. It forwards the access token from the
+   user's **SSO login**, which is exactly what FR-02 and `P1-04` require.
+
+   The consequence is that users must sign in to Onyx through Keycloak. A basic-auth login creates
+   no `oauth_accounts` row, so passthrough has nothing to forward. Also note `AUTH_TYPE=oidc` was
+   removed from this build — SSO is configured as provider rows in the admin UI.
 
 Onyx also supports self-hosted model providers (Ollama, LiteLLM, vLLM), so a paid model key is not a
 prerequisite for local work.
 
 ## Decision
 
-**Onyx runs in Lite mode under a separate Compose profile (`--profile onyx`), off by default.**
+**Onyx runs as its own Compose project, joined to SupportPilot's `app` network on demand.**
 
 ```bash
-docker compose up -d                  # SupportPilot + Keycloak + OPA + PostgreSQL
-docker compose --profile onyx up -d   # adds Onyx when agent work is being done
+docker compose up -d                   # SupportPilot + Keycloak + OPA + PostgreSQL
+python scripts/connect_onyx.py         # joins a running Onyx and configures Keycloak
 ```
+
+### Superseded: the `--profile onyx` service
+
+This ADR originally put Onyx in our own compose file under a profile, referencing an
+`onyxdotapp/onyx-lite` image. **That image does not exist** — Lite is a compose *overlay* on the
+upstream base file, not a published image, so the profile would have failed on first use. Vendoring
+a copy of upstream's compose would also have meant forking someone else's deployment.
+
+`scripts/connect_onyx.py` replaces it: it attaches a running Onyx to our `app` network and
+configures the Keycloak client, leaving Onyx's own deployment to Onyx.
 
 ## Rationale
 

@@ -73,19 +73,18 @@
     {
       "clientId": "onyx-web",
       "name": "Onyx",
-      "description": "The agent front end. Obtains a user-bound token and forwards it to the action API. Public client with PKCE: a browser front end cannot keep a secret, which also keeps an OAuth client secret out of the repository.",
+      "description": "Onyx. Confidential client: Onyx performs the OIDC code exchange server-side and its SSO provider row requires a client secret. The secret is generated locally by scripts/connect_onyx.py into .secrets/ and set through the admin API, so it is never committed.",
       "enabled": true,
-      "publicClient": true,
+      "publicClient": false,
       "attributes": {
-        "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:3000/*"
       },
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "redirectUris": [
-        "http://localhost:3000/auth/oidc/callback",
-        "http://localhost:3000/auth/callback"
+        "http://localhost:3000/api/auth/oidc/keycloak/callback",
+        "http://localhost:3000/auth/oidc/callback"
       ],
       "webOrigins": [
         "http://localhost:3000"

@@ -13,6 +13,9 @@ info:
   description: Business operations the SupportPilot agent may request on behalf of an authenticated support
     user. Every operation authorizes the individual user; none accepts an identity supplied by the caller.
   version: 1.0.0
+servers:
+- url: http://api:8000
+  description: SupportPilot API on the internal application network
 paths:
   /v1/orders/{order_number}:
     get:
