@@ -232,6 +232,15 @@ def main() -> int:
     step("Generating the certificate")
     generate_certificate()
 
+    step("Building the combined CA bundle")
+    result = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "build_ca_bundle.py")],
+        cwd=REPO, capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode != 0:
+        raise SystemExit(result.stdout + result.stderr)
+    ok(result.stdout.strip().splitlines()[-1].strip())
+
     step("Updating compose.yaml")
     patch_compose()
 

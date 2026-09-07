@@ -286,20 +286,31 @@ def main() -> int:
     # --- TS8-06 — the integrity check ---------------------------------------------------------
     @check("TS8-06", "Changing the payload after approval stops execution (hash mismatch)")
     def _():
-        action_id = propose(alice, amount="19.90")
-        response = approve(fiona, action_id)
-        if response["status"] != 201:
-            raise Failed(f"approval failed: {response['status']} {response['body'][:120]}")
+        # The worker is paused across approve-then-tamper. Approval enqueues immediately and the
+        # worker polls every few seconds, so without this it can execute the original — correctly
+        # hashed — payload before the tamper lands, and the resulting SUCCEEDED reads as "the
+        # tampered payload was executed" when the opposite happened. That false positive is worse
+        # than a missed one: it accuses a control that held.
+        subprocess.run(["docker", "compose", "stop", "worker"], cwd=REPO,
+                       capture_output=True, timeout=90)
+        try:
+            action_id = propose(alice, amount="19.90")
+            response = approve(fiona, action_id)
+            if response["status"] != 201:
+                raise Failed(f"approval failed: {response['status']} {response['body'][:120]}")
 
-        # Simulate a compromise between approval and execution: raise the amount, leaving the
-        # approved hash in place. The worker must notice.
-        sql(
-            "UPDATE app.action_requests "
-            "SET payload = jsonb_set(payload, '{amount}', '\"499.00\"') "
-            f"WHERE id='{action_id}'"
-        )
+            # A compromise between approval and execution: raise the amount, leaving the approved
+            # hash in place. The worker must notice before it reaches a provider.
+            sql(
+                "UPDATE app.action_requests "
+                "SET payload = jsonb_set(payload, '{amount}', '\"499.00\"') "
+                f"WHERE id='{action_id}'"
+            )
+        finally:
+            subprocess.run(["docker", "compose", "start", "worker"], cwd=REPO,
+                           capture_output=True, timeout=90)
 
-        state = wait_for_state(action_id, {"SUCCEEDED", "FAILED"}, seconds=45)
+        state = wait_for_state(action_id, {"SUCCEEDED", "FAILED"}, seconds=60)
         if state == "SUCCEEDED":
             raise Failed("a tampered payload was executed")
 

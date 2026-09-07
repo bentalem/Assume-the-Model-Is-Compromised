@@ -231,9 +231,10 @@ services:
       DATABASE_USER: sp_api_role
       API_DATABASE_SECRET_FILE: /run/secrets/api_db_password
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      # Trust the local Keycloak certificate for the JWKS fetch. Scoped to this one
-      # certificate rather than disabling verification.
-      SSL_CERT_FILE: /etc/ssl/supportpilot/keycloak.crt
+      # Public roots plus the local Keycloak certificate, for the JWKS fetch. Naming
+      # keycloak.crt directly would replace the trust store rather than extend it, leaving the
+      # API unable to verify anything else it might ever need to reach.
+      SSL_CERT_FILE: /etc/ssl/supportpilot/ca-bundle.crt
     volumes:
       - ./.secrets/tls:/etc/ssl/supportpilot:ro
     secrets:

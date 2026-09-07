@@ -246,6 +246,7 @@ docker compose exec -T -e PGPASSWORD="$(cat .secrets/postgres_bootstrap_password
 | Onyx rejects the URL as not HTTPS | Keycloak still on plain HTTP | `python scripts/enable_keycloak_tls.py` |
 | Onyx rejects the URL as a private address | SSRF protection at its default level | Admin Panel → Security → Allow private network |
 | Onyx cannot verify the certificate | The override is not applied | Re-run the `docker compose … -f docker-compose.supportpilot.yml up -d api_server` command |
+| `CERTIFICATE_VERIFY_FAILED` calling a model provider | `SSL_CERT_FILE` replaces the trust store; pointing it at `keycloak.crt` alone leaves *only* that certificate trusted | `python scripts/build_ca_bundle.py`, then recreate `api_server`. The override already points at `ca-bundle.crt` |
 | Every token is `claims_or_signature_invalid` after enabling TLS | `.env` still pins the old HTTP issuer, and it wins over compose defaults | `enable_keycloak_tls.py` rewrites it; re-run it, then recreate the API |
 | Tool calls succeed but as the wrong identity | An OAuth config is attached to the tool | Onyx prefers a tool-level OAuth config over passthrough; remove it |
 | The agent says the refund was issued | Agent instructions | `propose_refund` is described as creating a pending request; tighten the instructions |

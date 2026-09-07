@@ -22,9 +22,16 @@ name: onyx
 services:
   api_server:
     environment:
-      # Both, because Onyx's stack mixes httpx/requests and raw ssl contexts.
-      - SSL_CERT_FILE=/etc/ssl/supportpilot/keycloak.crt
-      - REQUESTS_CA_BUNDLE=/etc/ssl/supportpilot/keycloak.crt
+      # The combined bundle: public roots + the local Keycloak certificate.
+      #
+      # These variables REPLACE the trust store rather than adding to it. Pointing them at
+      # keycloak.crt alone left Onyx trusting exactly one certificate, so Keycloak verified and
+      # every model-provider call failed with CERTIFICATE_VERIFY_FAILED. Build it with
+      # scripts/build_ca_bundle.py.
+      #
+      # Both variables, because Onyx's stack mixes httpx, requests and raw ssl contexts.
+      - SSL_CERT_FILE=/etc/ssl/supportpilot/ca-bundle.crt
+      - REQUESTS_CA_BUNDLE=/etc/ssl/supportpilot/ca-bundle.crt
       # Onyx's SSRF guard blocks RFC1918 addresses by default, and every address Keycloak can be
       # reached at from a container is private — the Docker network (172.x), the host's LAN
       # address (192.168.x), host.docker.internal. There is no public address to use, so a local
