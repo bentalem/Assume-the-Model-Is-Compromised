@@ -29,7 +29,7 @@ or by a recorded acceptance with an owner and an expiry date.
 | OD-07 | Refund approval limits per role and the exact separation-of-duty rule | Finance + Security lead | Phase 4 | Most restrictive reading: always an independent approver, lowest configured limit | Open |
 | OD-08 | Whether prompts and full model conversations are stored, and under which purpose, access policy, retention, and redaction rules | Security lead + Legal | Phase 2 | Conversations are **not** stored as audit evidence; only structured audit events | Open |
 | OD-09 | Named owners for every workstream | Engineering lead | Phase 0 | The plan cannot be baselined; gates lack accountable owners | Open |
-| OD-10 | MFA policy and account lifecycle for production identities | Identity engineer + Security lead | Phase 5 | The local MFA policy is carried forward untested against production requirements | Open |
+| OD-10 | MFA policy and account lifecycle for production identities | Identity engineer + Security lead | Phase 5 | The local MFA policy is carried forward untested against production requirements | Open — see AC-01 |
 
 ## 3. Risk register
 
@@ -77,7 +77,7 @@ exist without an owner and an expiry date.**
 
 | ID | Condition accepted | Gate | Owner | Expiry | Removal evidence |
 |---|---|---|---|---|---|
-| — | *(none recorded)* | — | — | — | — |
+| AC-01 | **MFA is not enforced in the local realm.** The design requires multi-factor for human accounts (SP-DATA-001 §2). Enforcing it locally would block the direct-grant test harness that `verify_local.py` uses, because Keycloak applies required actions to the password grant as well. The API still derives `authentication_level` from ACR/AMR and reports `single_factor` honestly — nothing pretends MFA happened. | Phase 1 | Identity engineer | Phase 5 gate (with OD-10) | A production realm with MFA enforced on the browser flow, and a harness path that does not depend on the password grant. |
 
 > **Acceptance limit:** an S1 defect can never become an accepted condition. Cross-tenant exposure,
 > execution without approval, duplicate financial effect, and credential exposure are fixed before a
