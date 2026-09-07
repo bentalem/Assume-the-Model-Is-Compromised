@@ -31,7 +31,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 ONYX_DB_CONTAINER = "onyx-relational_db-1"
-EXPECTED_ISSUER = "http://localhost:8080/realms/supportpilot"
+EXPECTED_ISSUER = "https://localhost:8443/realms/supportpilot"
 EXPECTED_AUDIENCE = "supportpilot-api"
 
 GREEN, RED, YELLOW, GREY, BOLD, RESET = (

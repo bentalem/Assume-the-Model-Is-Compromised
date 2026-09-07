@@ -135,7 +135,8 @@ services:
     command:
       - |
         export KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)"
-        exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=8080
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm \
+             --http-port=8080 --https-port=8443
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-kcadmin}
       KC_HEALTH_ENABLED: "true"
@@ -146,7 +147,12 @@ services:
       # iss=keycloak:8080, and the API can only ever accept one of them. The API validates against
       # this issuer but fetches keys over the internal network (KEYCLOAK_JWKS_URL), which is what
       # backchannel-dynamic allows.
-      KC_HOSTNAME: http://localhost:8080
+      # HTTPS, because Onyx refuses a plain-HTTP identity provider and SP-ARCH-001 §8 asks
+      # for internal HTTPS regardless. The certificate covers both names, so the browser reaching
+      # localhost and containers reaching keycloak validate against the same file.
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/tls/keycloak.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/tls/keycloak.key
+      KC_HOSTNAME: https://localhost:8443
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     secrets:
       - keycloak_admin_password
@@ -155,15 +161,26 @@ services:
       # every start, so identity configuration is reproducible and cannot drift through the admin
       # UI. Changes made in the console are lost on restart — edit the realm file instead.
       - ./infrastructure/local/keycloak:/opt/keycloak/data/import:ro
+      - ./.secrets/tls:/opt/keycloak/conf/tls:ro
     ports:
       # Local only. The user-facing login flow and the token endpoint the test harness calls.
+      # 8080 stays published so the plain-HTTP harness keeps working; 8443 is what Onyx uses.
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8443:8443"
     networks:
       - edge
       - app
     healthcheck:
-      test:
-        ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      # A TCP connect to the HTTPS listener, and nothing more.
+      #
+      # Enabling TLS moves Keycloak's management interface to HTTPS on 9000, and this image ships
+      # with no curl, wget, python or openssl — so an in-container check of /health/ready is not
+      # available. Rather than a check that looks precise and silently tests nothing, this asserts
+      # exactly what it can: the TLS port is listening.
+      #
+      # Real readiness — the realm is imported and serving discovery — is asserted from the host by
+      # scripts/bootstrap_local.py, which can use a TLS client.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8443"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -192,8 +209,8 @@ services:
         condition: service_completed_successfully
     environment:
       SUPPORTPILOT_ENV: local
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/supportpilot}
-      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/supportpilot/protocol/openid-connect/certs}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://localhost:8443/realms/supportpilot}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-https://keycloak:8443/realms/supportpilot/protocol/openid-connect/certs}
       SUPPORTPILOT_AUDIENCE: ${SUPPORTPILOT_AUDIENCE:-supportpilot-api}
       TOKEN_LEEWAY_SECONDS: ${TOKEN_LEEWAY_SECONDS:-30}
       OPA_URL: ${OPA_URL:-http://opa:8181/v1/data/supportpilot/authz/decision}
@@ -204,6 +221,11 @@ services:
       DATABASE_USER: sp_api_role
       API_DATABASE_SECRET_FILE: /run/secrets/api_db_password
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Trust the local Keycloak certificate for the JWKS fetch. Scoped to this one
+      # certificate rather than disabling verification.
+      SSL_CERT_FILE: /etc/ssl/supportpilot/keycloak.crt
+    volumes:
+      - ./.secrets/tls:/etc/ssl/supportpilot:ro
     secrets:
       - api_db_password
     # No published port, deliberately. The API is reachable only from the internal `app` network
@@ -273,7 +295,7 @@ services:
     environment:
       SUPPORTPILOT_ENV: local
       SUPPORTPILOT_API_URL: http://api:8000
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/supportpilot}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://localhost:8443/realms/supportpilot}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "127.0.0.1:8090:8090"

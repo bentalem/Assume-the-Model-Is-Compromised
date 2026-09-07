@@ -1,0 +1,36 @@
+# SupportPilot overlay for Onyx.
+#
+# Apply alongside Onyx's own compose files:
+#
+#   cd ~/.config/onyx/deployment
+#   docker compose -f docker-compose.yml -f docker-compose.onyx-lite.yml \
+#                  -f <path-to-this-file> up -d api_server
+#
+# It does two things Onyx cannot do for itself:
+#
+#   1. Joins api_server to SupportPilot's `app` network, so it can reach the action API at
+#      http://api:8000 and Keycloak at https://keycloak:8443.
+#   2. Mounts the local Keycloak certificate and points Python's TLS stack at it, so Onyx will
+#      accept the identity provider. Scoped to this one certificate — verification stays on.
+#
+# Onyx refuses a plain-HTTP IdP (`https_only=True`, hardcoded in sso_url_guard.py) and applies the
+# same rule to every endpoint the discovery document names, so both the certificate and the trust
+# have to be real.
+
+name: onyx
+
+services:
+  api_server:
+    environment:
+      # Both, because Onyx's stack mixes httpx/requests and raw ssl contexts.
+      - SSL_CERT_FILE=/etc/ssl/supportpilot/keycloak.crt
+      - REQUESTS_CA_BUNDLE=/etc/ssl/supportpilot/keycloak.crt
+    volumes:
+      - ${SUPPORTPILOT_TLS_DIR:?set SUPPORTPILOT_TLS_DIR to the .secrets/tls path}:/etc/ssl/supportpilot:ro
+    networks:
+      - default
+      - supportpilot_app
+
+networks:
+  supportpilot_app:
+    external: true

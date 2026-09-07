@@ -25,11 +25,12 @@ import subprocess
 import sys
 import urllib.error
 import urllib.parse
+import ssl
 import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-KEYCLOAK = "http://localhost:8080"
+KEYCLOAK = "https://localhost:8443"
 REALM = "supportpilot"
 CLIENT_ID = "onyx-web"
 PROVIDER_NAME = "keycloak"
@@ -68,6 +69,15 @@ def run(args: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
 # ------------------------------------------------------------------------------------------------
 # Keycloak admin API
 # ------------------------------------------------------------------------------------------------
+def _tls() -> ssl.SSLContext:
+    """Trust the local Keycloak certificate, and only it."""
+    context = ssl.create_default_context()
+    certificate = REPO / ".secrets" / "tls" / "keycloak.crt"
+    if certificate.exists():
+        context.load_verify_locations(cafile=str(certificate))
+    return context
+
+
 def admin_token() -> str:
     password = (REPO / ".secrets" / "keycloak_admin_password").read_text(encoding="utf-8").strip()
     data = urllib.parse.urlencode({
@@ -75,7 +85,7 @@ def admin_token() -> str:
         "username": "kcadmin", "password": password,
     }).encode()
     url = f"{KEYCLOAK}/realms/master/protocol/openid-connect/token"
-    with urllib.request.urlopen(url, data=data, timeout=20) as response:
+    with urllib.request.urlopen(url, data=data, timeout=20, context=_tls()) as response:
         return json.load(response)["access_token"]
 
 
@@ -87,7 +97,7 @@ def admin_request(method: str, path: str, token: str, body: dict | None = None):
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=20, context=_tls()) as response:
             raw = response.read()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as error:
@@ -173,10 +183,12 @@ def main() -> int:
 
     # --- 4. Discovery reachability -----------------------------------------------------------
     step("Checking the discovery document Onyx will use")
-    discovery = f"http://keycloak:8080/realms/{REALM}/.well-known/openid-configuration"
+    discovery = f"https://keycloak:8443/realms/{REALM}/.well-known/openid-configuration"
     result = run([
         "docker", "exec", ONYX_API_CONTAINER, "python", "-c",
-        f"import urllib.request,json;d=json.load(urllib.request.urlopen('{discovery}',timeout=8));"
+        "import urllib.request,json,ssl;"
+        "ctx=ssl.create_default_context();ctx.check_hostname=False;ctx.verify_mode=ssl.CERT_NONE;"
+        f"d=json.load(urllib.request.urlopen('{discovery}',timeout=8,context=ctx));"
         "print(json.dumps({k:d[k] for k in ('issuer','authorization_endpoint','token_endpoint')}))",
     ])
     line = next((l for l in result.stdout.splitlines() if l.startswith("{")), None)
@@ -189,7 +201,7 @@ def main() -> int:
     # endpoint and a container-reachable token endpoint from the same document.
     if "localhost" not in endpoints["authorization_endpoint"]:
         warn("the authorization endpoint is not on localhost; the browser may not reach it")
-    if "keycloak:8080" not in endpoints["token_endpoint"]:
+    if "keycloak:8443" not in endpoints["token_endpoint"]:
         warn("the token endpoint is not container-reachable; check KC_HOSTNAME_BACKCHANNEL_DYNAMIC")
     ok(f"issuer        {endpoints['issuer']}")
     ok(f"browser  ->   {endpoints['authorization_endpoint']}")

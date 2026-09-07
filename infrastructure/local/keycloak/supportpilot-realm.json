@@ -73,7 +73,7 @@
     {
       "clientId": "onyx-web",
       "name": "Onyx",
-      "description": "Onyx. Confidential client: Onyx performs the OIDC code exchange server-side and its SSO provider row requires a client secret. The secret is generated locally by scripts/connect_onyx.py into .secrets/ and set through the admin API, so it is never committed.",
+      "description": "Onyx. Confidential client: Onyx does the OIDC code exchange server-side and its SSO provider row requires a client secret. The secret is generated into .secrets/ by scripts/connect_onyx.py, so it is never committed.",
       "enabled": true,
       "publicClient": false,
       "attributes": {

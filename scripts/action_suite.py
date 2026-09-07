@@ -17,11 +17,12 @@ import subprocess
 import sys
 import time
 import urllib.parse
+import ssl
 import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-KEYCLOAK = "http://localhost:8080"
+KEYCLOAK = "https://localhost:8443"
 REALM = "supportpilot"
 CEDAR = "11111111-1111-1111-1111-111111111111"
 ALICE = "a1111111-1111-1111-1111-111111111111"
@@ -97,13 +98,22 @@ def sql_fails(statement: str, role: str) -> str | None:
         return str(exc)
 
 
+def _tls() -> "ssl.SSLContext":
+    """Trust the local Keycloak certificate, and only it."""
+    context = ssl.create_default_context()
+    certificate = REPO / ".secrets" / "tls" / "keycloak.crt"
+    if certificate.exists():
+        context.load_verify_locations(cafile=str(certificate))
+    return context
+
+
 def token_for(username: str) -> str:
     data = urllib.parse.urlencode({
         "grant_type": "password", "client_id": "supportpilot-test-harness",
         "username": username, "password": f"{username}-local-password", "scope": "openid",
     }).encode()
     url = f"{KEYCLOAK}/realms/{REALM}/protocol/openid-connect/token"
-    with urllib.request.urlopen(url, data=data, timeout=20) as response:
+    with urllib.request.urlopen(url, data=data, timeout=20, context=_tls()) as response:
         return json.load(response)["access_token"]
 
 

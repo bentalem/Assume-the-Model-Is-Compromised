@@ -18,11 +18,12 @@ import sys
 import time
 import urllib.error
 import urllib.parse
+import ssl
 import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-KEYCLOAK = "http://localhost:8080"
+KEYCLOAK = "https://localhost:8443"
 REALM = "supportpilot"
 
 CEDAR_ORDER = "ORD-2001"
@@ -108,6 +109,15 @@ def api_get(path: str, token: str | None = None, extra_headers: dict | None = No
     return json.loads(line)
 
 
+def _tls() -> "ssl.SSLContext":
+    """Trust the local Keycloak certificate, and only it."""
+    context = ssl.create_default_context()
+    certificate = REPO / ".secrets" / "tls" / "keycloak.crt"
+    if certificate.exists():
+        context.load_verify_locations(cafile=str(certificate))
+    return context
+
+
 def get_token(username: str, password: str, scope: str = "openid") -> str:
     data = urllib.parse.urlencode(
         {
@@ -119,7 +129,7 @@ def get_token(username: str, password: str, scope: str = "openid") -> str:
         }
     ).encode()
     url = f"{KEYCLOAK}/realms/{REALM}/protocol/openid-connect/token"
-    with urllib.request.urlopen(url, data=data, timeout=20) as response:
+    with urllib.request.urlopen(url, data=data, timeout=20, context=_tls()) as response:
         return json.load(response)["access_token"]
 
 
@@ -268,7 +278,7 @@ def main() -> int:
         wrong_audience_rejected = True
         try:
             url = f"{KEYCLOAK}/realms/{REALM}/protocol/openid-connect/token"
-            with urllib.request.urlopen(url, data=other, timeout=20) as response:
+            with urllib.request.urlopen(url, data=other, timeout=20, context=_tls()) as response:
                 token = json.load(response)["access_token"]
             wrong_audience_rejected = api_get(f"/v1/orders/{CEDAR_ORDER}", token)["status"] == 401
         except urllib.error.HTTPError:

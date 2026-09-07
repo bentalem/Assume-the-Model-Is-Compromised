@@ -95,6 +95,41 @@ def wait_for_migration(timeout_seconds: int = 300) -> None:
     raise SystemExit(f"{RED}migration job did not finish within {timeout_seconds}s{RESET}")
 
 
+def wait_for_keycloak_realm(timeout_seconds: int = 240) -> None:
+    """Assert the realm is actually serving discovery over TLS.
+
+    The container healthcheck can only confirm the port is open — the image has no HTTP client
+    once TLS moves the management interface to HTTPS. This is the real check, and it is the one
+    that matters: a Keycloak that is listening but has not imported the realm will fail every
+    login in a way that looks like a client misconfiguration.
+    """
+    import json as _json
+    import ssl
+    import urllib.request
+
+    step("Waiting for the Keycloak realm")
+    url = "https://localhost:8443/realms/supportpilot/.well-known/openid-configuration"
+    # The local certificate is self-signed; trust it explicitly rather than disabling verification.
+    context = ssl.create_default_context()
+    certificate = REPO / ".secrets" / "tls" / "keycloak.crt"
+    if certificate.exists():
+        context.load_verify_locations(cafile=str(certificate))
+    else:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=5, context=context) as response:
+                issuer = _json.load(response)["issuer"]
+                detail(f"realm serving; issuer {issuer}")
+                return
+        except Exception:
+            time.sleep(3)
+    raise SystemExit(f"{RED}Keycloak realm did not become available within {timeout_seconds}s{RESET}")
+
+
 def wait_for_api(timeout_seconds: int = 240) -> None:
     step("Waiting for the API")
     # The API has no published port by design, so readiness is checked from inside the app network.
@@ -157,11 +192,13 @@ def main() -> int:
     detail("containers started")
 
     wait_for_migration()
+    wait_for_keycloak_realm()
     wait_for_api()
 
     print()
     print(f"{GREEN}Environment is up.{RESET}")
-    print("  Keycloak         http://localhost:8080   (realm: supportpilot)")
+    print("  Keycloak         https://localhost:8443  (realm: supportpilot)")
+    print(f"  {GREY}                 http://localhost:8080 also served, for the test harness{RESET}")
     print("  Approval portal  http://localhost:8090")
     print(f"  API              {GREY}internal only — reachable from the app network, by design{RESET}")
     if args.with_onyx:

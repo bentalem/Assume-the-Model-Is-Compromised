@@ -23,7 +23,25 @@ Two consequences follow, and both catch people out:
 - **`AUTH_TYPE=oidc` no longer exists.** Single-provider mode was removed; the build logs a warning
   and falls back to basic. SSO is configured as provider rows in the admin UI.
 
-## Prerequisites
+## Keycloak must serve HTTPS
+
+Onyx refuses a plain-HTTP identity provider. `validate_idp_url` passes `https_only=True` —
+hardcoded, no setting relaxes it — and applies the same rule to every endpoint the discovery
+document names. That is correct of Onyx: a discovery document fetched over HTTP is trivially
+forgeable, and it names the endpoints where credentials are exchanged.
+
+```bash
+python scripts/enable_keycloak_tls.py
+```
+
+It generates one self-signed certificate covering both names Keycloak answers to (`localhost` for
+the browser, `keycloak` for containers), serves HTTPS on 8443, trusts that certificate in the
+SupportPilot API, and writes an override that does the same for Onyx.
+
+Onyx's SSRF protection also blocks private addresses by default, and `keycloak:8443` resolves to a
+Docker RFC1918 address. Set **Admin Panel → Security → SSRF Protection → Allow private network**.
+
+### Prerequisites
 
 - SupportPilot running: `python scripts/bootstrap_local.py`
 - Onyx running (Lite is enough):
@@ -52,9 +70,9 @@ document serves both audiences:
 
 | | URL | Who uses it |
 |---|---|---|
-| `issuer` | `http://localhost:8080/realms/supportpilot` | Stable identity; what the API validates |
-| `authorization_endpoint` | `http://localhost:8080/…/auth` | The **browser**, on your machine |
-| `token_endpoint`, `jwks_uri` | `http://keycloak:8080/…` | **Onyx's container**, over the app network |
+| `issuer` | `https://localhost:8443/realms/supportpilot` | Stable identity; what the API validates |
+| `authorization_endpoint` | `https://localhost:8443/…/auth` | The **browser**, on your machine |
+| `token_endpoint`, `jwks_uri` | `https://keycloak:8443/…` | **Onyx's container**, over the app network |
 
 Without this you would have to choose: a URL the browser can reach, or one the container can. The
 usual workarounds — editing the hosts file, publishing Keycloak on all interfaces — are unnecessary.
@@ -66,7 +84,7 @@ usual workarounds — editing the hosts file, publishing Keycloak on all interfa
 | Field | Value |
 |---|---|
 | name | `keycloak` |
-| openid_config_url | `http://keycloak:8080/realms/supportpilot/.well-known/openid-configuration` |
+| openid_config_url | `https://keycloak:8443/realms/supportpilot/.well-known/openid-configuration` |
 | client_id | `onyx-web` |
 | client_secret | from `.secrets/onyx_oauth_client_secret` |
 | scopes | `openid profile email` |
@@ -92,6 +110,7 @@ network. The API publishes no host port on purpose, so this is the only route to
 ## Step 4 — sign in and verify
 
 Sign out of Onyx, then sign in with the **Keycloak** button as `alice` / `alice-local-password`.
+The browser will warn about the self-signed certificate the first time; accept it.
 
 ```bash
 python scripts/verify_onyx_flow.py
@@ -142,7 +161,11 @@ docker compose exec -T -e PGPASSWORD="$(cat .secrets/postgres_bootstrap_password
 | `unauthenticated` with a token present | Wrong audience | The audience mapper lives on `onyx-web`; re-run `connect_onyx.py`, sign in again |
 | Onyx cannot fetch the discovery document | Not on the `app` network | `python scripts/connect_onyx.py` |
 | Redirect URI mismatch at Keycloak | Provider named something other than `keycloak` | Rename it, or add the matching redirect URI |
-| Token exchange fails after the browser redirect | Discovery fetched over a URL the container cannot reach | Use the `keycloak:8080` discovery URL, not `localhost:8080` |
+| Token exchange fails after the browser redirect | Discovery fetched over a URL the container cannot reach | Use the `keycloak:8443` discovery URL, not `localhost:8443` |
+| Onyx rejects the URL as not HTTPS | Keycloak still on plain HTTP | `python scripts/enable_keycloak_tls.py` |
+| Onyx rejects the URL as a private address | SSRF protection at its default level | Admin Panel → Security → Allow private network |
+| Onyx cannot verify the certificate | The override is not applied | Re-run the `docker compose … -f docker-compose.supportpilot.yml up -d api_server` command |
+| Every token is `claims_or_signature_invalid` after enabling TLS | `.env` still pins the old HTTP issuer, and it wins over compose defaults | `enable_keycloak_tls.py` rewrites it; re-run it, then recreate the API |
 | Tool calls succeed but as the wrong identity | An OAuth config is attached to the tool | Onyx prefers a tool-level OAuth config over passthrough; remove it |
 | The agent says the refund was issued | Agent instructions | `propose_refund` is described as creating a pending request; tighten the instructions |
 
