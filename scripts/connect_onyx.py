@@ -170,22 +170,56 @@ def main() -> int:
     admin_request("PUT", f"/clients/{client['id']}", token, client)
     ok(f"{CLIENT_ID} is confidential, with redirect URI {callback}")
 
-    # Onyx force-adds `offline_access` to the authorization request, and Keycloak refuses a scope
-    # the client may not request — the whole login fails with "Invalid scopes". The scope must
-    # therefore be assigned as an *optional* client scope, not merely advertised by the realm.
-    assigned = {s["name"] for s in admin_request(
-        "GET", f"/clients/{client['id']}/optional-client-scopes", token) or []}
-    if "offline_access" not in assigned:
-        available = admin_request("GET", "/client-scopes", token) or []
-        scope = next((s for s in available if s["name"] == "offline_access"), None)
-        if scope is None:
-            warn("the realm has no offline_access scope; Onyx logins will fail")
-        else:
+    # Onyx force-adds `offline_access`, and an offline token needs three separate things to line
+    # up. Each failed in turn during the first integration, and each fails at a different stage
+    # with an error that does not name the real cause:
+    #
+    #   1. the realm advertises the scope            -> otherwise Onyx drops it (fine either way)
+    #   2. the client may *request* it (optional)    -> else "Invalid scopes" at authorization
+    #   3. the user holds the offline_access role    -> else "Offline tokens not allowed" at the
+    #                                                   code exchange, after a successful login
+    #
+    # 2 and 3 are enforced here so a recreated realm cannot regress to a login that fails halfway.
+    available = {s["name"]: s for s in admin_request("GET", "/client-scopes", token) or []}
+
+    for target in (CLIENT_ID, "supportpilot-test-harness"):
+        rows = admin_request("GET", f"/clients?clientId={target}", token) or []
+        if not rows:
+            continue
+        target_id = rows[0]["id"]
+        optional = {s["name"] for s in admin_request(
+            "GET", f"/clients/{target_id}/optional-client-scopes", token) or []}
+        for name in ("offline_access", "address", "phone", "microprofile-jwt", "organization"):
+            if name not in optional and name in available:
+                admin_request(
+                    "PUT", f"/clients/{target_id}/optional-client-scopes/{available[name]['id']}",
+                    token)
+        # web-origins is a default scope that serves CORS; it is lost the same way.
+        defaults = {s["name"] for s in admin_request(
+            "GET", f"/clients/{target_id}/default-client-scopes", token) or []}
+        if "web-origins" not in defaults and "web-origins" in available:
             admin_request(
-                "PUT", f"/clients/{client['id']}/optional-client-scopes/{scope['id']}", token)
-            ok("assigned offline_access as an optional client scope")
-    else:
-        ok("offline_access is assignable by the client")
+                "PUT", f"/clients/{target_id}/default-client-scopes/{available['web-origins']['id']}",
+                token)
+    ok("offline_access is requestable by the clients")
+
+    # The realm role. Declaring users with only `groups` leaves them without
+    # default-roles-<realm>, which is what carries offline_access — so the login succeeds and the
+    # token exchange then fails.
+    default_role = admin_request("GET", f"/roles/default-roles-{REALM}", token)
+    granted = []
+    for username in ("alice", "bob", "fiona", "dana", "mallory"):
+        users = admin_request("GET", f"/users?username={username}", token) or []
+        if not users:
+            continue
+        user_id = users[0]["id"]
+        held = {r["name"] for r in admin_request(
+            "GET", f"/users/{user_id}/role-mappings/realm", token) or []}
+        if f"default-roles-{REALM}" not in held:
+            admin_request("POST", f"/users/{user_id}/role-mappings/realm", token, [default_role])
+            granted.append(username)
+    ok(f"offline_access role held by all seeded users" +
+       (f" (granted to {', '.join(granted)})" if granted else ""))
 
     # Keycloak stores the secret separately from the representation on some versions; read it back
     # rather than assuming the PUT took.

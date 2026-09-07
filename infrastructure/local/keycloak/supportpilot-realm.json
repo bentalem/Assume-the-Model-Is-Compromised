@@ -175,6 +175,9 @@
           "value": "alice-local-password",
           "temporary": false
         }
+      ],
+      "realmRoles": [
+        "default-roles-supportpilot"
       ]
     },
     {
@@ -194,6 +197,9 @@
           "value": "bob-local-password",
           "temporary": false
         }
+      ],
+      "realmRoles": [
+        "default-roles-supportpilot"
       ]
     },
     {
@@ -213,6 +219,9 @@
           "value": "fiona-local-password",
           "temporary": false
         }
+      ],
+      "realmRoles": [
+        "default-roles-supportpilot"
       ]
     },
     {
@@ -232,6 +241,9 @@
           "value": "dana-local-password",
           "temporary": false
         }
+      ],
+      "realmRoles": [
+        "default-roles-supportpilot"
       ]
     },
     {
@@ -251,6 +263,9 @@
           "value": "mallory-local-password",
           "temporary": false
         }
+      ],
+      "realmRoles": [
+        "default-roles-supportpilot"
       ]
     }
   ]

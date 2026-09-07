@@ -153,6 +153,19 @@ error="invalid_request" reason="Invalid scopes: openid email profile offline_acc
 Advertising a scope in the realm and permitting a client to request it are two different things,
 and the error names the whole scope string rather than the one scope at fault.
 
+**And that is only the first of three.** An offline token needs all of these, and each fails at a
+different stage with an error that does not name the real cause:
+
+| # | Requirement | Failure if missing | When |
+|---|---|---|---|
+| 1 | The realm advertises `offline_access` | Onyx silently drops the scope | — |
+| 2 | The client may *request* it (optional client scope) | `Invalid scopes: …` | before the password prompt |
+| 3 | The user holds the `offline_access` **role** | `Offline tokens not allowed for the user or client` | at the code exchange, *after* a successful login |
+
+Requirement 3 is the confusing one: the login works, the Keycloak log shows your user id, and then
+the exchange fails. Users get the role through `default-roles-<realm>`, which a realm import skips
+if the user is declared with only `groups`. `connect_onyx.py` enforces 2 and 3.
+
 The provider **name matters**: Onyx builds the callback as
 `{WEB_DOMAIN}/api/auth/oidc/{name}/callback`, and Keycloak only allowlists the `keycloak` form. A
 different name needs a matching redirect URI in Keycloak.
@@ -228,6 +241,8 @@ docker compose exec -T -e PGPASSWORD="$(cat .secrets/postgres_bootstrap_password
 | `Access to hostname 'localhost' is not allowed` on a *discovered* endpoint | `KC_HOSTNAME` still advertises localhost | Already fixed in compose; recreate Keycloak, and add the hosts entry |
 | The browser cannot resolve `keycloak` | Hosts entry missing | Add `127.0.0.1 keycloak` |
 | `Invalid scopes: … offline_access` before the password prompt | The client may not request `offline_access` | `python scripts/connect_onyx.py` assigns it as an optional client scope |
+| `Offline tokens not allowed for the user or client` after a successful login | The user lacks the `offline_access` role | `python scripts/connect_onyx.py` grants `default-roles-<realm>` |
+| `Invalid user credentials` for one user only | That user's password was changed at runtime; the realm is ephemeral so the fixture value is only applied at import | Reset it in the Keycloak admin console to `<username>-local-password` |
 | Onyx rejects the URL as not HTTPS | Keycloak still on plain HTTP | `python scripts/enable_keycloak_tls.py` |
 | Onyx rejects the URL as a private address | SSRF protection at its default level | Admin Panel → Security → Allow private network |
 | Onyx cannot verify the certificate | The override is not applied | Re-run the `docker compose … -f docker-compose.supportpilot.yml up -d api_server` command |
