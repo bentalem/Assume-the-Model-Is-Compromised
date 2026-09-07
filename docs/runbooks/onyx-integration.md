@@ -141,6 +141,18 @@ the API validates.
 | client_secret | from `.secrets/onyx_oauth_client_secret` |
 | scopes | `openid profile email` |
 
+Leave `offline_access` out of that field — Onyx appends it itself, and only drops it when the IdP
+does not advertise it. This realm does advertise it, so it is always requested. That means the
+client must be *allowed* to request it: it is assigned as an **optional client scope**, which
+`connect_onyx.py` enforces. Without that assignment every login fails before the password prompt:
+
+```
+error="invalid_request" reason="Invalid scopes: openid email profile offline_access"
+```
+
+Advertising a scope in the realm and permitting a client to request it are two different things,
+and the error names the whole scope string rather than the one scope at fault.
+
 The provider **name matters**: Onyx builds the callback as
 `{WEB_DOMAIN}/api/auth/oidc/{name}/callback`, and Keycloak only allowlists the `keycloak` form. A
 different name needs a matching redirect URI in Keycloak.
@@ -215,6 +227,7 @@ docker compose exec -T -e PGPASSWORD="$(cat .secrets/postgres_bootstrap_password
 | Redirect URI mismatch at Keycloak | Provider named something other than `keycloak` | Rename it, or add the matching redirect URI |
 | `Access to hostname 'localhost' is not allowed` on a *discovered* endpoint | `KC_HOSTNAME` still advertises localhost | Already fixed in compose; recreate Keycloak, and add the hosts entry |
 | The browser cannot resolve `keycloak` | Hosts entry missing | Add `127.0.0.1 keycloak` |
+| `Invalid scopes: … offline_access` before the password prompt | The client may not request `offline_access` | `python scripts/connect_onyx.py` assigns it as an optional client scope |
 | Onyx rejects the URL as not HTTPS | Keycloak still on plain HTTP | `python scripts/enable_keycloak_tls.py` |
 | Onyx rejects the URL as a private address | SSRF protection at its default level | Admin Panel → Security → Allow private network |
 | Onyx cannot verify the certificate | The override is not applied | Re-run the `docker compose … -f docker-compose.supportpilot.yml up -d api_server` command |

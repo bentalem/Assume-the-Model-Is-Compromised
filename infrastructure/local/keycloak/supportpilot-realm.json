@@ -107,7 +107,15 @@
         "acr",
         "profile",
         "email",
-        "roles"
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "address",
+        "phone",
+        "microprofile-jwt",
+        "organization"
       ]
     },
     {
@@ -137,7 +145,15 @@
         "acr",
         "profile",
         "email",
-        "roles"
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "address",
+        "phone",
+        "microprofile-jwt",
+        "organization"
       ]
     }
   ],

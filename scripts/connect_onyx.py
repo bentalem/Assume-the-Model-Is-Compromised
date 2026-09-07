@@ -170,6 +170,23 @@ def main() -> int:
     admin_request("PUT", f"/clients/{client['id']}", token, client)
     ok(f"{CLIENT_ID} is confidential, with redirect URI {callback}")
 
+    # Onyx force-adds `offline_access` to the authorization request, and Keycloak refuses a scope
+    # the client may not request — the whole login fails with "Invalid scopes". The scope must
+    # therefore be assigned as an *optional* client scope, not merely advertised by the realm.
+    assigned = {s["name"] for s in admin_request(
+        "GET", f"/clients/{client['id']}/optional-client-scopes", token) or []}
+    if "offline_access" not in assigned:
+        available = admin_request("GET", "/client-scopes", token) or []
+        scope = next((s for s in available if s["name"] == "offline_access"), None)
+        if scope is None:
+            warn("the realm has no offline_access scope; Onyx logins will fail")
+        else:
+            admin_request(
+                "PUT", f"/clients/{client['id']}/optional-client-scopes/{scope['id']}", token)
+            ok("assigned offline_access as an optional client scope")
+    else:
+        ok("offline_access is assignable by the client")
+
     # Keycloak stores the secret separately from the representation on some versions; read it back
     # rather than assuming the PUT took.
     stored = admin_request("GET", f"/clients/{client['id']}/client-secret", token)
@@ -196,13 +213,14 @@ def main() -> int:
         fail(f"Onyx cannot fetch the discovery document: {(result.stderr or result.stdout)[:200]}")
     endpoints = json.loads(line)
 
-    # This split is the whole reason the integration works without editing hosts files:
-    # KC_HOSTNAME_BACKCHANNEL_DYNAMIC makes Keycloak advertise a browser-facing authorization
-    # endpoint and a container-reachable token endpoint from the same document.
-    if "localhost" not in endpoints["authorization_endpoint"]:
-        warn("the authorization endpoint is not on localhost; the browser may not reach it")
+    # Every endpoint must name `keycloak`, not `localhost`. Onyx guards each one it finds, and
+    # ALLOW_PRIVATE_NETWORK still blocks loopback — a localhost authorization endpoint fails the
+    # login even though the discovery URL itself passed.
+    for field in ("issuer", "authorization_endpoint", "token_endpoint"):
+        if "localhost" in endpoints[field]:
+            warn(f"{field} names localhost; Onyx will refuse it (loopback stays blocked)")
     if "keycloak:8443" not in endpoints["token_endpoint"]:
-        warn("the token endpoint is not container-reachable; check KC_HOSTNAME_BACKCHANNEL_DYNAMIC")
+        warn("the token endpoint is not container-reachable; check KC_HOSTNAME")
     ok(f"issuer        {endpoints['issuer']}")
     ok(f"browser  ->   {endpoints['authorization_endpoint']}")
     ok(f"Onyx     ->   {endpoints['token_endpoint']}")
@@ -220,6 +238,8 @@ def main() -> int:
     print(f"     client_id          {CLIENT_ID}")
     print(f"     client_secret      {client_secret}")
     print(f"     scopes             openid profile email")
+    print(f"   {GREY}Onyx appends offline_access itself; it is assigned as an optional client{RESET}")
+    print(f"   {GREY}scope above, which is what stops Keycloak refusing it as an invalid scope.{RESET}")
     print(f"   {GREY}Callback to allowlist (already added to Keycloak): {callback}{RESET}")
     print(f"   {GREY}Login link becomes: {ONYX_WEB}/api/auth/oidc/{PROVIDER_NAME}/authorize{RESET}")
     print()
