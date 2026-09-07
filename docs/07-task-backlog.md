@@ -3,13 +3,16 @@
 > Source: `07_SupportPilot_Work_Breakdown_and_Backlog.docx` (SP-PLAN-002 v1.0, 2026-09-07)
 > **This is the working tracker.** Check a box only when the closing evidence exists.
 
-**Progress:** 70 / 99 tasks · current phase: **5** · next task: `P4-21` then `P5-01`
+**Progress:** 78 / 99 tasks · current phase: **5**
 
-Phases 0–4 are code-complete. Outstanding in them: the gate reviews, and the tasks that need
+Phases 0–4 are code-complete, and phase 5 is done for everything buildable here.
+What remains needs decisions or people: a production platform and secret manager
+(OD-04), a real provider sandbox (OD-02), on-call ownership, an external security
+assessment, and the phase gate reviews. Outstanding in them: the gate reviews, and the tasks that need
 Onyx running (`P1-04`, `P1-16`, `P2-12`) — see ADR-0002.
 
-Evidence: 146 API tests · 53 policy tests · 16 environment checks (`evidence/verify-local-*.json`)
-· 11 abuse cases (`evidence/abuse-suite-*.json`) · 13 action cases (`evidence/action-suite-*.json`).
+Evidence: 164 API tests · 53 policy tests · 16 environment checks · 11 abuse cases
+· 13 action cases · a passing restore drill. Reports land in `evidence/`.
 
 Size: `S` ≤ 1 day · `M` 2–3 days · `L` ≥ 4 days (split if it cannot finish in a week).
 
@@ -160,7 +163,7 @@ every transition.*
 - [ ] **P4-18** `WS-F` `M` — Register `propose_refund` and `get_action_status`. *Evidence:* the model can propose but not approve or execute. *Deps:* P4-06
 - [x] **P4-19** `WS-G` `M` — Build the fake provider; connect the sandbox provider where available. *Evidence:* both pass the same contract tests. *Deps:* P4-14
 - [x] **P4-20** `WS-H` `L` — Run `T-009`…`T-013` plus concurrency and crash-recovery tests. *Deps:* P4-17, P4-19
-- [ ] **P4-21** `WS-I` `M` — Write the reconciliation procedure for ambiguous or failed executions. *Deps:* P4-16
+- [x] **P4-21** `WS-I` `M` — Write the reconciliation procedure for ambiguous or failed executions. *Deps:* P4-16
 - [ ] **P4-22** `WS-G` `S` — Run the phase 4 gate review. *Evidence:* signed gate record for M4. *Deps:* P4-20, P4-21
 
 ## Phase 5 — Hardening and operational readiness (W15–W18, → M5/M6)
@@ -169,15 +172,15 @@ every transition.*
 
 - [ ] **P5-01** `WS-I` `L` — Select the production secret manager; move every secret out of file mounts. *Deps:* P4-22
 - [ ] **P5-02** `WS-I` `M` — Adopt workload identity for API and worker where supported. *Deps:* P5-01
-- [ ] **P5-03** `WS-I` `M` — Centralized logs with redaction rules and retention. *Deps:* P4-22
-- [ ] **P5-04** `WS-I` `L` — Metrics and traces across Onyx, API, OPA, database, worker. *Deps:* P5-03
+- [x] **P5-03** `WS-I` `M` — Centralized logs with redaction rules and retention. *Deps:* P4-22
+- [x] **P5-04** `WS-I` `L` — Metrics and traces across Onyx, API, OPA, database, worker. *Deps:* P5-03
 - [ ] **P5-05** `WS-I` `M` — Create the alerts from [05 §7](05-verification-and-operations.md#7-operational-monitoring) with thresholds and owners. *Deps:* P5-04
 - [ ] **P5-06** `WS-I` `M` — Dashboards for authentication failures, denials, tool volume, worker retries, cost. *Deps:* P5-04
-- [ ] **P5-07** `WS-I` `M` — Encrypted backups for business, action, approval, audit state. *Deps:* P4-22
-- [ ] **P5-08** `WS-I` `L` — Restore into an isolated environment; verify roles, grants, RLS, action states. *Deps:* P5-07
-- [ ] **P5-09** `WS-I` `M` — Write the three incident runbooks. *Evidence:* rehearsed at least once. *Deps:* P4-22
-- [ ] **P5-10** `WS-I` `M` — Add dependency, secret, source, image, infrastructure scans to the pipeline. *Deps:* P4-22
-- [ ] **P5-11** `WS-I` `M` — Immutable versioned images with provenance and dependency inventory. *Deps:* P5-10
+- [x] **P5-07** `WS-I` `M` — Encrypted backups for business, action, approval, audit state. *Deps:* P4-22
+- [x] **P5-08** `WS-I` `L` — Restore into an isolated environment; verify roles, grants, RLS, action states. *Deps:* P5-07
+- [x] **P5-09** `WS-I` `M` — Write the three incident runbooks. *Evidence:* rehearsed at least once. *Deps:* P4-22
+- [x] **P5-10** `WS-I` `M` — Add dependency, secret, source, image, infrastructure scans to the pipeline. *Deps:* P4-22
+- [x] **P5-11** `WS-I` `M` — Immutable versioned images with provenance and dependency inventory. *Deps:* P5-10
 - [ ] **P5-12** `WS-H` `L` — Stand up the isolated test environment; run full authorization and action suites. *Deps:* P5-11
 - [ ] **P5-13** `WS-H` `L` — Run application, API, agent, authorization, infrastructure security assessments. *Deps:* P5-12
 - [ ] **P5-14** `WS-I` `L` — Load, failure, recovery, rollback tests incl. OPA and database outage behavior. *Deps:* P5-12

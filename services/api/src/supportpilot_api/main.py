@@ -6,7 +6,7 @@ import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -15,6 +15,7 @@ from .auth.tokens import JwksCache, TokenVerifier
 from .config import Settings, load_settings
 from .db import Database
 from .errors import ApiError
+from .observability import configure_logging, metrics
 from .pipeline import Pipeline
 from .policy.client import PolicyClient
 from .repositories.memberships import MembershipRepository
@@ -87,10 +88,9 @@ async def lifespan(app: FastAPI):
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
-    logging.basicConfig(
-        level=settings.log_level,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    # JSON lines with a redaction filter on the root logger, so library output and tracebacks are
+    # covered too — the accidental leaks are the ones worth catching.
+    configure_logging(settings.log_level)
 
     app = FastAPI(
         title="SupportPilot Actions",
@@ -135,6 +135,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(ApiError)
     async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
+        # Authentication failures and denials are the two signals operations watches most closely.
+        metrics.increment("supportpilot_api_errors_total", code=exc.code)
         return _error(exc.status_code, exc.code, request)
 
     @app.exception_handler(RequestValidationError)
@@ -188,6 +190,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # --------------------------------------------------------------------------------------------
     # Health. Not part of the action document; reachable only on the internal network.
     # --------------------------------------------------------------------------------------------
+    @app.middleware("http")
+    async def count_requests(request: Request, call_next):
+        response = await call_next(request)
+        route = request.scope.get("route")
+        # The route template, never the concrete path: a metric labelled with an order number
+        # would be both unbounded and a data leak into the metrics store.
+        name = getattr(route, "path", "unmatched")
+        metrics.increment(
+            "supportpilot_api_requests_total",
+            route=name,
+            method=request.method,
+            status=str(response.status_code),
+        )
+        return response
+
+    @app.get("/metrics", include_in_schema=False)
+    def prometheus_metrics() -> Response:
+        return Response(content=metrics.render(), media_type="text/plain; version=0.0.4")
+
     @app.get("/healthz", include_in_schema=False)
     def healthz() -> dict[str, str]:
         return {"status": "ok"}

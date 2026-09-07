@@ -33,6 +33,10 @@ ALLOWED_PATHS = {
     "scripts/scan_secrets.py",                                 # this file's own patterns
     "scripts/verify_local.py",                                 # references fixture passwords
     "docs/08-local-build-runbook.md",                          # documents the fixtures
+    # The redaction tests must contain realistic secret shapes — that is what they assert gets
+    # redacted. Every value there is fabricated and matched only against the redactor's output.
+    "services/api/tests/test_observability.py",
+    "docs/runbooks/incidents.md",                               # shows the rotation commands
 }
 
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".docx", ".xlsx", ".whl", ".zip", ".ico"}

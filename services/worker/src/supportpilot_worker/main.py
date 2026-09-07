@@ -26,6 +26,65 @@ from .jobs.processor import JobProcessor, RefusedToExecute
 
 logger = logging.getLogger("supportpilot.worker")
 
+
+def _configure_logging(level: str) -> None:
+    """JSON lines with redaction, matching the API.
+
+    The worker handles the credential with the widest blast radius — the provider credential — so
+    a redaction filter here is not optional. It is a copy rather than a shared package because the
+    two services are deployed independently and must not couple through a library for four
+    regexes; if a third service needs it, that is the moment to extract one.
+    """
+    import json as _json
+    import re as _re
+
+    patterns = [
+        (_re.compile(r"password=\S+"), "password=[redacted]"),
+        (_re.compile(r"postgres(?:ql)?://[^\s:@/]+:[^\s@/]+@"), "postgresql://[redacted]@"),
+        (_re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]+"), "Bearer [redacted]"),
+        (_re.compile(r"sk-[A-Za-z0-9_-]{16,}"), "[redacted-key]"),
+        (
+            _re.compile(
+                r"(?i)([a-z0-9_.-]*(?:password|secret|api[_-]?key|token|credential)[a-z0-9_.-]*)"
+                r"[\"']?\s*[:=]\s*[\"']?([^\s\"',}]{6,})"
+            ),
+            r"=[redacted]",
+        ),
+    ]
+
+    def _redact(text: str) -> str:
+        for pattern, replacement in patterns:
+            text = pattern.sub(replacement, text)
+        return text
+
+    reserved = {
+        "name", "msg", "args", "levelname", "levelno", "pathname", "filename", "module",
+        "exc_info", "exc_text", "stack_info", "lineno", "funcName", "created", "msecs",
+        "relativeCreated", "thread", "threadName", "processName", "process", "taskName",
+    }
+
+    class _Formatter(logging.Formatter):
+        def format(self, record: logging.LogRecord) -> str:
+            payload = {
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
+                "level": record.levelname,
+                "logger": record.name,
+                "event": _redact(record.getMessage()),
+                "service": "worker",
+            }
+            for key, value in record.__dict__.items():
+                if key not in reserved and not key.startswith("_"):
+                    payload[key] = value
+            if record.exc_info:
+                payload["error"] = _redact(self.formatException(record.exc_info))[:2000]
+            return _json.dumps(payload, default=str)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(_Formatter())
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(level)
+
 _running = True
 
 
@@ -75,10 +134,7 @@ def verify_least_privilege(conn: psycopg.Connection) -> None:
 
 
 def run() -> None:
-    logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO"),
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    _configure_logging(os.environ.get("LOG_LEVEL", "INFO"))
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 
