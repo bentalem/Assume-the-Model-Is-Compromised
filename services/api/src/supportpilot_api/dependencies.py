@@ -15,6 +15,7 @@ from fastapi import Header, Request
 from .auth.tokens import VerifiedToken, bearer_from_header
 from .pipeline import Pipeline
 from .repositories.memberships import Subject
+from .repositories.actions import ActionRepository
 from .repositories.notes import NoteRepository
 from .repositories.customers import CustomerRepository
 from .repositories.orders import OrderRepository
@@ -31,6 +32,7 @@ class RequestScope:
     customers: CustomerRepository
     tickets: TicketRepository
     notes: NoteRepository
+    actions: ActionRepository
 
 
 def request_scope(
@@ -62,6 +64,7 @@ def request_scope(
         customers=services.customers,
         tickets=services.tickets,
         notes=services.notes,
+        actions=services.actions,
     )
 
 

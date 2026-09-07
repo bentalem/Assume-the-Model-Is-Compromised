@@ -3,13 +3,13 @@
 > Source: `07_SupportPilot_Work_Breakdown_and_Backlog.docx` (SP-PLAN-002 v1.0, 2026-09-07)
 > **This is the working tracker.** Check a box only when the closing evidence exists.
 
-**Progress:** 51 / 99 tasks · current phase: **4** · next task: `P4-01`
+**Progress:** 70 / 99 tasks · current phase: **5** · next task: `P4-21` then `P5-01`
 
-Phases 0–3 are code-complete. Outstanding in them: the gate reviews, and the tasks that need
+Phases 0–4 are code-complete. Outstanding in them: the gate reviews, and the tasks that need
 Onyx running (`P1-04`, `P1-16`, `P2-12`) — see ADR-0002.
 
-Evidence: 107 API tests · 35 policy tests · 16 environment checks (`evidence/verify-local-*.json`)
-· 11 abuse cases (`evidence/abuse-suite-*.json`).
+Evidence: 146 API tests · 53 policy tests · 16 environment checks (`evidence/verify-local-*.json`)
+· 11 abuse cases (`evidence/abuse-suite-*.json`) · 13 action cases (`evidence/action-suite-*.json`).
 
 Size: `S` ≤ 1 day · `M` 2–3 days · `L` ≥ 4 days (split if it cannot finish in a week).
 
@@ -140,26 +140,26 @@ behavior.*
 *Goal: a refund can be proposed, independently approved, and executed exactly once, with evidence at
 every transition.*
 
-- [ ] **P4-01** `WS-D` `L` — Create `action_requests`, `approval_decisions`, `action_jobs`, `action_executions`, idempotency tables. *Deps:* P3-10
-- [ ] **P4-02** `WS-D` `M` — RLS and grants so the worker role cannot read broad customer data. *Deps:* P4-01
-- [ ] **P4-03** `WS-G` `L` — Implement the action state machine with allowed transitions and guards. *Deps:* P4-01
-- [ ] **P4-04** `WS-G` `M` — Compute and store an immutable payload hash at proposal time. *Deps:* P4-03
-- [ ] **P4-05** `WS-E` `L` — Build `propose_refund` with order, amount, currency, reason validation and business limits. *Deps:* P4-04
-- [ ] **P4-06** `WS-E` `M` — Build `get_action_status` returning only permitted state fields. *Deps:* P4-03
-- [ ] **P4-07** `WS-C` `L` — OPA rules for `refund.propose` and `refund.approve`, incl. limits and separation of duty. *Deps:* P4-05
-- [ ] **P4-08** `WS-G` `L` — Approval portal view showing the exact immutable payload and risk details. *Deps:* P4-05
-- [ ] **P4-09** `WS-G` `M` — Re-check approver authorization at decision time with a current token. *Deps:* P4-08
-- [ ] **P4-10** `WS-G` `M` — Record approval, rejection, comment, policy version, timestamp, expiry. *Deps:* P4-09
-- [ ] **P4-11** `WS-G` `M` — Action coordinator queues only valid unexpired approvals. *Deps:* P4-10
-- [ ] **P4-12** `WS-G` `L` — Worker job claim with an atomic lease; no double claim. *Deps:* P4-11
-- [ ] **P4-13** `WS-G` `M` — Verify approval state, expiry, payload hash, idempotency reservation before execution. *Deps:* P4-12
-- [ ] **P4-14** `WS-G` `L` — Refund provider adapter with destination, method, operation allowlists. *Deps:* P4-13
-- [ ] **P4-15** `WS-G` `M` — Bounded retries with provider state checks for ambiguous timeouts. *Deps:* P4-14
-- [ ] **P4-16** `WS-G` `M` — Store outcome evidence; complete or release the job transactionally. *Evidence:* no job stuck in `EXECUTING` after a crash test. *Deps:* P4-15
-- [ ] **P4-17** `WS-G` `M` — Audit events for propose, approve, reject, queue, execute, succeed, fail. *Deps:* P4-16
+- [x] **P4-01** `WS-D` `L` — Create `action_requests`, `approval_decisions`, `action_jobs`, `action_executions`, idempotency tables. *Deps:* P3-10
+- [x] **P4-02** `WS-D` `M` — RLS and grants so the worker role cannot read broad customer data. *Deps:* P4-01
+- [x] **P4-03** `WS-G` `L` — Implement the action state machine with allowed transitions and guards. *Deps:* P4-01
+- [x] **P4-04** `WS-G` `M` — Compute and store an immutable payload hash at proposal time. *Deps:* P4-03
+- [x] **P4-05** `WS-E` `L` — Build `propose_refund` with order, amount, currency, reason validation and business limits. *Deps:* P4-04
+- [x] **P4-06** `WS-E` `M` — Build `get_action_status` returning only permitted state fields. *Deps:* P4-03
+- [x] **P4-07** `WS-C` `L` — OPA rules for `refund.propose` and `refund.approve`, incl. limits and separation of duty. *Deps:* P4-05
+- [x] **P4-08** `WS-G` `L` — Approval portal view showing the exact immutable payload and risk details. *Deps:* P4-05
+- [x] **P4-09** `WS-G` `M` — Re-check approver authorization at decision time with a current token. *Deps:* P4-08
+- [x] **P4-10** `WS-G` `M` — Record approval, rejection, comment, policy version, timestamp, expiry. *Deps:* P4-09
+- [x] **P4-11** `WS-G` `M` — Action coordinator queues only valid unexpired approvals. *Deps:* P4-10
+- [x] **P4-12** `WS-G` `L` — Worker job claim with an atomic lease; no double claim. *Deps:* P4-11
+- [x] **P4-13** `WS-G` `M` — Verify approval state, expiry, payload hash, idempotency reservation before execution. *Deps:* P4-12
+- [x] **P4-14** `WS-G` `L` — Refund provider adapter with destination, method, operation allowlists. *Deps:* P4-13
+- [x] **P4-15** `WS-G` `M` — Bounded retries with provider state checks for ambiguous timeouts. *Deps:* P4-14
+- [x] **P4-16** `WS-G` `M` — Store outcome evidence; complete or release the job transactionally. *Evidence:* no job stuck in `EXECUTING` after a crash test. *Deps:* P4-15
+- [x] **P4-17** `WS-G` `M` — Audit events for propose, approve, reject, queue, execute, succeed, fail. *Deps:* P4-16
 - [ ] **P4-18** `WS-F` `M` — Register `propose_refund` and `get_action_status`. *Evidence:* the model can propose but not approve or execute. *Deps:* P4-06
-- [ ] **P4-19** `WS-G` `M` — Build the fake provider; connect the sandbox provider where available. *Evidence:* both pass the same contract tests. *Deps:* P4-14
-- [ ] **P4-20** `WS-H` `L` — Run `T-009`…`T-013` plus concurrency and crash-recovery tests. *Deps:* P4-17, P4-19
+- [x] **P4-19** `WS-G` `M` — Build the fake provider; connect the sandbox provider where available. *Evidence:* both pass the same contract tests. *Deps:* P4-14
+- [x] **P4-20** `WS-H` `L` — Run `T-009`…`T-013` plus concurrency and crash-recovery tests. *Deps:* P4-17, P4-19
 - [ ] **P4-21** `WS-I` `M` — Write the reconciliation procedure for ambiguous or failed executions. *Deps:* P4-16
 - [ ] **P4-22** `WS-G` `S` — Run the phase 4 gate review. *Evidence:* signed gate record for M4. *Deps:* P4-20, P4-21
 

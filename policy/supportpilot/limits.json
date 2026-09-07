@@ -1,0 +1,15 @@
+{
+  "limits": {
+    "refund": {
+      "action_maximum": 500.00,
+      "per_role": {
+        "support_agent": 200.00,
+        "support_manager": 500.00
+      },
+      "approval": {
+        "_comment": "require_mfa is false ONLY because the local realm does not enforce MFA (accepted condition AC-01, tied to open decision OD-10). Production must set it to true; the launch gate tracker carries that as a required flip. The API still reports authentication_level honestly - nothing here pretends a password login was multi-factor.",
+        "require_mfa": false
+      }
+    }
+  }
+}

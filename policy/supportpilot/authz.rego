@@ -230,3 +230,170 @@ decision := deny("resource_state_forbids_action") if {
 	any_role(note_authors)
 	input.resource.status == "closed"
 }
+
+# ------------------------------------------------------------------------------------------------
+# refund.propose
+#
+# Limits come from versioned policy data (limits.json), not from an environment variable read at
+# runtime. A limit change is then a reviewed policy publication with a version, which is what
+# SP-OPS-001 §10 requires of it.
+# ------------------------------------------------------------------------------------------------
+# data.limits, not data.supportpilot.limits: OPA maps a JSON file to a path from the *bundle root*,
+# and limits.json sits at the root of the mounted bundle. Nesting it to match the package name would
+# mean a supportpilot/ directory inside the bundle, which buys nothing.
+refund_limits := data.limits.refund
+
+# The lowest limit the caller's roles allow. A user holding two roles gets the *higher* of their
+# own limits, but never more than the action maximum.
+role_limit := limit if {
+	limits := {l |
+		some role in input.subject.roles
+		l := refund_limits.per_role[role]
+	}
+	count(limits) > 0
+	limit := min([max(limits), refund_limits.action_maximum])
+}
+
+requested_amount := to_number(input.resource.requested_amount)
+
+refundable_states := {"paid", "shipped", "delivered"}
+
+decision := deny("not_a_member_of_resource_organization") if {
+	input.action == "refund.propose"
+	not in_tenant
+}
+
+decision := deny("role_not_permitted_for_action") if {
+	input.action == "refund.propose"
+	in_tenant
+	not any_role({"support_agent", "support_manager"})
+}
+
+decision := deny("resource_state_forbids_action") if {
+	input.action == "refund.propose"
+	in_tenant
+	any_role({"support_agent", "support_manager"})
+	not input.resource.status in refundable_states
+}
+
+decision := deny("currency_mismatch") if {
+	input.action == "refund.propose"
+	in_tenant
+	any_role({"support_agent", "support_manager"})
+	input.resource.status in refundable_states
+	input.resource.requested_currency != input.resource.currency
+}
+
+decision := deny("amount_exceeds_action_maximum") if {
+	input.action == "refund.propose"
+	in_tenant
+	any_role({"support_agent", "support_manager"})
+	input.resource.status in refundable_states
+	input.resource.requested_currency == input.resource.currency
+	requested_amount > refund_limits.action_maximum
+}
+
+decision := deny("amount_exceeds_role_limit") if {
+	input.action == "refund.propose"
+	in_tenant
+	any_role({"support_agent", "support_manager"})
+	input.resource.status in refundable_states
+	input.resource.requested_currency == input.resource.currency
+	requested_amount <= refund_limits.action_maximum
+	requested_amount > role_limit
+}
+
+# The only allow arm. Note the obligation: even a permitted proposal must go to approval.
+decision := allow_with("same_organization_and_allowed_role", {
+	"requires_approval": true,
+}) if {
+	input.action == "refund.propose"
+	in_tenant
+	any_role({"support_agent", "support_manager"})
+	input.resource.status in refundable_states
+	input.resource.requested_currency == input.resource.currency
+	requested_amount <= role_limit
+	requested_amount <= refund_limits.action_maximum
+}
+
+# ------------------------------------------------------------------------------------------------
+# refund.approve
+#
+# Separation of duty lives here, in policy — not only in the approval portal, and not only in the
+# database trigger. All three refuse it, which is the point: no single mistake re-enables it.
+# ------------------------------------------------------------------------------------------------
+decision := deny("self_approval_not_permitted") if {
+	input.action == "refund.approve"
+	input.subject.id == input.resource.requester_id
+}
+
+decision := deny("not_a_member_of_resource_organization") if {
+	input.action == "refund.approve"
+	input.subject.id != input.resource.requester_id
+	not in_tenant
+}
+
+decision := deny("role_not_permitted_for_action") if {
+	input.action == "refund.approve"
+	input.subject.id != input.resource.requester_id
+	in_tenant
+	not has_role("finance_approver")
+}
+
+decision := deny("approval_expired") if {
+	input.action == "refund.approve"
+	input.subject.id != input.resource.requester_id
+	in_tenant
+	has_role("finance_approver")
+	time.parse_rfc3339_ns(input.context.occurred_at) > time.parse_rfc3339_ns(input.resource.expires_at)
+}
+
+# Whether approval requires multi-factor is versioned policy data, not a constant. It is false in
+# the local bundle (AC-01: the local realm cannot enforce MFA) and must be true in production. That
+# keeps the requirement visible and reviewable instead of being deleted to make a demo work.
+approval_requires_mfa if refund_limits.approval.require_mfa
+
+approver_authentication_sufficient if not approval_requires_mfa
+
+approver_authentication_sufficient if {
+	approval_requires_mfa
+	input.subject.authentication_level == "mfa"
+}
+
+decision := deny("authentication_level_insufficient") if {
+	input.action == "refund.approve"
+	input.subject.id != input.resource.requester_id
+	in_tenant
+	has_role("finance_approver")
+	time.parse_rfc3339_ns(input.context.occurred_at) <= time.parse_rfc3339_ns(input.resource.expires_at)
+	not approver_authentication_sufficient
+}
+
+decision := allow_with("independent_approver_verified", {}) if {
+	input.action == "refund.approve"
+	input.subject.id != input.resource.requester_id
+	in_tenant
+	has_role("finance_approver")
+	time.parse_rfc3339_ns(input.context.occurred_at) <= time.parse_rfc3339_ns(input.resource.expires_at)
+	approver_authentication_sufficient
+}
+
+# ------------------------------------------------------------------------------------------------
+# action.read
+# ------------------------------------------------------------------------------------------------
+decision := allow_with("same_organization_and_allowed_role", {}) if {
+	input.action == "action.read"
+	in_tenant
+	any_role({"support_agent", "support_manager", "finance_approver", "auditor"})
+}
+
+decision := deny("not_a_member_of_resource_organization") if {
+	input.action == "action.read"
+	not in_tenant
+}
+
+decision := deny("role_not_permitted_for_action") if {
+	input.action == "action.read"
+	in_tenant
+	not any_role({"support_agent", "support_manager", "finance_approver", "auditor"})
+}

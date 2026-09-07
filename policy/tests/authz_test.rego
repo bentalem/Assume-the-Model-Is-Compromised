@@ -406,3 +406,239 @@ test_note_create_has_exactly_one_decision_for_every_combination if {
 		}
 	}
 }
+
+# ================================================================================================
+# Phase 4 — refund.propose and refund.approve
+# ================================================================================================
+
+refundable_order(status, currency, amount, requested) := {
+	"type": "order",
+	"id": "ORD-2001",
+	"organization_id": "11111111-1111-1111-1111-111111111111",
+	"status": status,
+	"currency": currency,
+	"total_amount": amount,
+	"requested_amount": requested,
+	"requested_currency": currency,
+}
+
+pending_action(requester, expires) := {
+	"type": "action_request",
+	"id": "9c1f0000-0000-0000-0000-000000000001",
+	"organization_id": "11111111-1111-1111-1111-111111111111",
+	"requester_id": requester,
+	"expires_at": expires,
+	"state": "PENDING_APPROVAL",
+}
+
+approve_ctx(now) := {"request_id": "req-a", "occurred_at": now, "network_zone": "internal"}
+
+ALICE := "a1111111-1111-1111-1111-111111111111"
+FIONA := "f1111111-1111-1111-1111-111111111111"
+
+fiona(roles, level) := {
+	"id": FIONA,
+	"organizations": ["11111111-1111-1111-1111-111111111111"],
+	"roles": roles,
+	"authentication_level": level,
+}
+
+# --- refund.propose -----------------------------------------------------------------------------
+test_agent_may_propose_within_role_limit if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "refund.propose",
+		refundable_order("shipped", "USD", "149.90", "49.90"),
+	)
+	d.allow
+	# Even a permitted proposal must go to approval. This obligation is the whole point.
+	d.obligations.requires_approval == true
+}
+
+test_agent_denied_above_their_role_limit if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "refund.propose",
+		refundable_order("shipped", "USD", "400.00", "250.00"),
+	)
+	not d.allow
+	d.reason == "amount_exceeds_role_limit"
+}
+
+test_manager_allowed_where_agent_is_not if {
+	d := authz.decision with input as act(
+		alice(["support_manager"]), "refund.propose",
+		refundable_order("shipped", "USD", "400.00", "250.00"),
+	)
+	d.allow
+}
+
+test_nobody_exceeds_the_action_maximum if {
+	d := authz.decision with input as act(
+		alice(["support_manager"]), "refund.propose",
+		refundable_order("shipped", "USD", "900.00", "600.00"),
+	)
+	not d.allow
+	d.reason == "amount_exceeds_action_maximum"
+}
+
+test_currency_must_match_the_order if {
+	order := refundable_order("shipped", "USD", "149.90", "49.90")
+	mismatched := object.union(order, {"requested_currency": "EUR"})
+	d := authz.decision with input as act(alice(["support_agent"]), "refund.propose", mismatched)
+	not d.allow
+	d.reason == "currency_mismatch"
+}
+
+test_cancelled_order_cannot_be_refunded if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "refund.propose",
+		refundable_order("cancelled", "USD", "149.90", "49.90"),
+	)
+	not d.allow
+	d.reason == "resource_state_forbids_action"
+}
+
+test_already_refunded_order_cannot_be_refunded_again if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "refund.propose",
+		refundable_order("refunded", "USD", "149.90", "49.90"),
+	)
+	not d.allow
+	d.reason == "resource_state_forbids_action"
+}
+
+test_finance_approver_may_not_propose if {
+	d := authz.decision with input as act(
+		alice(["finance_approver"]), "refund.propose",
+		refundable_order("shipped", "USD", "149.90", "49.90"),
+	)
+	not d.allow
+	d.reason == "role_not_permitted_for_action"
+}
+
+# Exactly at the limit is allowed; one cent over is not.
+test_amount_exactly_at_the_role_limit_is_allowed if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "refund.propose",
+		refundable_order("shipped", "USD", "300.00", "200.00"),
+	)
+	d.allow
+}
+
+test_one_cent_over_the_role_limit_is_denied if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "refund.propose",
+		refundable_order("shipped", "USD", "300.00", "200.01"),
+	)
+	not d.allow
+	d.reason == "amount_exceeds_role_limit"
+}
+
+# --- refund.approve -----------------------------------------------------------------------------
+test_independent_approver_with_mfa_may_approve if {
+	d := authz.decision with input as {
+		"subject": fiona(["finance_approver"], "mfa"),
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-12-31T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	}
+	d.allow
+	d.reason == "independent_approver_verified"
+}
+
+# The single most important test in the file.
+test_requester_cannot_approve_their_own_action if {
+	d := authz.decision with input as {
+		"subject": {
+			"id": ALICE,
+			"organizations": ["11111111-1111-1111-1111-111111111111"],
+			"roles": ["support_agent", "finance_approver"],
+			"authentication_level": "mfa",
+		},
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-12-31T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	}
+	not d.allow
+	d.reason == "self_approval_not_permitted"
+}
+
+test_non_approver_may_not_approve if {
+	d := authz.decision with input as {
+		"subject": fiona(["support_manager"], "mfa"),
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-12-31T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	}
+	not d.allow
+	d.reason == "role_not_permitted_for_action"
+}
+
+test_expired_approval_window_is_refused if {
+	d := authz.decision with input as {
+		"subject": fiona(["finance_approver"], "mfa"),
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-10-01T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	}
+	not d.allow
+	d.reason == "approval_expired"
+}
+
+# Production configuration: MFA required. Asserted with the data overridden, so this test states
+# the production rule regardless of what the local bundle is set to.
+test_single_factor_approver_is_refused_when_mfa_is_required if {
+	d := authz.decision with input as {
+		"subject": fiona(["finance_approver"], "single_factor"),
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-12-31T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	} with data.limits.refund.approval.require_mfa as true
+	not d.allow
+	d.reason == "authentication_level_insufficient"
+}
+
+test_mfa_approver_is_allowed_when_mfa_is_required if {
+	d := authz.decision with input as {
+		"subject": fiona(["finance_approver"], "mfa"),
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-12-31T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	} with data.limits.refund.approval.require_mfa as true
+	d.allow
+}
+
+# Relaxing the factor requirement must not relax anything else. Self-approval stays refused even
+# with MFA switched off, which is what stops AC-01 from quietly widening into a real hole.
+test_self_approval_still_refused_when_mfa_is_not_required if {
+	d := authz.decision with input as {
+		"subject": {
+			"id": ALICE,
+			"organizations": ["11111111-1111-1111-1111-111111111111"],
+			"roles": ["finance_approver"],
+			"authentication_level": "single_factor",
+		},
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2026-12-31T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	} with data.limits.refund.approval.require_mfa as false
+	not d.allow
+	d.reason == "self_approval_not_permitted"
+}
+
+# Self-approval is checked before everything else, so a requester learns nothing about the other
+# conditions by attempting it.
+test_self_approval_beats_every_other_reason if {
+	d := authz.decision with input as {
+		"subject": {
+			"id": ALICE,
+			"organizations": ["22222222-2222-2222-2222-222222222222"],
+			"roles": [],
+			"authentication_level": "single_factor",
+		},
+		"action": "refund.approve",
+		"resource": pending_action(ALICE, "2020-01-01T00:00:00Z"),
+		"context": approve_ctx("2026-10-08T10:00:00Z"),
+	}
+	not d.allow
+	d.reason == "self_approval_not_permitted"
+}

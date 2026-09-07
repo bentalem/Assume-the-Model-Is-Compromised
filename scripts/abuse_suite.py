@@ -45,12 +45,15 @@ class Failed(Exception):
 _PROBE = """
 import json, os, httpx
 headers = json.loads(os.environ.get("PROBE_HEADERS", "{}"))
+kw = {}
+if os.environ.get("PROBE_BODY"):
+    kw["json"] = json.loads(os.environ["PROBE_BODY"])
 try:
     r = httpx.request(
         os.environ.get("PROBE_METHOD", "GET"),
         "http://api:8000" + os.environ["PROBE_PATH"],
         headers=headers,
-        timeout=20,
+        timeout=20, **kw,
     )
     print(json.dumps({"status": r.status_code, "body": r.text}))
 except Exception as exc:
@@ -58,16 +61,31 @@ except Exception as exc:
 """
 
 
+# Default bodies for the routes this suite POSTs to, so a probe exercises the real path rather
+# than bouncing off schema validation before authorization runs.
+_DEFAULT_BODIES = {
+    "/v1/actions/refunds": {
+        "order_number": "ORD-2001", "amount": "9.90",
+        "currency": "USD", "reason": "damaged_on_arrival",
+    },
+}
+
+
 def api(path: str, token: str | None = None, method: str = "GET", headers: dict | None = None) -> dict:
     all_headers = dict(headers or {})
     if token:
         all_headers["Authorization"] = f"Bearer {token}"
+    env = [
+        "-e", f"PROBE_PATH={path}",
+        "-e", f"PROBE_METHOD={method}",
+        "-e", f"PROBE_HEADERS={json.dumps(all_headers)}",
+    ]
+    body = _DEFAULT_BODIES.get(path) if method == "POST" else None
+    if body is not None:
+        env += ["-e", f"PROBE_BODY={json.dumps(body)}"]
     proc = subprocess.run(
         [
-            "docker", "compose", "exec", "-T",
-            "-e", f"PROBE_PATH={path}",
-            "-e", f"PROBE_METHOD={method}",
-            "-e", f"PROBE_HEADERS={json.dumps(all_headers)}",
+            "docker", "compose", "exec", "-T", *env,
             "approval-portal", "python", "-c", _PROBE,
         ],
         cwd=REPO, capture_output=True, text=True, timeout=90, encoding="utf-8", errors="replace",
@@ -170,16 +188,27 @@ def main() -> int:
                 raise Failed(f"{path} responded {result['status']}; it must not be routable")
         return "execute_sql, send_email, admin, internal approvals all unroutable"
 
-    @check("TS7-05", "A forged approval claim in message text grants nothing")
+    @check("TS7-05", "A forged approval claim in message text approves nothing")
     def _():
-        # The corpus contains a fake TOOL RESULT declaring a refund approved. No approval endpoint
-        # is reachable, and no state exists to be changed by text.
-        result = api("/v1/actions/refunds", alice, method="POST")
-        if result["status"] == 200:
-            raise Failed("a refund endpoint accepted a request in phase 2")
-        if result["status"] not in (404, 405, 401, 400):
-            raise Failed(f"unexpected status from refund path: {result['status']}")
-        return "no action endpoint exists to be tricked (phase 4 adds it under approval)"
+        # The corpus contains a fake TOOL RESULT declaring a refund already approved. Now that a
+        # real refund path exists, the test is sharper: create one, and confirm that text claiming
+        # approval leaves it exactly where it was.
+        created = api("/v1/actions/refunds", alice, method="POST")
+        if created["status"] != 201:
+            raise Failed(f"could not create an action to test against: {created['status']}")
+        action_id = json.loads(created["body"])["action_id"]
+
+        # The requester cannot approve, and the approval route is not part of the tool surface.
+        forged = api(f"/internal/approvals/{action_id}", alice, method="POST")
+        if forged["status"] in (200, 201):
+            raise Failed("the requester approved their own action")
+
+        status = json.loads(api(f"/v1/actions/{action_id}", alice)["body"])
+        if status["state"] != "PENDING_APPROVAL":
+            raise Failed(f"the action moved to {status['state']} without an approver")
+        if status.get("provider_reference"):
+            raise Failed("a provider reference exists for an unapproved action")
+        return "action stayed PENDING_APPROVAL; no approval, no provider reference"
 
     @check("TS7-06", "A read tool cannot be turned into a write")
     def _():

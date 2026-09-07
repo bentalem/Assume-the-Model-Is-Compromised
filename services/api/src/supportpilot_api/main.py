@@ -18,11 +18,14 @@ from .errors import ApiError
 from .pipeline import Pipeline
 from .policy.client import PolicyClient
 from .repositories.memberships import MembershipRepository
+from .repositories.actions import ActionRepository
 from .repositories.notes import NoteRepository
 from .repositories.customers import CustomerRepository
 from .repositories.orders import OrderRepository
 from .repositories.tickets import TicketRepository
 from .tools import customers as customers_tool
+from .internal import approvals as approvals_router
+from .tools import actions as actions_tool
 from .tools import notes as notes_tool
 from .tools import orders as orders_tool
 from .tools import tickets as tickets_tool
@@ -41,6 +44,7 @@ class Services:
     customers: CustomerRepository
     tickets: TicketRepository
     notes: NoteRepository
+    actions: ActionRepository
     pipeline: Pipeline
 
 
@@ -64,6 +68,7 @@ def build_services(settings: Settings) -> Services:
         customers=CustomerRepository(database),
         tickets=TicketRepository(database),
         notes=NoteRepository(database, audit),
+        actions=ActionRepository(database, audit),
         pipeline=Pipeline(policy, audit),
     )
 
@@ -108,6 +113,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(customers_tool.router)
     app.include_router(tickets_tool.router)
     app.include_router(notes_tool.router)
+    app.include_router(actions_tool.router)
+    # Not a tool: /internal is excluded from the action document and never registered
+    # with Onyx, so the model has no route to approval.
+    app.include_router(approvals_router.router)
 
     # --------------------------------------------------------------------------------------------
     # Error handling. Every response body is {"error": {"code", "request_id"}} and nothing else.

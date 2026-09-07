@@ -19,6 +19,10 @@ import time
 from pathlib import Path
 
 import psycopg
+from psycopg.rows import dict_row
+
+from .adapters.refund import FakeRefundAdapter
+from .jobs.processor import JobProcessor, RefusedToExecute
 
 logger = logging.getLogger("supportpilot.worker")
 
@@ -50,12 +54,12 @@ def verify_least_privilege(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls
+            SELECT (rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls) AS privileged
             FROM pg_roles WHERE rolname = current_user
             """
         )
         row = cur.fetchone()
-        if row and row[0]:
+        if row and row["privileged"]:
             raise SystemExit("FATAL: worker role holds a privileged attribute")
 
         # The worker holds no grant on customer or order data. Probing must fail.
@@ -82,7 +86,7 @@ def run() -> None:
 
     for attempt in range(30):
         try:
-            conn = psycopg.connect(_dsn())
+            conn = psycopg.connect(_dsn(), row_factory=dict_row)
             break
         except psycopg.OperationalError:
             logger.info("waiting_for_database", extra={"attempt": attempt})
@@ -93,13 +97,52 @@ def run() -> None:
 
     with conn:
         verify_least_privilege(conn)
-        logger.info("worker_started", extra={"poll_interval": poll_interval})
+
+        # OD-02 has not chosen a provider, so the fake adapter is what runs. It enforces the same
+        # idempotency a real provider must, so retry bugs surface here rather than in a sandbox.
+        adapter = FakeRefundAdapter()
+        worker_id = f"worker-{os.getpid()}"
+        lease_seconds = int(os.environ.get("WORKER_LEASE_SECONDS", "300"))
+        processor = JobProcessor(conn, adapter, worker_id=worker_id, lease_seconds=lease_seconds)
+
+        logger.info("worker_started", extra={"poll_interval": poll_interval, "id": worker_id})
 
         while _running:
-            # Phase 4 (P4-12): claim one job with FOR UPDATE SKIP LOCKED, verify approval state,
-            # expiry, payload hash and idempotency, then execute through an allowlisted adapter.
-            # Until those tables exist there is nothing to claim.
-            time.sleep(poll_interval)
+            try:
+                job = processor.claim()
+            except Exception:
+                logger.error("claim_failed", exc_info=True)
+                conn.rollback()
+                time.sleep(poll_interval)
+                continue
+
+            if job is None:
+                time.sleep(poll_interval)
+                continue
+
+            try:
+                key = processor.verify(job)
+            except RefusedToExecute as refusal:
+                # A failed check is never retried into success. The job is closed and the refusal
+                # recorded with its reason.
+                processor.refuse(job, refusal.reason)
+                continue
+            except Exception:
+                logger.error("verification_error", exc_info=True)
+                conn.rollback()
+                processor.refuse(job, "verification_error")
+                continue
+
+            try:
+                outcome = processor.execute(job, key)
+                logger.info(
+                    "job_finished",
+                    extra={"job": job.job_id, "outcome": str(outcome)},
+                )
+            except Exception:
+                logger.error("execution_error", exc_info=True)
+                conn.rollback()
+                processor.refuse(job, "execution_error")
 
     logger.info("worker_stopped")
 

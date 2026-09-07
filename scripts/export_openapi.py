@@ -34,6 +34,8 @@ APPROVED_OPERATIONS = {
     "get_customer",
     "get_ticket",
     "add_internal_note",
+    "propose_refund",
+    "get_action_status",
 }
 
 # Names the server derives from verified identity. A parameter with one of these names would mean
