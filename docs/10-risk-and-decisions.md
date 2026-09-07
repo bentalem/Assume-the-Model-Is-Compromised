@@ -77,6 +77,7 @@ exist without an owner and an expiry date.**
 
 | ID | Condition accepted | Gate | Owner | Expiry | Removal evidence |
 |---|---|---|---|---|---|
+| AC-02 | **Onyx's SSRF guard is lowered to ALLOW_PRIVATE_NETWORK in the local environment.** Onyx blocks outbound requests to RFC1918 addresses by default, and every address Keycloak can be reached at from a container is private — the Docker network, the host's LAN address, `host.docker.internal`. With no public address available, a local deployment cannot use an identity provider at all without this. The level still blocks loopback and cloud-metadata (169.254.0.0/16); it is not "SSRF off". Set via `MCP_SERVER_ALLOW_PRIVATE_NETWORK` in the Onyx override. | Phase 1 | Onyx owner | Phase 5 gate (with OD-04) | A production deployment where the IdP has a routable address, so Onyx keeps its default level. |
 | AC-01 | **MFA is not enforced in the local realm.** The design requires multi-factor for human accounts (SP-DATA-001 §2). Enforcing it locally would block the direct-grant test harness that `verify_local.py` uses, because Keycloak applies required actions to the password grant as well. The API still derives `authentication_level` from ACR/AMR and reports `single_factor` honestly — nothing pretends MFA happened. | Phase 1 | Identity engineer | Phase 5 gate (with OD-10) | A production realm with MFA enforced on the browser flow, and a harness path that does not depend on the password grant. |
 
 > **Acceptance limit:** an S1 defect can never become an accepted condition. Cross-tenant exposure,

@@ -38,8 +38,55 @@ It generates one self-signed certificate covering both names Keycloak answers to
 the browser, `keycloak` for containers), serves HTTPS on 8443, trusts that certificate in the
 SupportPilot API, and writes an override that does the same for Onyx.
 
-Onyx's SSRF protection also blocks private addresses by default, and `keycloak:8443` resolves to a
-Docker RFC1918 address. Set **Admin Panel → Security → SSRF Protection → Allow private network**.
+### One hosts-file line
+
+Keycloak advertises itself as `keycloak:8443`, not `localhost:8443`. Add to your hosts file
+(`C:\Windows\System32\drivers\etc\hosts` as Administrator, or `/etc/hosts`):
+
+```
+127.0.0.1 keycloak
+```
+
+This is not cosmetic, and it is worth understanding because the obvious alternative is worse.
+
+Onyx guards **every endpoint the discovery document names**, as strictly as the URL itself — a
+malicious document could otherwise point the token exchange anywhere. `ALLOW_PRIVATE_NETWORK`
+permits RFC1918 but still blocks loopback. So a document advertising
+`authorization_endpoint: https://localhost:8443/...` is refused even after the discovery URL was
+accepted:
+
+```
+authorization_endpoint: Access to hostname 'localhost' is not allowed.
+```
+
+Naming the service instead makes every endpoint resolve to a private Docker address *inside the
+container*, which is allowed, while the hosts entry makes the same name resolve to `127.0.0.1` for
+your browser. Keycloak stays bound to loopback — nothing is published to the LAN — and the SSRF
+guard keeps blocking loopback rather than being switched off entirely.
+
+The alternative, setting SSRF protection to `DISABLED`, would let Onyx reach loopback on every
+outbound path, not just this one. One hosts line is the smaller change.
+
+### And its SSRF guard has to allow private addresses
+
+Onyx blocks outbound requests to RFC1918 addresses by default, so you will see:
+
+```
+Hostname 'keycloak' resolves to internal/private IP address '172.20.0.2'.
+Access to internal networks is not allowed.
+```
+
+Every address Keycloak can be reached at from a container is private — the Docker network, the
+host's LAN address, `host.docker.internal` — so there is nothing to switch to. The level has to
+come down. It still blocks loopback and cloud-metadata; it is not "SSRF off".
+
+The override file sets `MCP_SERVER_ALLOW_PRIVATE_NETWORK=true`, which derives
+`ALLOW_PRIVATE_NETWORK`. That seeds the **default** — a value already saved in
+**Admin Panel → Security → SSRF Protection** wins over it, so if the error persists after applying
+the override, change it there instead. Settings are cached briefly, so restart `api_server` after.
+
+Recorded as **AC-02** in [../10-risk-and-decisions.md](../10-risk-and-decisions.md#5-accepted-conditions),
+because a relaxed guard is exactly the kind of local convenience that reaches production unexamined.
 
 ### Prerequisites
 
@@ -70,12 +117,17 @@ document serves both audiences:
 
 | | URL | Who uses it |
 |---|---|---|
-| `issuer` | `https://localhost:8443/realms/supportpilot` | Stable identity; what the API validates |
-| `authorization_endpoint` | `https://localhost:8443/…/auth` | The **browser**, on your machine |
-| `token_endpoint`, `jwks_uri` | `https://keycloak:8443/…` | **Onyx's container**, over the app network |
+| `issuer` | `https://keycloak:8443/realms/supportpilot` | Stable identity; what the API validates |
+| `authorization_endpoint` | `https://keycloak:8443/…/auth` | The **browser**, via the hosts entry |
+| `token_endpoint`, `jwks_uri` | `https://keycloak:8443/…` | **Onyx's container**, via Docker DNS |
 
-Without this you would have to choose: a URL the browser can reach, or one the container can. The
-usual workarounds — editing the hosts file, publishing Keycloak on all interfaces — are unnecessary.
+One name, resolved differently on each side: `127.0.0.1` for the browser, the container's Docker
+address for Onyx. That is what lets a single document satisfy both without exposing Keycloak beyond
+loopback.
+
+Note the harness scripts still *reach* Keycloak at `https://localhost:8443` — the URL a request is
+sent to and the `iss` claim it carries are different things, and only the claim has to match what
+the API validates.
 
 ## Step 2 — add the SSO provider
 
@@ -161,7 +213,8 @@ docker compose exec -T -e PGPASSWORD="$(cat .secrets/postgres_bootstrap_password
 | `unauthenticated` with a token present | Wrong audience | The audience mapper lives on `onyx-web`; re-run `connect_onyx.py`, sign in again |
 | Onyx cannot fetch the discovery document | Not on the `app` network | `python scripts/connect_onyx.py` |
 | Redirect URI mismatch at Keycloak | Provider named something other than `keycloak` | Rename it, or add the matching redirect URI |
-| Token exchange fails after the browser redirect | Discovery fetched over a URL the container cannot reach | Use the `keycloak:8443` discovery URL, not `localhost:8443` |
+| `Access to hostname 'localhost' is not allowed` on a *discovered* endpoint | `KC_HOSTNAME` still advertises localhost | Already fixed in compose; recreate Keycloak, and add the hosts entry |
+| The browser cannot resolve `keycloak` | Hosts entry missing | Add `127.0.0.1 keycloak` |
 | Onyx rejects the URL as not HTTPS | Keycloak still on plain HTTP | `python scripts/enable_keycloak_tls.py` |
 | Onyx rejects the URL as a private address | SSRF protection at its default level | Admin Panel → Security → Allow private network |
 | Onyx cannot verify the certificate | The override is not applied | Re-run the `docker compose … -f docker-compose.supportpilot.yml up -d api_server` command |

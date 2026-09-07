@@ -25,6 +25,20 @@ services:
       # Both, because Onyx's stack mixes httpx/requests and raw ssl contexts.
       - SSL_CERT_FILE=/etc/ssl/supportpilot/keycloak.crt
       - REQUESTS_CA_BUNDLE=/etc/ssl/supportpilot/keycloak.crt
+      # Onyx's SSRF guard blocks RFC1918 addresses by default, and every address Keycloak can be
+      # reached at from a container is private — the Docker network (172.x), the host's LAN
+      # address (192.168.x), host.docker.internal. There is no public address to use, so a local
+      # deployment cannot use an IdP at all without lowering this.
+      #
+      # This derives SSRFProtectionLevel.ALLOW_PRIVATE_NETWORK, which permits RFC1918 and keeps
+      # loopback and cloud-metadata (169.254.0.0/16) blocked. It is not "SSRF off".
+      #
+      # It is a local-environment relaxation of Onyx's posture, recorded as AC-02 in
+      # docs/10-risk-and-decisions.md so it is not carried into production unexamined.
+      #
+      # This seeds the *default*. A value saved in Admin Panel -> Security wins over it; if the
+      # error persists after applying this, change it there instead.
+      - MCP_SERVER_ALLOW_PRIVATE_NETWORK=true
     volumes:
       - ${SUPPORTPILOT_TLS_DIR:?set SUPPORTPILOT_TLS_DIR to the .secrets/tls path}:/etc/ssl/supportpilot:ro
     networks:

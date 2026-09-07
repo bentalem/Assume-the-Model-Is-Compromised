@@ -152,7 +152,17 @@ services:
       # localhost and containers reaching keycloak validate against the same file.
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/tls/keycloak.crt
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/tls/keycloak.key
-      KC_HOSTNAME: https://localhost:8443
+      # `keycloak`, not `localhost`, and this is the subtle part.
+      #
+      # Onyx guards every endpoint the discovery document names, and ALLOW_PRIVATE_NETWORK still
+      # blocks loopback — so a document advertising a localhost authorization_endpoint is refused
+      # even though the discovery URL itself was accepted. Naming the service instead makes every
+      # endpoint resolve to a private Docker address inside the container, which is allowed, and
+      # keeps loopback blocked rather than switching the guard off.
+      #
+      # The browser needs `keycloak` to resolve too: add `127.0.0.1 keycloak` to the hosts file.
+      # Keycloak stays bound to 127.0.0.1, so nothing is exposed to the LAN.
+      KC_HOSTNAME: https://keycloak:8443
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     secrets:
       - keycloak_admin_password
@@ -209,7 +219,7 @@ services:
         condition: service_completed_successfully
     environment:
       SUPPORTPILOT_ENV: local
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://localhost:8443/realms/supportpilot}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://keycloak:8443/realms/supportpilot}
       KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-https://keycloak:8443/realms/supportpilot/protocol/openid-connect/certs}
       SUPPORTPILOT_AUDIENCE: ${SUPPORTPILOT_AUDIENCE:-supportpilot-api}
       TOKEN_LEEWAY_SECONDS: ${TOKEN_LEEWAY_SECONDS:-30}
@@ -295,7 +305,7 @@ services:
     environment:
       SUPPORTPILOT_ENV: local
       SUPPORTPILOT_API_URL: http://api:8000
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://localhost:8443/realms/supportpilot}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://keycloak:8443/realms/supportpilot}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "127.0.0.1:8090:8090"
