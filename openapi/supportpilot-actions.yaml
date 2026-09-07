@@ -1,0 +1,96 @@
+# SupportPilot actions — the operations Onyx may register.
+#
+# GENERATED from the API routes by scripts/export_openapi.py. Do not edit by hand.
+# The diff of this file is the tool-schema review: a change here changes what the model
+# can call, which is a control-plane change (SP-OPS-001 section 10).
+#
+# Regenerate:  python scripts/export_openapi.py
+# Verify only: python scripts/export_openapi.py --check
+
+openapi: 3.1.0
+info:
+  title: SupportPilot Actions
+  description: Business operations the SupportPilot agent may request on behalf of an authenticated support
+    user. Every operation authorizes the individual user; none accepts an identity supplied by the caller.
+  version: 1.0.0
+paths:
+  /v1/orders/{order_number}:
+    get:
+      tags:
+      - orders
+      summary: Get an order visible to the authenticated user
+      operationId: get_order
+      parameters:
+      - name: order_number
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 16
+          pattern: ^ORD-[0-9]{4,12}$
+          description: Order number in the form ORD-nnnn
+          examples:
+          - ORD-2001
+          title: Order Number
+        description: Order number in the form ORD-nnnn
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthenticated
+        '404':
+          description: Not found or not allowed
+        '503':
+          description: Service unavailable
+components:
+  schemas:
+    OrderResponse:
+      properties:
+        order_number:
+          type: string
+          title: Order Number
+          description: The order identifier, e.g. ORD-2001
+        status:
+          type: string
+          title: Status
+          description: Order lifecycle status
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+          title: Currency
+        total_amount:
+          type: string
+          title: Total Amount
+          description: Decimal amount as a string, to avoid float rounding
+        placed_at:
+          type: string
+          format: date-time
+          title: Placed At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      additionalProperties: false
+      type: object
+      required:
+      - order_number
+      - status
+      - currency
+      - total_amount
+      - placed_at
+      - updated_at
+      title: OrderResponse
+      description: 'The bounded response schema.
+
+
+        `extra="forbid"` means a field the repository adds later cannot reach the caller until someone
+
+        adds it here deliberately — response minimization by construction rather than by review.'

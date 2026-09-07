@@ -1,0 +1,318 @@
+# SupportPilot local environment.
+#
+# Network boundaries are the point of this file (SP-ARCH-001 §8). A service is attached only to the
+# networks it must reach. PostgreSQL and OPA are on internal networks with no route to the edge, and
+# check V-02 proves it.
+#
+#   docker compose up -d                   SupportPilot + Keycloak + OPA + PostgreSQL
+#   docker compose --profile onyx up -d    adds Onyx (see ADR-0002)
+
+name: supportpilot
+
+x-postgres-image: &postgres-image postgres:16.4-alpine
+x-python-base: &python-base
+  restart: unless-stopped
+  stop_grace_period: 10s
+
+networks:
+  # Reverse proxy and user-facing services only.
+  edge:
+    driver: bridge
+  # Onyx -> API, approval portal -> API.
+  app:
+    driver: bridge
+    internal: true
+  # API -> OPA. Nothing else may reach the policy decision point.
+  policy:
+    driver: bridge
+    internal: true
+  # API and worker -> PostgreSQL.
+  data:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:
+
+services:
+  # --------------------------------------------------------------------------------------------
+  # Data layer
+  # --------------------------------------------------------------------------------------------
+  postgres:
+    image: *postgres-image
+    container_name: supportpilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-supportpilot}
+      POSTGRES_USER: ${POSTGRES_BOOTSTRAP_USER:-supportpilot_admin}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_bootstrap_password
+      # Deterministic ordering for tests; avoids locale-dependent sort results.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    secrets:
+      - postgres_bootstrap_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_BOOTSTRAP_USER:-supportpilot_admin} -d ${DATABASE_NAME:-supportpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # One-shot job. Owns the schema; runtime services never receive this credential.
+  migrate:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: supportpilot/migrate:local
+    container_name: supportpilot-migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: ${DATABASE_NAME:-supportpilot}
+      BOOTSTRAP_USER: ${POSTGRES_BOOTSTRAP_USER:-supportpilot_admin}
+      BOOTSTRAP_PASSWORD_FILE: /run/secrets/postgres_bootstrap_password
+      MIGRATOR_PASSWORD_FILE: /run/secrets/migrator_db_password
+      API_PASSWORD_FILE: /run/secrets/api_db_password
+      WORKER_PASSWORD_FILE: /run/secrets/worker_db_password
+      AUDITOR_PASSWORD_FILE: /run/secrets/auditor_db_password
+      SEED_LOCAL_DATA: ${SEED_LOCAL_DATA:-true}
+    secrets:
+      - postgres_bootstrap_password
+      - migrator_db_password
+      - api_db_password
+      - worker_db_password
+      - auditor_db_password
+    networks:
+      - data
+
+  # --------------------------------------------------------------------------------------------
+  # Policy decision point. Private network only; no published port.
+  # --------------------------------------------------------------------------------------------
+  opa:
+    image: openpolicyagent/opa:1.4.2-static
+    container_name: supportpilot-opa
+    restart: unless-stopped
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--set=decision_logs.console=true"
+      - "/policy"
+    volumes:
+      # Read-only bundle. OPA never writes policy.
+      - ./policy/supportpilot:/policy:ro
+    networks:
+      - policy
+    healthcheck:
+      # The static image carries no shell or HTTP client, so the check evaluates the bundle
+      # directly. Reachability of the OPA server is covered by the API's /readyz.
+      test: ["CMD", "/opa", "eval", "--data", "/policy", "data.supportpilot.authz.health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+  # --------------------------------------------------------------------------------------------
+  # Identity
+  # --------------------------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: supportpilot-keycloak
+    restart: unless-stopped
+    # Keycloak 26 reads the bootstrap password only from KC_BOOTSTRAP_ADMIN_PASSWORD, with no
+    # _FILE variant. The wrapper reads the mounted secret and exports it into Keycloak's own
+    # process, so the value still never appears in compose, the image, or `docker inspect`.
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        export KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)"
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=8080
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-kcadmin}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_PORT: "9000"
+      KC_HOSTNAME_STRICT: "false"
+      # One canonical issuer regardless of how Keycloak is reached. Without this, a token fetched
+      # from the host carries iss=localhost:8080 while a token fetched from a container carries
+      # iss=keycloak:8080, and the API can only ever accept one of them. The API validates against
+      # this issuer but fetches keys over the internal network (KEYCLOAK_JWKS_URL), which is what
+      # backchannel-dynamic allows.
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    secrets:
+      - keycloak_admin_password
+    volumes:
+      # Realm state is deliberately ephemeral: the realm is re-imported from this read-only file on
+      # every start, so identity configuration is reproducible and cannot drift through the admin
+      # UI. Changes made in the console are lost on restart — edit the realm file instead.
+      - ./infrastructure/local/keycloak:/opt/keycloak/data/import:ro
+    ports:
+      # Local only. The user-facing login flow and the token endpoint the test harness calls.
+      - "127.0.0.1:8080:8080"
+    networks:
+      - edge
+      - app
+    healthcheck:
+      test:
+        ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # --------------------------------------------------------------------------------------------
+  # SupportPilot API. Reaches Keycloak (app), OPA (policy), PostgreSQL (data).
+  # Not on the edge network: Onyx and the approval portal reach it over `app`.
+  # --------------------------------------------------------------------------------------------
+  api:
+    <<: *python-base
+    build:
+      # Context is the repository root so the vendored wheel set is shared by every service.
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: supportpilot/api:local
+    container_name: supportpilot-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opa:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SUPPORTPILOT_ENV: local
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/supportpilot}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/supportpilot/protocol/openid-connect/certs}
+      SUPPORTPILOT_AUDIENCE: ${SUPPORTPILOT_AUDIENCE:-supportpilot-api}
+      TOKEN_LEEWAY_SECONDS: ${TOKEN_LEEWAY_SECONDS:-30}
+      OPA_URL: ${OPA_URL:-http://opa:8181/v1/data/supportpilot/authz/decision}
+      OPA_TIMEOUT_MS: ${OPA_TIMEOUT_MS:-250}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: ${DATABASE_NAME:-supportpilot}
+      DATABASE_USER: sp_api_role
+      API_DATABASE_SECRET_FILE: /run/secrets/api_db_password
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - api_db_password
+    # No published port, deliberately. The API is reachable only from the internal `app` network
+    # (Onyx and the approval portal). Publishing a host port here would not even work — every
+    # network the API is attached to is internal — and it would contradict SP-ARCH-001 §8, which
+    # puts the API behind the reverse proxy rather than on the user network.
+    #
+    # verify-local.ps1 therefore calls the API from inside a container on `app`, which is also a
+    # more faithful test: it exercises the path Onyx actually uses.
+    networks:
+      - app
+      - policy
+      - data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  # --------------------------------------------------------------------------------------------
+  # Worker. Data network only: no inbound, and no route to OPA or the edge.
+  # Phase 4 gives it real jobs; it holds a claim loop and health state now.
+  # --------------------------------------------------------------------------------------------
+  worker:
+    <<: *python-base
+    build:
+      # Context is the repository root so the vendored wheel set is shared by every service.
+      context: .
+      dockerfile: services/worker/Dockerfile
+    image: supportpilot/worker:local
+    container_name: supportpilot-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SUPPORTPILOT_ENV: local
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: ${DATABASE_NAME:-supportpilot}
+      DATABASE_USER: sp_worker_role
+      WORKER_DATABASE_SECRET_FILE: /run/secrets/worker_db_password
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-5}
+      WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-300}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - worker_db_password
+    networks:
+      - data
+
+  # --------------------------------------------------------------------------------------------
+  # Approval portal. Edge for approvers, app to reach the API. No database access at all.
+  # --------------------------------------------------------------------------------------------
+  approval-portal:
+    <<: *python-base
+    build:
+      # Context is the repository root so the vendored wheel set is shared by every service.
+      context: .
+      dockerfile: services/approval-portal/Dockerfile
+    image: supportpilot/approval-portal:local
+    container_name: supportpilot-approval
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      SUPPORTPILOT_ENV: local
+      SUPPORTPILOT_API_URL: http://api:8000
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/supportpilot}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "127.0.0.1:8090:8090"
+    networks:
+      - edge
+      - app
+
+  # --------------------------------------------------------------------------------------------
+  # Onyx, Lite mode, opt-in profile (ADR-0002).
+  # --------------------------------------------------------------------------------------------
+  onyx:
+    profiles: ["onyx"]
+    image: onyxdotapp/onyx-lite:latest
+    container_name: supportpilot-onyx
+    restart: unless-stopped
+    environment:
+      AUTH_TYPE: ${ONYX_AUTH_TYPE:-oidc}
+      OPENID_CONFIG_URL: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/supportpilot}/.well-known/openid-configuration
+      OAUTH_CLIENT_ID: ${ONYX_OAUTH_CLIENT_ID:-onyx-web}
+      # Public client with PKCE (see the realm import): no client secret exists to mount.
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - edge
+      - app
+
+# ------------------------------------------------------------------------------------------------
+# Secrets are files outside the repository tree. Each service mounts only its own (SP-DATA-001 §10).
+# ------------------------------------------------------------------------------------------------
+secrets:
+  postgres_bootstrap_password:
+    file: ./.secrets/postgres_bootstrap_password
+  migrator_db_password:
+    file: ./.secrets/migrator_db_password
+  api_db_password:
+    file: ./.secrets/api_db_password
+  worker_db_password:
+    file: ./.secrets/worker_db_password
+  auditor_db_password:
+    file: ./.secrets/auditor_db_password
+  keycloak_admin_password:
+    file: ./.secrets/keycloak_admin_password

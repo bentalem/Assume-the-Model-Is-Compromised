@@ -1,0 +1,242 @@
+{
+  "realm": "supportpilot",
+  "enabled": true,
+  "displayName": "SupportPilot",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "failureFactor": 5,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "support_agent",
+        "description": "Handles normal customer questions"
+      },
+      {
+        "name": "support_manager",
+        "description": "Supervises support work"
+      },
+      {
+        "name": "finance_approver",
+        "description": "Approves or rejects refund requests"
+      },
+      {
+        "name": "auditor",
+        "description": "Reads audit records and action history"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "support-agents",
+      "realmRoles": [
+        "support_agent"
+      ]
+    },
+    {
+      "name": "support-managers",
+      "realmRoles": [
+        "support_manager"
+      ]
+    },
+    {
+      "name": "finance-approvers",
+      "realmRoles": [
+        "finance_approver"
+      ]
+    },
+    {
+      "name": "auditors",
+      "realmRoles": [
+        "auditor"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "supportpilot-api",
+      "name": "SupportPilot Action API",
+      "description": "Resource server. Never initiates a flow; only validates tokens.",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "onyx-web",
+      "name": "Onyx",
+      "description": "The agent front end. Obtains a user-bound token and forwards it to the action API. Public client with PKCE: a browser front end cannot keep a secret, which also keeps an OAuth client secret out of the repository.",
+      "enabled": true,
+      "publicClient": true,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/auth/oidc/callback",
+        "http://localhost:3000/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "protocolMappers": [
+        {
+          "name": "supportpilot-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "supportpilot-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles"
+      ]
+    },
+    {
+      "clientId": "supportpilot-test-harness",
+      "name": "Local test harness",
+      "description": "Direct grant client used by verify-local.ps1 to exercise the API without Onyx. Local realm only; see ADR-0002. It grants no authority the browser flow would not, and is not a substitute for the Onyx OAuth-forwarding evidence.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "supportpilot-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "supportpilot-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "id": "alice-id",
+      "email": "alice@cedar.example.invalid",
+      "firstName": "Alice",
+      "lastName": "Nguyen",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": [
+        "/support-agents"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice-local-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "bob",
+      "id": "bob-id",
+      "email": "bob@cedar.example.invalid",
+      "firstName": "Bob",
+      "lastName": "Ferreira",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": [
+        "/support-managers"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob-local-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "fiona",
+      "id": "fiona-id",
+      "email": "fiona@cedar.example.invalid",
+      "firstName": "Fiona",
+      "lastName": "Adeyemi",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": [
+        "/finance-approvers"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fiona-local-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "dana",
+      "id": "dana-id",
+      "email": "dana@cedar.example.invalid",
+      "firstName": "Dana",
+      "lastName": "Kovacs",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": [
+        "/auditors"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dana-local-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "mallory",
+      "id": "mallory-id",
+      "email": "mallory@northwind.example.invalid",
+      "firstName": "Mallory",
+      "lastName": "Okonkwo",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": [
+        "/support-agents"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "mallory-local-password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
