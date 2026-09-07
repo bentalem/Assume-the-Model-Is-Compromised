@@ -50,6 +50,7 @@ class Database:
         *,
         user_id: str | None = None,
         organization_id: str | None = None,
+        roles: list[str] | None = None,
         read_only: bool = False,
     ) -> Iterator[psycopg.Cursor[dict[str, Any]]]:
         """Run a block inside one transaction with request context set locally.
@@ -57,6 +58,10 @@ class Database:
         Omitting `organization_id` is meaningful, not an oversight: the membership lookup runs with
         only `app.user_id` set, because the tenant is not known until that lookup returns. Business
         tables are invisible in that state, which is exactly right.
+
+        `roles` are the caller's memberships **for the tenant being accessed**, loaded server-side.
+        Row policies that depend on a role (restricted ticket messages, for one) read them through
+        app.current_roles(). Omitting them means no role is held, so those policies fail closed.
         """
         try:
             with self._pool.connection() as conn:
@@ -72,6 +77,12 @@ class Database:
                         cur.execute(
                             "SELECT set_config('app.organization_id', %s, true)",
                             (organization_id or "",),
+                        )
+                        # A role name is validated at the source (a CHECK constraint on
+                        # app.memberships), so the comma-separated form cannot smuggle a separator.
+                        cur.execute(
+                            "SELECT set_config('app.roles', %s, true)",
+                            (",".join(sorted(roles or [])),),
                         )
                         yield cur
         except psycopg.OperationalError:

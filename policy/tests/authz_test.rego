@@ -160,3 +160,173 @@ test_default_deny_version_matches_constant if {
 	d := authz.decision with input as {}
 	d.policy_version == authz.policy_version
 }
+
+# ================================================================================================
+# Phase 2 — customer and ticket rules
+# ================================================================================================
+
+cedar_customer(sensitivity) := {
+	"type": "customer",
+	"id": "CUS-4001",
+	"organization_id": "11111111-1111-1111-1111-111111111111",
+	"sensitivity": sensitivity,
+}
+
+northwind_customer := {
+	"type": "customer",
+	"id": "CUS-9001",
+	"organization_id": "22222222-2222-2222-2222-222222222222",
+	"sensitivity": "normal",
+}
+
+cedar_ticket := {
+	"type": "ticket",
+	"id": "TKT-1001",
+	"organization_id": "11111111-1111-1111-1111-111111111111",
+	"status": "open",
+	"assigned_team": "team-north",
+}
+
+act(subject, action, resource) := {
+	"subject": subject,
+	"action": action,
+	"resource": resource,
+	"context": ctx,
+}
+
+# --- customer.search ----------------------------------------------------------------------------
+test_agent_may_search_own_tenant if {
+	d := authz.decision with input as act(alice(["support_agent"]), "customer.search", {
+		"type": "organization",
+		"organization_id": "11111111-1111-1111-1111-111111111111",
+	})
+	d.allow
+}
+
+# The page cap lives in policy, so it can be tightened without touching application code.
+test_search_carries_a_result_cap if {
+	d := authz.decision with input as act(alice(["support_agent"]), "customer.search", {
+		"type": "organization",
+		"organization_id": "11111111-1111-1111-1111-111111111111",
+	})
+	d.obligations.max_results == 25
+}
+
+test_search_never_returns_contact_details if {
+	d := authz.decision with input as act(alice(["support_agent"]), "customer.search", {
+		"type": "organization",
+		"organization_id": "11111111-1111-1111-1111-111111111111",
+	})
+	not "email" in d.obligations.allowed_fields
+	not "open_ticket_count" in d.obligations.allowed_fields
+}
+
+test_search_denied_outside_tenant if {
+	d := authz.decision with input as act(alice(["support_agent"]), "customer.search", {
+		"type": "organization",
+		"organization_id": "22222222-2222-2222-2222-222222222222",
+	})
+	not d.allow
+	d.reason == "not_a_member_of_resource_organization"
+}
+
+# --- customer.read ------------------------------------------------------------------------------
+test_agent_reads_normal_customer_with_contact_details if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "customer.read", cedar_customer("normal"),
+	)
+	d.allow
+	"email" in d.obligations.allowed_fields
+}
+
+# The heart of the sensitivity rule: an agent still gets an answer, minus the contact details.
+test_agent_reading_restricted_customer_loses_contact_details if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "customer.read", cedar_customer("restricted"),
+	)
+	d.allow
+	d.reason == "restricted_customer_minimal_fields"
+	not "email" in d.obligations.allowed_fields
+	"full_name" in d.obligations.allowed_fields
+}
+
+test_manager_reading_restricted_customer_keeps_contact_details if {
+	d := authz.decision with input as act(
+		alice(["support_manager"]), "customer.read", cedar_customer("restricted"),
+	)
+	d.allow
+	"email" in d.obligations.allowed_fields
+}
+
+test_auditor_reading_restricted_customer_keeps_contact_details if {
+	d := authz.decision with input as act(
+		alice(["auditor"]), "customer.read", cedar_customer("restricted"),
+	)
+	d.allow
+	"email" in d.obligations.allowed_fields
+}
+
+test_customer_read_denied_outside_tenant if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "customer.read", northwind_customer,
+	)
+	not d.allow
+	d.reason == "not_a_member_of_resource_organization"
+}
+
+test_finance_approver_may_not_read_customers if {
+	d := authz.decision with input as act(
+		alice(["finance_approver"]), "customer.read", cedar_customer("normal"),
+	)
+	not d.allow
+	d.reason == "role_not_permitted_for_action"
+}
+
+# --- ticket.read --------------------------------------------------------------------------------
+test_agent_may_read_own_tenant_ticket if {
+	d := authz.decision with input as act(alice(["support_agent"]), "ticket.read", cedar_ticket)
+	d.allow
+	"messages" in d.obligations.allowed_fields
+}
+
+test_ticket_read_denied_outside_tenant if {
+	d := authz.decision with input as act(alice(["support_agent"]), "ticket.read", {
+		"type": "ticket",
+		"id": "TKT-3001",
+		"organization_id": "22222222-2222-2222-2222-222222222222",
+		"status": "open",
+	})
+	not d.allow
+	d.reason == "not_a_member_of_resource_organization"
+}
+
+# --- no ambiguity -------------------------------------------------------------------------------
+# customer.read has three allow arms and two deny arms. If any pair could be true at once, Rego
+# raises a conflict and the API converts that to a deny — a denial nobody intended. Every
+# combination of role and sensitivity must produce exactly one decision.
+test_customer_read_has_exactly_one_decision_for_every_combination if {
+	roles := [
+		["support_agent"], ["support_manager"], ["auditor"], ["finance_approver"], [],
+		["support_agent", "support_manager"], ["support_agent", "auditor"],
+	]
+	sensitivities := ["normal", "restricted"]
+	every role in roles {
+		every sensitivity in sensitivities {
+			d := authz.decision with input as act(
+				alice(role), "customer.read", cedar_customer(sensitivity),
+			)
+			is_boolean(d.allow)
+			is_string(d.reason)
+		}
+	}
+}
+
+# A user holding both agent and manager gets the manager's view of a restricted customer: the
+# broader membership wins, and the two allow arms do not collide.
+test_agent_plus_manager_sees_restricted_contact_details if {
+	d := authz.decision with input as act(
+		alice(["support_agent", "support_manager"]), "customer.read", cedar_customer("restricted"),
+	)
+	d.allow
+	"email" in d.obligations.allowed_fields
+}

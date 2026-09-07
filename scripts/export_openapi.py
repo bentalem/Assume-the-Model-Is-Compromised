@@ -30,6 +30,9 @@ OUTPUT = REPO / "openapi" / "supportpilot-actions.yaml"
 # SP-OPS-001 section 10 — it is not a side effect of writing a route.
 APPROVED_OPERATIONS = {
     "get_order",
+    "search_customers",
+    "get_customer",
+    "get_ticket",
 }
 
 # Names the server derives from verified identity. A parameter with one of these names would mean

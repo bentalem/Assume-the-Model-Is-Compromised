@@ -3,11 +3,13 @@
 > Source: `07_SupportPilot_Work_Breakdown_and_Backlog.docx` (SP-PLAN-002 v1.0, 2026-09-07)
 > **This is the working tracker.** Check a box only when the closing evidence exists.
 
-**Progress:** 26 / 99 tasks · current phase: **1** · next task: `P1-03` (MFA policy)
+**Progress:** 42 / 99 tasks · current phase: **3** · next task: `P3-01`
 
-Phase 0 is complete except its gate review (`P0-12`). Phase 1 is complete except the three
-tasks that need Onyx running (`P1-04`, `P1-16`) or a decision (`P1-03`), plus `P1-19`/`P1-20`.
-Evidence: `evidence/verify-local-*.json` — 16/16 environment checks, 70 API tests, 14 policy tests.
+Phases 0–2 are code-complete. Outstanding in them: the gate reviews, and the tasks that need
+Onyx running (`P1-04`, `P1-16`, `P2-12`) — see ADR-0002.
+
+Evidence: 96 API tests · 28 policy tests · 16 environment checks (`evidence/verify-local-*.json`)
+· 11 abuse cases (`evidence/abuse-suite-*.json`).
 
 Size: `S` ≤ 1 day · `M` 2–3 days · `L` ≥ 4 days (split if it cannot finish in a week).
 
@@ -98,23 +100,23 @@ organization is denied at both the API and the database.*
 *Goal: the full read surface with minimized responses, pagination, audit coverage, and proven
 resistance to instructions stored in business data.*
 
-- [ ] **P2-01** `WS-D` `M` — Extend schema: order items, shipments, tickets, ticket messages, internal notes. *Deps:* P1-20
-- [ ] **P2-02** `WS-D` `M` — Add RLS policies and role grants for every new table. *Deps:* P2-01
-- [ ] **P2-03** `WS-E` `L` — Build `search_customers` with mandatory pagination and maximum result size. *Deps:* P2-02
-- [ ] **P2-04** `WS-E` `M` — Build `get_customer` with an approved field subset. *Deps:* P2-02
-- [ ] **P2-05** `WS-E` `L` — Build `get_ticket` with permitted conversation history and visibility rules. *Deps:* P2-02
-- [ ] **P2-06** `WS-E` `M` — Extend `get_order` with items and shipment status under the same authorization path. *Deps:* P2-02
-- [ ] **P2-07** `WS-C` `L` — Add OPA rules and tests for `customer.read`, `ticket.read`, and field obligations. *Deps:* P2-03
-- [ ] **P2-08** `WS-E` `M` — Apply obligations so denied fields are removed before the response is built. *Deps:* P2-07
-- [ ] **P2-09** `WS-D` `M` — Add sorting allowlists, query timeouts, maximum row limits to all read repositories. *Deps:* P2-03
-- [ ] **P2-10** `WS-E` `M` — Audit events for every allowed and denied tool call with stable reason codes. *Deps:* P2-06
-- [ ] **P2-11** `WS-F` `M` — Extend the OpenAPI document; no open objects or unbounded arrays. *Deps:* P2-06
+- [x] **P2-01** `WS-D` `M` — Extend schema: order items, shipments, tickets, ticket messages, internal notes. *Deps:* P1-20
+- [x] **P2-02** `WS-D` `M` — Add RLS policies and role grants for every new table. *Deps:* P2-01
+- [x] **P2-03** `WS-E` `L` — Build `search_customers` with mandatory pagination and maximum result size. *Deps:* P2-02
+- [x] **P2-04** `WS-E` `M` — Build `get_customer` with an approved field subset. *Deps:* P2-02
+- [x] **P2-05** `WS-E` `L` — Build `get_ticket` with permitted conversation history and visibility rules. *Deps:* P2-02
+- [x] **P2-06** `WS-E` `M` — Extend `get_order` with items and shipment status under the same authorization path. *Deps:* P2-02
+- [x] **P2-07** `WS-C` `L` — Add OPA rules and tests for `customer.read`, `ticket.read`, and field obligations. *Deps:* P2-03
+- [x] **P2-08** `WS-E` `M` — Apply obligations so denied fields are removed before the response is built. *Deps:* P2-07
+- [x] **P2-09** `WS-D` `M` — Add sorting allowlists, query timeouts, maximum row limits to all read repositories. *Deps:* P2-03
+- [x] **P2-10** `WS-E` `M` — Audit events for every allowed and denied tool call with stable reason codes. *Deps:* P2-06
+- [x] **P2-11** `WS-F` `M` — Extend the OpenAPI document; no open objects or unbounded arrays. *Deps:* P2-06
 - [ ] **P2-12** `WS-F` `M` — Configure model-call, tool-call, time, token, and cost budgets. *Deps:* P2-11
-- [ ] **P2-13** `WS-H` `M` — Seed prompt-injection records into ticket messages, customer names, order notes. *Deps:* P2-05
-- [ ] **P2-14** `WS-H` `L` — Build the agent abuse suite (`TS-7`): direct, indirect, tool confusion, argument manipulation. *Deps:* P2-13
-- [ ] **P2-15** `WS-H` `M` — Add exfiltration and memory-isolation tests across two users and two organizations. *Deps:* P2-14
-- [ ] **P2-16** `WS-H` `M` — Add response and log redaction checks for secrets and excessive fields. *Deps:* P2-10
-- [ ] **P2-17** `WS-H` `M` — Run `T-008`, `T-014`, and the abuse suite; store results. *Deps:* P2-14, P2-12
+- [x] **P2-13** `WS-H` `M` — Seed prompt-injection records into ticket messages, customer names, order notes. *Deps:* P2-05
+- [x] **P2-14** `WS-H` `L` — Build the agent abuse suite (`TS-7`): direct, indirect, tool confusion, argument manipulation. *Deps:* P2-13
+- [x] **P2-15** `WS-H` `M` — Add exfiltration and memory-isolation tests across two users and two organizations. *Deps:* P2-14
+- [x] **P2-16** `WS-H` `M` — Add response and log redaction checks for secrets and excessive fields. *Deps:* P2-10
+- [x] **P2-17** `WS-H` `M` — Run `T-008`, `T-014`, and the abuse suite; store results. *Deps:* P2-14, P2-12
 - [ ] **P2-18** `WS-E` `S` — Run the phase 2 gate review. *Evidence:* signed gate record for M2. *Deps:* P2-17
 
 ## Phase 3 — Controlled low-impact writes (W09–W10, → M3)

@@ -74,6 +74,26 @@ WHERE order_number = %s
 LIMIT 1
 """
 
+# Line items. Capped: an order with a pathological number of lines must not become an unbounded
+# response. The cap is above any realistic order, so truncation is a signal, not normal behavior.
+_SELECT_ITEMS = """
+SELECT i.sku, i.description, i.quantity, i.unit_amount
+FROM app.order_items i
+JOIN app.orders o ON o.id = i.order_id
+WHERE o.order_number = %s
+ORDER BY i.sku
+LIMIT 50
+"""
+
+_SELECT_SHIPMENT = """
+SELECT s.status, s.carrier, s.tracking_ref, s.updated_at
+FROM app.shipments s
+JOIN app.orders o ON o.id = s.order_id
+WHERE o.order_number = %s
+ORDER BY s.updated_at DESC
+LIMIT 1
+"""
+
 
 class OrderRepository:
     def __init__(self, database: Database) -> None:
@@ -108,22 +128,58 @@ class OrderRepository:
         return None
 
     def read_authorized(
-        self, *, order_number: str, user_id: str, organization_id: str
-    ) -> OrderRecord | None:
-        """The authorized read, under full request context."""
+        self,
+        *,
+        order_number: str,
+        user_id: str,
+        organization_id: str,
+        roles: list[str] | None = None,
+        include_items: bool = False,
+        include_shipment: bool = False,
+    ) -> dict[str, Any] | None:
+        """The authorized read, under full request context.
+
+        Items and shipment are fetched in the same transaction as the order, so all three see one
+        consistent snapshot and all three pass through the same row policy.
+        """
         with self._db.transaction(
-            user_id=user_id, organization_id=organization_id, read_only=True
+            user_id=user_id, organization_id=organization_id, roles=roles, read_only=True
         ) as cur:
             cur.execute(_SELECT_ORDER, (order_number,))
             row = cur.fetchone()
+            if not row:
+                return None
 
-        if not row:
-            return None
-        return OrderRecord(
-            order_number=row["order_number"],
-            status=row["status"],
-            currency=row["currency"],
-            total_amount=row["total_amount"],
-            placed_at=row["placed_at"],
-            updated_at=row["updated_at"],
-        )
+            record: dict[str, Any] = {
+                "order_number": row["order_number"],
+                "status": row["status"],
+                "currency": row["currency"],
+                "total_amount": str(row["total_amount"]),
+                "placed_at": row["placed_at"],
+                "updated_at": row["updated_at"],
+            }
+
+            if include_items:
+                cur.execute(_SELECT_ITEMS, (order_number,))
+                record["items"] = [
+                    {
+                        "sku": item["sku"],
+                        "description": item["description"],
+                        "quantity": item["quantity"],
+                        "unit_amount": str(item["unit_amount"]),
+                    }
+                    for item in cur.fetchall()
+                ]
+
+            if include_shipment:
+                cur.execute(_SELECT_SHIPMENT, (order_number,))
+                shipment = cur.fetchone()
+                if shipment:
+                    record["shipment"] = {
+                        "status": shipment["status"],
+                        "carrier": shipment["carrier"],
+                        "tracking_ref": shipment["tracking_ref"],
+                        "updated_at": shipment["updated_at"],
+                    }
+
+        return record
