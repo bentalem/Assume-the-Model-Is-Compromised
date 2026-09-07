@@ -33,6 +33,7 @@ APPROVED_OPERATIONS = {
     "search_customers",
     "get_customer",
     "get_ticket",
+    "add_internal_note",
 }
 
 # Names the server derives from verified identity. A parameter with one of these names would mean
@@ -105,10 +106,16 @@ def audit(spec: dict) -> list[str]:
                 ):
                     findings.append(f"{operation_id}: string parameter '{name}' is unbounded")
 
-            success = operation.get("responses", {}).get("200", {})
-            content = success.get("content", {}).get("application/json", {})
-            if not content.get("schema"):
-                findings.append(f"{operation_id}: 200 response has no schema")
+            # Any 2xx, not just 200: a creation route answers 201, and requiring 200 would
+            # report a correct route as broken.
+            responses = operation.get("responses", {})
+            success_codes = [c for c in responses if c.startswith("2")]
+            if not success_codes:
+                findings.append(f"{operation_id}: no success response documented")
+            for code in success_codes:
+                content = responses[code].get("content", {}).get("application/json", {})
+                if not content.get("schema"):
+                    findings.append(f"{operation_id}: {code} response has no schema")
 
     for schema_name, schema in spec.get("components", {}).get("schemas", {}).items():
         if schema.get("additionalProperties") is True:

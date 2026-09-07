@@ -203,8 +203,90 @@ paths:
           description: Not found or not allowed
         '503':
           description: Service unavailable
+  /v1/tickets/{ticket_number}/notes:
+    post:
+      tags:
+      - tickets
+      summary: Add an internal note to a ticket
+      operationId: add_internal_note
+      parameters:
+      - name: ticket_number
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 16
+          pattern: ^TKT-[0-9]{4,12}$
+          description: Ticket number in the form TKT-nnnn
+          examples:
+          - TKT-1001
+          title: Ticket Number
+        description: Ticket number in the form TKT-nnnn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNoteRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateNoteResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthenticated
+        '404':
+          description: Not found or not allowed
+        '409':
+          description: The ticket changed; the note was not written
+        '503':
+          description: Service unavailable
 components:
   schemas:
+    CreateNoteRequest:
+      properties:
+        body:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Body
+          description: The note text. Staff-only; never shown to the customer.
+        expected_ticket_status:
+          $ref: '#/components/schemas/TicketStatus'
+          description: The ticket status the caller believes is current. The write is refused if the ticket
+            has moved on, so a note is never attached to a ticket that changed underneath.
+      additionalProperties: false
+      type: object
+      required:
+      - body
+      - expected_ticket_status
+      title: CreateNoteRequest
+      description: 'The request body.
+
+
+        Note what is absent: author, organization, user id, timestamp. All are server-derived. With
+
+        `extra="forbid"`, a model that tries to supply one gets a 400 rather than a quiet drop.'
+    CreateNoteResponse:
+      properties:
+        note_id:
+          type: string
+          title: Note Id
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      additionalProperties: false
+      type: object
+      required:
+      - note_id
+      - created_at
+      title: CreateNoteResponse
     CustomerResponse:
       properties:
         customer_ref:
@@ -457,3 +539,11 @@ components:
       - updated_at
       - messages
       title: TicketResponse
+    TicketStatus:
+      type: string
+      enum:
+      - open
+      - pending
+      - resolved
+      - closed
+      title: TicketStatus

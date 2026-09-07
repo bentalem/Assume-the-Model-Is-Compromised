@@ -3,12 +3,12 @@
 > Source: `07_SupportPilot_Work_Breakdown_and_Backlog.docx` (SP-PLAN-002 v1.0, 2026-09-07)
 > **This is the working tracker.** Check a box only when the closing evidence exists.
 
-**Progress:** 42 / 99 tasks · current phase: **3** · next task: `P3-01`
+**Progress:** 51 / 99 tasks · current phase: **4** · next task: `P4-01`
 
-Phases 0–2 are code-complete. Outstanding in them: the gate reviews, and the tasks that need
+Phases 0–3 are code-complete. Outstanding in them: the gate reviews, and the tasks that need
 Onyx running (`P1-04`, `P1-16`, `P2-12`) — see ADR-0002.
 
-Evidence: 96 API tests · 28 policy tests · 16 environment checks (`evidence/verify-local-*.json`)
+Evidence: 107 API tests · 35 policy tests · 16 environment checks (`evidence/verify-local-*.json`)
 · 11 abuse cases (`evidence/abuse-suite-*.json`).
 
 Size: `S` ≤ 1 day · `M` 2–3 days · `L` ≥ 4 days (split if it cannot finish in a week).
@@ -124,15 +124,15 @@ resistance to instructions stored in business data.*
 *Goal: one controlled write, with authorship from verified identity and proven concurrency and audit
 behavior.*
 
-- [ ] **P3-01** `WS-D` `M` — Add internal note constraints: length, content type, ticket ownership, organization. *Deps:* P2-18
-- [ ] **P3-02** `WS-D` `M` — Add insert policies for internal notes, API role only. *Deps:* P3-01
-- [ ] **P3-03** `WS-E` `M` — Build `add_internal_note` with strict schema and **server-derived** author identity. *Deps:* P3-02
-- [ ] **P3-04** `WS-C` `M` — Add OPA rules and tests for `note.create`, incl. role and ticket-state conditions. *Deps:* P3-03
-- [ ] **P3-05** `WS-E` `M` — Add expected-current-state checks to prevent stale writes. *Deps:* P3-03
-- [ ] **P3-06** `WS-E` `M` — Write business state and audit evidence in one transaction. *Evidence:* a forced audit failure rolls back the note. *Deps:* P3-05
-- [ ] **P3-07** `WS-H` `M` — Negative tests: cross-tenant ticket, unauthorized role, oversized content, injected instructions in note text. *Deps:* P3-06
-- [ ] **P3-08** `WS-F` `S` — Register the write operation in the OpenAPI document and Onyx agent. *Deps:* P3-06
-- [ ] **P3-09** `WS-H` `S` — Run the phase 3 test set; store results. *Deps:* P3-07, P3-08
+- [x] **P3-01** `WS-D` `M` — Add internal note constraints: length, content type, ticket ownership, organization. *Deps:* P2-18
+- [x] **P3-02** `WS-D` `M` — Add insert policies for internal notes, API role only. *Deps:* P3-01
+- [x] **P3-03** `WS-E` `M` — Build `add_internal_note` with strict schema and **server-derived** author identity. *Deps:* P3-02
+- [x] **P3-04** `WS-C` `M` — Add OPA rules and tests for `note.create`, incl. role and ticket-state conditions. *Deps:* P3-03
+- [x] **P3-05** `WS-E` `M` — Add expected-current-state checks to prevent stale writes. *Deps:* P3-03
+- [x] **P3-06** `WS-E` `M` — Write business state and audit evidence in one transaction. *Evidence:* a forced audit failure rolls back the note. *Deps:* P3-05
+- [x] **P3-07** `WS-H` `M` — Negative tests: cross-tenant ticket, unauthorized role, oversized content, injected instructions in note text. *Deps:* P3-06
+- [x] **P3-08** `WS-F` `S` — Register the write operation in the OpenAPI document and Onyx agent. *Deps:* P3-06
+- [x] **P3-09** `WS-H` `S` — Run the phase 3 test set; store results. *Deps:* P3-07, P3-08
 - [ ] **P3-10** `WS-E` `S` — Run the phase 3 gate review. *Evidence:* signed gate record for M3. *Deps:* P3-09
 
 ## Phase 4 — Approval and worker (W11–W14, → M4)

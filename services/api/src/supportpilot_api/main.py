@@ -18,10 +18,12 @@ from .errors import ApiError
 from .pipeline import Pipeline
 from .policy.client import PolicyClient
 from .repositories.memberships import MembershipRepository
+from .repositories.notes import NoteRepository
 from .repositories.customers import CustomerRepository
 from .repositories.orders import OrderRepository
 from .repositories.tickets import TicketRepository
 from .tools import customers as customers_tool
+from .tools import notes as notes_tool
 from .tools import orders as orders_tool
 from .tools import tickets as tickets_tool
 
@@ -38,6 +40,7 @@ class Services:
     orders: OrderRepository
     customers: CustomerRepository
     tickets: TicketRepository
+    notes: NoteRepository
     pipeline: Pipeline
 
 
@@ -60,6 +63,7 @@ def build_services(settings: Settings) -> Services:
         orders=OrderRepository(database),
         customers=CustomerRepository(database),
         tickets=TicketRepository(database),
+        notes=NoteRepository(database, audit),
         pipeline=Pipeline(policy, audit),
     )
 
@@ -103,6 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(orders_tool.router)
     app.include_router(customers_tool.router)
     app.include_router(tickets_tool.router)
+    app.include_router(notes_tool.router)
 
     # --------------------------------------------------------------------------------------------
     # Error handling. Every response body is {"error": {"code", "request_id"}} and nothing else.

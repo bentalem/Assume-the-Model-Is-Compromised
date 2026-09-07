@@ -196,3 +196,37 @@ decision := deny("role_not_permitted_for_action") if {
 	in_tenant
 	not any_role(read_roles)
 }
+
+# ------------------------------------------------------------------------------------------------
+# note.create
+#
+# A closed ticket does not take new notes: the record of a closed case should not keep changing.
+# That is a business rule, so it lives here rather than in application code, and the deny arm names
+# the reason so the audit trail explains itself.
+# ------------------------------------------------------------------------------------------------
+note_authors := {"support_agent", "support_manager"}
+
+decision := allow_with("same_organization_and_allowed_role", {}) if {
+	input.action == "note.create"
+	in_tenant
+	any_role(note_authors)
+	input.resource.status != "closed"
+}
+
+decision := deny("not_a_member_of_resource_organization") if {
+	input.action == "note.create"
+	not in_tenant
+}
+
+decision := deny("role_not_permitted_for_action") if {
+	input.action == "note.create"
+	in_tenant
+	not any_role(note_authors)
+}
+
+decision := deny("resource_state_forbids_action") if {
+	input.action == "note.create"
+	in_tenant
+	any_role(note_authors)
+	input.resource.status == "closed"
+}

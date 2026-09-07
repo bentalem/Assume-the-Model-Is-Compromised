@@ -330,3 +330,79 @@ test_agent_plus_manager_sees_restricted_contact_details if {
 	d.allow
 	"email" in d.obligations.allowed_fields
 }
+
+# ================================================================================================
+# Phase 3 — note.create
+# ================================================================================================
+
+ticket_in_status(status) := {
+	"type": "ticket",
+	"id": "TKT-1001",
+	"organization_id": "11111111-1111-1111-1111-111111111111",
+	"status": status,
+	"assigned_team": "team-north",
+}
+
+test_agent_may_add_a_note_to_an_open_ticket if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "note.create", ticket_in_status("open"),
+	)
+	d.allow
+}
+
+test_manager_may_add_a_note if {
+	d := authz.decision with input as act(
+		alice(["support_manager"]), "note.create", ticket_in_status("pending"),
+	)
+	d.allow
+}
+
+# A closed case stops accumulating commentary. This is a business rule, so it belongs in policy
+# rather than in application code where it would be invisible to review.
+test_no_notes_on_a_closed_ticket if {
+	d := authz.decision with input as act(
+		alice(["support_agent"]), "note.create", ticket_in_status("closed"),
+	)
+	not d.allow
+	d.reason == "resource_state_forbids_action"
+}
+
+test_auditor_may_not_write_notes if {
+	d := authz.decision with input as act(
+		alice(["auditor"]), "note.create", ticket_in_status("open"),
+	)
+	not d.allow
+	d.reason == "role_not_permitted_for_action"
+}
+
+test_finance_approver_may_not_write_notes if {
+	d := authz.decision with input as act(
+		alice(["finance_approver"]), "note.create", ticket_in_status("open"),
+	)
+	not d.allow
+	d.reason == "role_not_permitted_for_action"
+}
+
+test_note_create_denied_outside_tenant if {
+	d := authz.decision with input as act(alice(["support_agent"]), "note.create", {
+		"type": "ticket",
+		"id": "TKT-3001",
+		"organization_id": "22222222-2222-2222-2222-222222222222",
+		"status": "open",
+	})
+	not d.allow
+	d.reason == "not_a_member_of_resource_organization"
+}
+
+# Four arms again: exactly one must fire for any role and status.
+test_note_create_has_exactly_one_decision_for_every_combination if {
+	roles := [["support_agent"], ["support_manager"], ["auditor"], ["finance_approver"], []]
+	statuses := ["open", "pending", "resolved", "closed"]
+	every role in roles {
+		every status in statuses {
+			d := authz.decision with input as act(alice(role), "note.create", ticket_in_status(status))
+			is_boolean(d.allow)
+			is_string(d.reason)
+		}
+	}
+}
