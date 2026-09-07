@@ -24,7 +24,11 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+# Two formats of one document. YAML is what a human reviews in a diff; Onyx's "Add OpenAPI Action"
+# accepts JSON only, so the JSON is what actually gets pasted. Both are generated from the same
+# schema in the same run, so they cannot drift apart.
 OUTPUT = REPO / "openapi" / "supportpilot-actions.yaml"
+OUTPUT_JSON = REPO / "openapi" / "supportpilot-actions.json"
 
 # The registered action set. Adding to this list is a control-plane change and needs the review in
 # SP-OPS-001 section 10 — it is not a side effect of writing a route.
@@ -135,6 +139,12 @@ def audit(spec: dict) -> list[str]:
     return findings
 
 
+def to_json(spec: dict) -> str:
+    """The paste-ready form. A JSON document carries no comments, so the note about it being
+    generated goes in the description rather than being lost."""
+    return json.dumps(spec, indent=2, ensure_ascii=False) + chr(10)
+
+
 def to_yaml(spec: dict) -> str:
     try:
         import yaml
@@ -174,22 +184,25 @@ def main() -> int:
         if method in {"get", "post", "put", "patch", "delete"}
     )
 
+    rendered_json = to_json(spec)
+
     if check_only:
-        if not OUTPUT.exists():
-            print(f"{OUTPUT.relative_to(REPO)} does not exist; run without --check")
-            return 1
-        if OUTPUT.read_text(encoding="utf-8") != rendered:
-            print(
-                f"{OUTPUT.relative_to(REPO)} is out of date with the running code.\n"
-                "Regenerate it and review the diff before merging."
-            )
-            return 1
-        print(f"OK: {OUTPUT.relative_to(REPO)} matches the code. Operations: {', '.join(operations)}")
+        for path, expected in ((OUTPUT, rendered), (OUTPUT_JSON, rendered_json)):
+            if not path.exists():
+                print(f"{path.relative_to(REPO)} does not exist; run without --check")
+                return 1
+            if path.read_text(encoding="utf-8") != expected:
+                print(f"{path.relative_to(REPO)} is out of date with the running code.")
+                print("Regenerate it and review the diff before merging.")
+                return 1
+        print(f"OK: action document matches the code. Operations: {', '.join(operations)}")
         return 0
 
     OUTPUT.parent.mkdir(exist_ok=True)
     OUTPUT.write_text(rendered, encoding="utf-8")
-    print(f"Wrote {OUTPUT.relative_to(REPO)}")
+    OUTPUT_JSON.write_text(rendered_json, encoding="utf-8")
+    print(f"Wrote {OUTPUT.relative_to(REPO)}       (for review and diffs)")
+    print(f"Wrote {OUTPUT_JSON.relative_to(REPO)}  (paste this into Onyx)")
     print(f"Registered operations: {', '.join(operations)}")
     return 0
 

@@ -41,6 +41,8 @@ they must produce.
 | [../specs/database-schema.md](../specs/database-schema.md) | DDL, roles, grants, RLS policies, migration order |
 | [../specs/api-contract.md](../specs/api-contract.md) | Endpoints, schemas, error model, request pipeline |
 | [../specs/policy-contract.md](../specs/policy-contract.md) | OPA input and output shape, rules, reason codes, tests |
+| `openapi/supportpilot-actions.yaml` | The registered action set, for review — generated |
+| `openapi/supportpilot-actions.json` | The same document, for pasting into Onyx — generated |
 
 ## Identifier conventions
 

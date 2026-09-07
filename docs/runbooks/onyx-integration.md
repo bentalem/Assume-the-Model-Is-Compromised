@@ -177,11 +177,13 @@ is the control-plane separation in SP-ARCH-001 §5, and it is why alice has no a
 
 **Admin Panel → Actions → Add OpenAPI Action.**
 
-1. Paste `openapi/supportpilot-actions.yaml` — all 7 operations. Regenerate it first if a tool has
-   changed:
+1. Paste **`openapi/supportpilot-actions.json`** — all 7 operations. Onyx's Add OpenAPI Action
+   accepts JSON only, not YAML. Regenerate first if a tool has changed:
    ```bash
    python scripts/export_openapi.py
    ```
+   That writes both files from the same schema in one run, so they cannot drift: the YAML is what
+   you review in a diff, the JSON is what you paste.
 2. **Turn on "Pass through user's OAuth token".** This is the setting the whole design depends on.
 3. Leave custom headers empty — Onyx refuses passthrough combined with them.
 
