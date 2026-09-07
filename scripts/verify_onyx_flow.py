@@ -203,7 +203,43 @@ def main() -> int:
             raise Missing(
                 "passthrough is on but custom headers are set; Onyx refuses that combination"
             )
-        return f"'{detail[0]}' with passthrough on and no custom headers"
+
+        # A stale paste is the quiet failure here: an older schema registers cleanly and simply
+        # lacks the newer tools, so the agent silently cannot do half its job.
+        expected = {
+            "get_order", "search_customers", "get_customer", "get_ticket",
+            "add_internal_note", "propose_refund", "get_action_status",
+        }
+        schema_ops = onyx_sql(
+            "SELECT coalesce(string_agg(DISTINCT op.value->>'operationId', ','), '') "
+            "FROM tool t, jsonb_each(t.openapi_schema->'paths') AS path(p_key, p_val), "
+            "jsonb_each(path.p_val) AS op(m_key, value) "
+            "WHERE t.passthrough_auth AND op.value ? 'operationId'"
+        )
+        present = {o for o in schema_ops.split(",") if o}
+        missing = expected - present
+        if missing:
+            raise Missing(
+                f"the registered schema is out of date — missing {', '.join(sorted(missing))}. "
+                f"Re-paste openapi/supportpilot-actions.yaml (run scripts/export_openapi.py first)."
+            )
+        return f"'{detail[0]}': {len(present)} operations, passthrough on, no custom headers"
+
+    @check("4b", "The action is attached to an agent")
+    def _():
+        rows = onyx_sql(
+            "SELECT p.name || ' (' || count(*)::text || ' tool(s))' "
+            "FROM persona p JOIN persona__tool pt ON pt.persona_id = p.id "
+            "JOIN tool t ON t.id = pt.tool_id "
+            "WHERE t.openapi_schema IS NOT NULL AND t.passthrough_auth "
+            "GROUP BY p.name"
+        )
+        if not rows:
+            raise Missing(
+                "the action exists but no agent has it enabled, so nothing can call it. "
+                "Open the agent in Onyx and turn the SupportPilot action on under Actions."
+            )
+        return rows.replace(chr(10), ", ")
 
     @check("5", "A tool call reached the API carrying the user's own identity")
     def _():

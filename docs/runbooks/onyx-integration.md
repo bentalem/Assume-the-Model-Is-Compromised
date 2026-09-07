@@ -172,9 +172,13 @@ different name needs a matching redirect URI in Keycloak.
 
 ## Step 3 — register the action
 
+Sign in as your **Onyx admin** for this, not as alice. Support agents are not administrators — that
+is the control-plane separation in SP-ARCH-001 §5, and it is why alice has no admin role here.
+
 **Admin Panel → Actions → Add OpenAPI Action.**
 
-1. Paste `openapi/supportpilot-actions.yaml`. Regenerate it first if you have changed a tool:
+1. Paste `openapi/supportpilot-actions.yaml` — all 7 operations. Regenerate it first if a tool has
+   changed:
    ```bash
    python scripts/export_openapi.py
    ```
@@ -183,6 +187,25 @@ different name needs a matching redirect URI in Keycloak.
 
 The document carries `servers: http://api:8000`, which is the API's address on the internal `app`
 network. The API publishes no host port on purpose, so this is the only route to it.
+
+A stale paste is the quiet failure here: an older schema registers cleanly and simply lacks the
+newer tools, so the agent silently cannot do half its job. `verify_onyx_flow.py` compares the
+registered operation set against the expected seven.
+
+## Step 3b — attach it to the agent, and set its instructions
+
+Registering an action does not make any agent use it.
+
+1. Open the agent (or create one) and enable the SupportPilot action under **Actions**.
+2. Paste the system prompt from
+   [`../../infrastructure/local/onyx/agent-instructions.md`](../../infrastructure/local/onyx/agent-instructions.md).
+3. Set the tool-call budget to **8** per turn.
+
+The instructions are not a security control — every rule the release depends on is enforced by the
+API, OPA and the database, and the abuse suite proves it with no model in the loop. What they
+prevent is the agent being misleading in ways a boundary cannot catch: saying a refund was issued
+when it is pending, retrying a denial, or inventing an order. They are deliberately written to shape
+honesty rather than permission, and changing them is a control-plane change.
 
 ## Step 4 — sign in and verify
 
