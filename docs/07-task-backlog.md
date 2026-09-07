@@ -3,7 +3,7 @@
 > Source: `07_SupportPilot_Work_Breakdown_and_Backlog.docx` (SP-PLAN-002 v1.0, 2026-09-07)
 > **This is the working tracker.** Check a box only when the closing evidence exists.
 
-**Progress:** 25 / 99 tasks · current phase: **1** · next task: `P1-03` (MFA policy)
+**Progress:** 26 / 99 tasks · current phase: **1** · next task: `P1-03` (MFA policy)
 
 Phase 0 is complete except its gate review (`P0-12`). Phase 1 is complete except the three
 tasks that need Onyx running (`P1-04`, `P1-16`) or a decision (`P1-03`), plus `P1-19`/`P1-20`.
@@ -42,7 +42,7 @@ network and secret boundaries already in place.*
       *Evidence:* environment reports healthy without manual retries. *Deps:* P0-06
 - [x] **P0-10** `WS-A` `M` — Write `scripts/bootstrap-local.ps1` and `scripts/verify-local.ps1`.
       *Evidence:* one command starts; one command reports pass/fail per check. *Deps:* P0-09
-- [ ] **P0-11** `WS-I` `S` — Add secret-scanning and formatting to pre-commit or pipeline.
+- [x] **P0-11** `WS-I` `S` — Add secret-scanning and formatting to pre-commit or pipeline.
       *Evidence:* a committed test secret is blocked. *Deps:* P0-02
 - [ ] **P0-12** `WS-A` `S` — Run the phase 0 gate review.
       *Evidence:* signed gate record for M0. *Deps:* P0-10, P0-11
