@@ -112,6 +112,22 @@ def audit(spec: dict) -> list[str]:
                 ):
                     findings.append(f"{operation_id}: string parameter '{name}' is unbounded")
 
+                # No array-typed query parameters.
+                #
+                # An array has several wire forms — repeated params, comma-joined, a JSON array —
+                # and clients disagree. Onyx sent include=["shipment"] where FastAPI expected
+                # include=shipment, and a correct model request failed as invalid_request. Every
+                # local test passed, because the tests built the URL themselves.
+                #
+                # Accepting more forms would mean more parsing paths to validate. Splitting into
+                # scalars removes the ambiguity instead: prefer the parameter shape with the fewest
+                # ways to express it.
+                if parameter.get("in") == "query" and schema.get("type") == "array":
+                    findings.append(
+                        f"{operation_id}: query parameter '{name}' is an array. Clients serialise "
+                        f"arrays inconsistently; split it into scalar parameters."
+                    )
+
             # Any 2xx, not just 200: a creation route answers 201, and requiring 200 would
             # report a correct route as broken.
             responses = operation.get("responses", {})

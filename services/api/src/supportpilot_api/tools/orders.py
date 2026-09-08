@@ -8,7 +8,6 @@ did not allow.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
@@ -22,17 +21,6 @@ router = APIRouter(prefix="/v1", tags=["orders"])
 
 ORDER_NUMBER_PATTERN = r"^ORD-[0-9]{4,12}$"
 MAX_ITEMS = 50
-
-
-class OrderInclude(str, Enum):
-    """What extra detail to return.
-
-    An enumeration rather than a free string: the model can ask for items or shipment and nothing
-    else, and an unexpected value is a schema rejection rather than something the server interprets.
-    """
-
-    items = "items"
-    shipment = "shipment"
 
 
 class OrderItem(BaseModel):
@@ -98,10 +86,22 @@ def get_order(
         ),
     ],
     scope: Annotated[RequestScope, Depends(request_scope)],
-    include: Annotated[
-        list[OrderInclude] | None,
-        Query(description="Optional extra detail: items, shipment"),
-    ] = None,
+    # Two booleans rather than one array.
+    #
+    # An array query parameter has several wire forms — repeated params, a comma-joined value, a
+    # JSON array — and clients disagree about which to send. Onyx sent `include=["shipment"]`,
+    # FastAPI expects `include=shipment`, and the call failed with invalid_request even though the
+    # model had asked for exactly the right thing.
+    #
+    # The fix is not to accept every form: each extra accepted shape is another parsing path to get
+    # right. It is to choose the parameter shape with the fewest ways to express it. A boolean has
+    # two accepted values, the framework validates them, and no client can serialise it wrongly.
+    include_items: Annotated[
+        bool, Query(description="Include the order's line items")
+    ] = False,
+    include_shipment: Annotated[
+        bool, Query(description="Include shipment and tracking status")
+    ] = False,
 ) -> OrderResponse:
     # Steps 1 and 2 are already done: the path pattern rejected a malformed identifier before this
     # body ran, and `request_scope` verified the token and loaded the subject before any resource
@@ -138,8 +138,6 @@ def get_order(
         resource_id=order_number,
     )
 
-    requested = set(include or [])
-
     # Steps 7 and 8 — the authorized read, under transaction-local request context. Row security
     # filters this a second time even though policy already allowed it.
     record = scope.orders.read_authorized(
@@ -147,8 +145,8 @@ def get_order(
         user_id=auth.subject.user_id,
         organization_id=auth.organization_id,
         roles=auth.subject.roles_in(auth.organization_id),
-        include_items=OrderInclude.items in requested,
-        include_shipment=OrderInclude.shipment in requested,
+        include_items=include_items,
+        include_shipment=include_shipment,
     )
     if record is None:
         # Allowed by policy but invisible to row security: the two layers disagree, which means a

@@ -38,25 +38,28 @@
             "description": "Order number in the form ORD-nnnn"
           },
           {
-            "name": "include",
+            "name": "include_items",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OrderInclude"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optional extra detail: items, shipment",
-              "title": "Include"
+              "type": "boolean",
+              "description": "Include the order's line items",
+              "default": false,
+              "title": "Include Items"
             },
-            "description": "Optional extra detail: items, shipment"
+            "description": "Include the order's line items"
+          },
+          {
+            "name": "include_shipment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include shipment and tracking status",
+              "default": false,
+              "title": "Include Shipment"
+            },
+            "description": "Include shipment and tracking status"
           }
         ],
         "responses": {
@@ -710,15 +713,6 @@
           "full_name"
         ],
         "title": "CustomerSummary"
-      },
-      "OrderInclude": {
-        "type": "string",
-        "enum": [
-          "items",
-          "shipment"
-        ],
-        "title": "OrderInclude",
-        "description": "What extra detail to return.\n\nAn enumeration rather than a free string: the model can ask for items or shipment and nothing\nelse, and an unexpected value is a schema rejection rather than something the server interprets."
       },
       "OrderItem": {
         "properties": {
