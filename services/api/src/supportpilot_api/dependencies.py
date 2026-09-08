@@ -12,7 +12,10 @@ from dataclasses import dataclass
 
 from fastapi import Header, Request
 
+import logging
+
 from .auth.tokens import VerifiedToken, bearer_from_header
+from .errors import invalid_request
 from .pipeline import Pipeline
 from .repositories.memberships import Subject
 from .repositories.actions import ActionRepository
@@ -20,6 +23,9 @@ from .repositories.notes import NoteRepository
 from .repositories.customers import CustomerRepository
 from .repositories.orders import OrderRepository
 from .repositories.tickets import TicketRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -46,6 +52,8 @@ def request_scope(
 ) -> RequestScope:
     services = request.app.state.services
 
+    _reject_unknown_query_parameters(request)
+
     # A caller-supplied correlation id is accepted but never trusted as data: it is bounded and
     # stripped of anything that could forge a log line.
     request_id = _safe_request_id(x_request_id)
@@ -66,6 +74,35 @@ def request_scope(
         notes=services.notes,
         actions=services.actions,
     )
+
+
+def _reject_unknown_query_parameters(request: Request) -> None:
+    """Refuse a query parameter the route does not declare.
+
+    HTTP convention is to ignore unknown parameters. For a tool API that convention is a trap: a
+    model sending `include_item=true` (no plural) would get a clean 200 with no items and reasonably
+    conclude it had asked for them. Silence is the worst possible answer to give a caller that
+    cannot see the schema it violated.
+
+    Rejecting is also the same rule the response models already follow — `extra="forbid"` — applied
+    to the request side, so the contract is strict in both directions.
+    """
+    route = request.scope.get("route")
+    declared = {p.alias for p in getattr(route, "dependant", None).query_params} if route else None
+    if declared is None:
+        return
+
+    # Dependencies declare their own parameters; collect those too rather than special-casing.
+    for dependency in getattr(route.dependant, "dependencies", []):
+        declared |= {p.alias for p in dependency.query_params}
+
+    unknown = set(request.query_params) - declared
+    if unknown:
+        logger.info(
+            "request_rejected",
+            extra={"path": request.url.path, "reason": "unknown_query_parameter"},
+        )
+        raise invalid_request()
 
 
 def _safe_request_id(value: str | None) -> str:

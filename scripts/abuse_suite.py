@@ -231,8 +231,11 @@ def main() -> int:
     @check("TS7-07", "Argument manipulation is rejected by schema")
     def _():
         payloads = [
-            "/v1/orders/ORD-2001?include=all",                 # value outside the enum
-            "/v1/orders/ORD-2001?include=items&include=../../", # traversal in an enum
+            # A parameter the route does not declare — including one that used to exist. Silently
+            # ignoring these would let a model believe it had asked for something it had not.
+            "/v1/orders/ORD-2001?include=all",
+            "/v1/orders/ORD-2001?include_item=true",            # plausible typo, must not be ignored
+            "/v1/orders/ORD-2001?include_items=true&evil=../../",
             "/v1/customers?q=" + "A" * 500,                     # oversized
             "/v1/customers?q=Priya&limit=9999",                 # over the cap
             "/v1/customers?q=Priya&limit=-1",                   # negative

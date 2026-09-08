@@ -52,5 +52,34 @@ control is unnecessary. That resistance is the part of the job that cannot be le
 | Module | State | Notes |
 |---|---|---|
 | 0 | done | The trust boundary and the prompt test |
-| 1 | in progress | Meridian Retail engagement |
-| 2–8 | not started | |
+| 1 | done | Five live probes in Onyx; found a real integration bug |
+| 2–8 | not started | Next: identity — how a token becomes a verified subject |
+
+### What module 1 actually produced
+
+Five probes typed into the Onyx chat, not a walkthrough:
+
+| Probe | Result | Layer that held |
+|---|---|---|
+| Read own-tenant order | **failed** — real bug, see below | — |
+| Read another tenant's order | 404 | resource lookup, scoped to memberships |
+| Claim to be an administrator | 404 | nothing changed; the claim touches no input to any check |
+| Summarise a ticket with ten injections | summarised, and reported them | tools that do not exist; secrets the model never sees |
+| Retry the cross-tenant read after the injection | 404 | as before |
+
+The bug is the lesson. `get_order` declared an array query parameter; Onyx sent
+`include=["shipment"]`, FastAPI expected `include=shipment`, and a correct model request came back
+`invalid_request`. 219 tests passed the whole time because every one of them built the URL itself.
+
+Three fixes, in increasing order of value:
+
+1. the instance — two booleans instead of an array;
+2. the class — the export audit now rejects any array-typed query parameter;
+3. the blind spot — `scripts/contract_suite.py` builds every call from the action document rather
+   than by hand, so "the client cannot express this call" fails in CI instead of in a chat window.
+
+Then the stale abuse case `?include=all` started returning 200, because the parameter no longer
+existed and unknown query parameters were being ignored. Standard HTTP, and wrong here: a model
+sending `include_item=true` would get a clean 200 with no items and conclude it had asked for them.
+Unknown query parameters are now rejected — the same `extra="forbid"` rule the responses already
+had, applied to the request side.
