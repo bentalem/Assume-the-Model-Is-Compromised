@@ -240,7 +240,39 @@ def cmd_role(username: str, role: str) -> None:
     print(f"  {GREY}Ask the agent something in the SAME Onyx session and watch what changes.{RESET}\n")
 
 
-COMMANDS = {"token", "forge", "audience", "demote", "promote", "whois"}
+def cmd_actors() -> None:
+    """Who the API recorded as the actor, for recent tool calls.
+
+    The question this answers: when the agent calls a tool on bob's behalf, whose identity does the
+    API see? Not the agent's — the agent has none here. Each row is the person whose token was
+    attached to that call.
+    """
+    rows = sql(
+        "SELECT coalesce(u.identity_subject, a.actor_id) || ' | ' || a.action || ' | ' "
+        "|| a.decision || ' | ' || coalesce(a.reason,'-') || ' | ' "
+        "|| to_char(a.occurred_at, 'HH24:MI:SS') "
+        "FROM app.audit_events a LEFT JOIN app.users u ON u.id::text = a.actor_id "
+        "WHERE a.actor_type = 'user' "
+        "ORDER BY a.occurred_at DESC LIMIT 15"
+    )
+    print()
+    print(f"{BOLD}Who the API recorded, most recent first{RESET}")
+    print("-" * 78)
+    print(f"  {'actor':12} | {'action':16} | {'decision':9} | reason")
+    print("  " + "-" * 74)
+    for row in rows.splitlines():
+        parts = [p.strip() for p in row.split("|")]
+        if len(parts) < 5:
+            continue
+        actor, action, decision, reason, when = parts[:5]
+        colour = GREEN if decision in ("allowed", "succeeded") else YELLOW
+        print(f"  {actor:12} | {action:16} | {colour}{decision:9}{RESET} | {GREY}{reason}{RESET}")
+    print()
+    print(f"  {GREY}No row says 'onyx' or 'agent'. The API never learns one was involved.{RESET}")
+    print()
+
+
+COMMANDS = {"token", "forge", "audience", "demote", "promote", "whois", "actors"}
 
 
 def main() -> int:
@@ -258,6 +290,8 @@ def main() -> int:
         cmd_audience()
     elif command == "whois":
         cmd_whois(who)
+    elif command == "actors":
+        cmd_actors()
     elif command == "demote":
         cmd_role(who, "support_agent")
     elif command == "promote":
