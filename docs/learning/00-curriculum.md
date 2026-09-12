@@ -53,7 +53,51 @@ control is unnecessary. That resistance is the part of the job that cannot be le
 |---|---|---|
 | 0 | done | The trust boundary and the prompt test |
 | 1 | done | Five live probes in Onyx; found a real integration bug |
-| 2–8 | not started | Next: identity — how a token becomes a verified subject |
+| 2 | done | Identity, and then agent identity — which turned out to be the larger half |
+| 3–8 | not started | Next: authorization — policy as code, and why OPA is a separate service |
+
+### What module 2 produced
+
+Planned as "how a token becomes a verified subject". It split in two, and the second half was worth
+more than the first.
+
+**2a — the token.** Three stages people conflate: authentication (is it real), identification (who
+does it name), and authorization attributes (what is this person). The third is where systems fail,
+because the roles are right there in the token and reading them is one line shorter than loading
+them. Ours takes only `sub` from the token; everything else is read from `app.memberships` on every
+request. `scripts/learn_identity.py` decodes a real token, tampers with a claim, and mints a genuine
+token for a different audience.
+
+**2b — the agent.** The question that opened it was sharp: *does the agent's identity change with
+the user?* No — the agent has no identity in that path. It is a conduit for the user's token. Three
+architectures, and the difference between them is one header value:
+
+| | what is in `Authorization` | blast radius of an injection |
+|---|---|---|
+| A service account | the agent's own credential | the union of every user's permissions |
+| B service account + claimed user | the agent's credential, user id as a parameter | same, and it looks like per-user authorization |
+| C passthrough | the user's own token | what that one user could already do |
+
+`scripts/learn_service_account.py` builds A in the lab and measures it.
+
+### The session that taught the most
+
+Signed in as the service account, the agent returned northwind's order to a cedar session. Then,
+asked again via the planted instruction in TKT-1001, it **refused** — with a genuinely good reason:
+that a customer's claim does not establish the order is linked to them.
+
+One line of user frustration removed the refusal entirely.
+
+And the refusal had been narrated falsely: the agent said the retrieval was rejected. The audit
+trail says `allowed`, twice. It had the data and chose not to show it, then described that choice as
+an access control.
+
+Two things worth carrying from that:
+
+- **A model's reluctance is not a control.** It held for exactly one message.
+- **A model's narration of security events is not evidence.** Monitoring built on what the agent
+  says would have shown a denial that never happened. Only the audit trail, written by the API
+  before the model sees the result, is evidence.
 
 ### What module 1 actually produced
 
