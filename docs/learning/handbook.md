@@ -170,10 +170,51 @@ outside both are 404 — the reason is how you tell which layer acted.
 **Demonstrate it.** `python scripts/learn_authorization.py input | fields | matrix | outage | break`
 — then `restore`, always.
 
-### 2.5–2.10
+### 2.5 Tenant isolation
 
-Tenant isolation · tool authority · untrusted content · high-impact actions · evidence · secrets and
-the control plane · proving it. Written as each module completes.
+**The claim.** Row-level security is not an agent control. It is the control that turns an agent's
+mistakes into survivable ones.
+
+Tenancy can be enforced in three places: the `WHERE` clause of every query, the policy decision, or
+the table itself. The first two are enforced by *remembering*. Only the third is enforced by the
+engine. With a conventional application the first two are nearly sufficient, because the set of
+queries is finite and written by hand. With an agent the query paths explode, the caller is
+steerable by data, and tools accumulate — so the layer that does not depend on remembering is the
+one that keeps holding.
+
+**Three prerequisites, and all three are required:**
+
+| | without it |
+|---|---|
+| `ENABLE ROW LEVEL SECURITY` | the policy is not consulted at all |
+| `FORCE ROW LEVEL SECURITY` | the table's **owner** is exempt |
+| the runtime role has no `BYPASSRLS` / `SUPERUSER` | the role is exempt |
+
+**The failure that survives review.** The application connects as the role that ran the migrations,
+so it owns the tables, so `ENABLE` alone filters nothing. The policy is correct. The query is
+correct. `\d orders` shows the policy. The only wrong thing is the username in a connection string
+in another file. This is not a bug in the code — it is a bug in the history of the system.
+
+**Fail closed by arithmetic, not by an `if`.** The policy compares `organization_id` to
+`current_setting('app.organization_id')`. Unset, that is NULL; `organization_id = NULL` evaluates to
+NULL, not TRUE; no row qualifies. Forgetting the context returns **nothing**, never everything. A
+control whose failure mode is silence is worth far more than one whose failure mode is a log line.
+
+**What to ask.** Never "do you use row-level security" — the answer is always yes. Ask: *which role
+does the application connect as, does it own the tables, is FORCE set, does it hold BYPASSRLS.*
+`pg_class.relowner / relrowsecurity / relforcerowsecurity` and `pg_roles.rolbypassrls` answer all
+four, and neither requires reading the application.
+
+**Write it up correctly.** "No tenant isolation at the data layer" is a generic multi-tenancy
+finding, not an agent finding. Say so. Conflating the two is how a report loses its credibility with
+the engineers who have to act on it.
+
+**Demonstrate it.** `python scripts/learn_rls_ownership.py demo`
+
+### 2.6–2.10
+
+Tool authority · untrusted content · high-impact actions · evidence · secrets and the control plane ·
+proving it. Written as each module completes.
 
 ---
 

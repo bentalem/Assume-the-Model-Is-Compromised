@@ -37,7 +37,7 @@ ask a client are a consequence of knowing that, not a route to it.
 | 2 | Identity | A token says who, not what. Roles come from the database | done |
 | 2b | Agent identity | Which token is attached to the tool call decides the blast radius | done |
 | 3 | Authorization | The decision is a question, and policy is one link in a chain | done |
-| 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | |
+| 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | done |
 | 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | |
 | 6 | Untrusted content | Injection matters only where a boundary is missing | |
 | 7 | High-impact actions | propose → approve → execute, and payload binding | |
@@ -70,7 +70,8 @@ control is unnecessary. That resistance is the part of the job that cannot be le
 | 0–1 | done | The trust boundary; five live probes in Onyx, which found a real integration bug |
 | 2 | done | Identity, and then agent identity — which turned out to be the larger half |
 | 3 | done | Policy as code: the input, obligations, the matrix, an outage, and a broken rule |
-| 4–10 | not started | Next: tenant isolation — the layer that held when the policy did not |
+| 4 | done | Tenant isolation — one demonstration: the RLS configuration that filters nothing |
+| 5–10 | not started | Next: tool authority — the module that defines the role |
 
 ### What module 2 produced
 
@@ -143,3 +144,20 @@ existed and unknown query parameters were being ignored. Standard HTTP, and wron
 sending `include_item=true` would get a clean 200 with no items and conclude it had asked for them.
 Unknown query parameters are now rejected — the same `extra="forbid"` rule the responses already
 had, applied to the request side.
+
+### What module 4 produced
+
+Compressed to a single demonstration, because row-level security is ordinary multi-tenancy
+engineering and the question that opened the module was the right one: *this is not really an agent
+control, is it?* No. It is the control that makes an agent's mistakes survivable — worth knowing
+precisely, worth classifying correctly in a report, and not worth four exercises.
+
+The demonstration is the failure that survives code review: `scripts/learn_rls_ownership.py` builds a
+throwaway role that **owns** its table, attaches a correct policy, and shows the policy filtering
+nothing. `ENABLE` without `FORCE` exempts the owner. The same table one keyword later filters
+correctly, and with no tenant set returns zero rows rather than all of them.
+
+The carried lesson is the classification, not the mechanism: **"generic multi-tenancy gap" and
+"agent-specific gap" are different findings.** Most of agent security is not new. The genuinely new
+parts are narrow — untrusted input that is also control flow, tools as ambient authority,
+non-determinism — and a reviewer who cannot tell them apart writes reports engineers stop reading.
