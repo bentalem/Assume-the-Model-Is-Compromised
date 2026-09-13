@@ -20,20 +20,31 @@ model decides to ignore it?* If the answer is "the model", you have found a find
 
 ## Modules
 
-| # | Module | What you hand the client | Reference |
-|---|---|---|---|
-| 0 | The one idea | — | — |
-| 1 | Scoping the mandate | Scope and prohibited actions | [01](../01-product-requirements.md) |
-| 2 | Threat modelling an agent | Threat model | [02 §9](../02-architecture-and-security.md#9-threat-model) |
-| 3 | Identity and authorization | Authorization model review | [03](../03-data-identity-authorization.md) |
-| 4 | **Tool authority review** | Blast-radius report per tool | [api-contract](../../specs/api-contract.md) |
-| 5 | High-impact actions | propose/approve/execute review | [02 §7](../02-architecture-and-security.md#7-sensitive-action-flow) |
-| 6 | Proving it | Verification plan and evidence package | [09](../09-test-plan.md) |
-| 7 | Operating and change control | Runbooks, monitoring, change gates | [05 §7–10](../05-verification-and-operations.md) |
-| 8 | The consulting layer | Findings, gates, risk acceptance | [10](../10-risk-and-decisions.md) |
+Ordered by mechanism, not by engagement phase. An earlier version of this file ordered it the other
+way — scoping, threat model, then controls — which put a client roleplay in module 1, before there
+was anything to reason with. Learn what the controls are and how they fail first; the questions you
+ask a client are a consequence of knowing that, not a route to it.
 
-Module 4 is the one that distinguishes the role. Reading a tool schema and saying "that is more
-authority than this job needs" is what the client is paying for, and few people do it well.
+| # | Module | The claim it establishes | State |
+|---|---|---|---|
+| 0 | The one idea | The model is untrusted input | done |
+| 1 | The trust boundary | The model proposes; it has no identity and no authority | done |
+| 2 | Identity | A token says who, not what. Roles come from the database | done |
+| 2b | Agent identity | Which token is attached to the tool call decides the blast radius | done |
+| 3 | Authorization | The decision is a question, and policy is one link in a chain | done |
+| 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | |
+| 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | |
+| 6 | Untrusted content | Injection matters only where a boundary is missing | |
+| 7 | High-impact actions | propose → approve → execute, and payload binding | |
+| 8 | Evidence | An audit trail that can reconstruct, and a model's narration that cannot | |
+| 9 | Secrets and the control plane | What a runtime service must never be able to change | |
+| 10 | Proving it | Tests that do not lie, and what counts as evidence | |
+
+Module 5 is the one that distinguishes the role. Reading a tool schema and saying "that is more
+authority than this job needs" is what a client is paying for, and few people do it well.
+
+The consulting layer — running the engagement, writing findings, risk acceptance with an owner and
+an expiry — comes after all of it, for the reason at the top of this section.
 
 ## How each module runs
 
@@ -51,10 +62,10 @@ control is unnecessary. That resistance is the part of the job that cannot be le
 
 | Module | State | Notes |
 |---|---|---|
-| 0 | done | The trust boundary and the prompt test |
-| 1 | done | Five live probes in Onyx; found a real integration bug |
+| 0–1 | done | The trust boundary; five live probes in Onyx, which found a real integration bug |
 | 2 | done | Identity, and then agent identity — which turned out to be the larger half |
-| 3–8 | not started | Next: authorization — policy as code, and why OPA is a separate service |
+| 3 | done | Policy as code: the input, obligations, the matrix, an outage, and a broken rule |
+| 4–10 | not started | Next: tenant isolation — the layer that held when the policy did not |
 
 ### What module 2 produced
 
