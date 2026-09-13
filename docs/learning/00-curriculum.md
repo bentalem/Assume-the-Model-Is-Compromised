@@ -6,6 +6,11 @@ the team building their agent and say where they are wrong, before it costs them
 SupportPilot is the case study: a system where every control is already implemented and provable, so
 each module can point at a real enforcement point rather than a principle.
 
+## The reference
+
+[`handbook.md`](handbook.md) is the thing to open before a review. This file tracks where we are;
+the handbook holds what was learned, and grows as each module closes.
+
 ## The one idea (module 0)
 
 The model is **untrusted input** — the same status as a form field filled in by an anonymous user.

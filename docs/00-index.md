@@ -57,6 +57,14 @@ they must produce.
 | `R-nn` | Risk | 10 |
 | `AP-nn` | Planning assumption | 06 / 10 |
 
+## Learning track
+
+| File | Contents |
+|---|---|
+| [learning/handbook.md](learning/handbook.md) | Field manual: principles, mechanisms, the question bank, the lab, and the failures |
+| [learning/00-curriculum.md](learning/00-curriculum.md) | Module order and progress |
+| [learning/exercise-02-whose-token.md](learning/exercise-02-whose-token.md) | Run both identity architectures yourself |
+
 ## Where the authoritative copy lives
 
 The `.docx` files in the project root are the signed baseline and the formal plan. This Markdown is
