@@ -38,7 +38,7 @@ ask a client are a consequence of knowing that, not a route to it.
 | 2b | Agent identity | Which token is attached to the tool call decides the blast radius | done |
 | 3 | Authorization | The decision is a question, and policy is one link in a chain | done |
 | 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | done |
-| 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | |
+| 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | done |
 | 6 | Untrusted content | Injection matters only where a boundary is missing | |
 | 7 | High-impact actions | propose → approve → execute, and payload binding | |
 | 8 | Evidence | An audit trail that can reconstruct, and a model's narration that cannot | |
@@ -71,7 +71,8 @@ control is unnecessary. That resistance is the part of the job that cannot be le
 | 2 | done | Identity, and then agent identity — which turned out to be the larger half |
 | 3 | done | Policy as code: the input, obligations, the matrix, an outage, and a broken rule |
 | 4 | done | Tenant isolation — one demonstration: the RLS configuration that filters nothing |
-| 5–10 | not started | Next: tool authority — the module that defines the role |
+| 5 | done | Tool authority — a review of a client's six tools, then the client argued back |
+| 6–10 | not started | Next: untrusted content — why injection matters only where a boundary is missing |
 
 ### What module 2 produced
 
@@ -161,3 +162,36 @@ The carried lesson is the classification, not the mechanism: **"generic multi-te
 "agent-specific gap" are different findings.** Most of agent security is not new. The genuinely new
 parts are narrow — untrusted input that is also control flow, tools as ambient authority,
 non-determinism — and a reviewer who cannot tell them apart writes reports engineers stop reading.
+
+### What module 5 produced
+
+The module that defines the role, and the only one so far with no equivalent in classical security.
+
+The technique: three dimensions (reach, effect, rate), five parameter classes where authority leaks,
+and one question asked of every tool — *what is the worst thing one legal call can do, for the most
+privileged user, when the attacker chooses every argument?* Answered in a concrete sentence, never a
+severity rating.
+
+**The exercise was a real review**, not a walkthrough: six tools from a health insurer's support
+agent, graded cold. Four of the six were correctly refused — the query tool, the attachment-widening
+tool, the free-string status write, and the outbound email. Two things were missed, and both were
+the lesson:
+
+- **`run_report(report_name, parameters: object)`** — an unschema'd `object` parameter is a generic
+  tool wearing a business name. It was missed precisely *because* it did not look generic. The rule
+  that came out of it: any `object` / `dict` / `map` parameter with no schema is itself the finding.
+- **`lookup_member`** returning national ID, date of birth and address on every call — narrow in
+  reach, worst in the field dimension. Missing it meant that dimension was not being looked at.
+
+Two smaller corrections worth keeping: a composition finding is **two different tools** (one that
+brings data into context, one that sends anything out), and a tool that bounds the *recipient* but
+not the *content* is not bounded — the recipient is a parameter too.
+
+Then the client argued back, and the strongest objection was legitimate: *remove the search tool and
+the agent uses the old portal in another tab, where I have no log at all.* Correct. A control that
+pushes work onto an unmonitored path is a net loss. Concede it completely, then narrow rather than
+remove — and ask what that portal limits that the tool does not.
+
+**The move that carries beyond this module:** concede the true half loudly, then move the claim to
+the half that actually changed. And close with a schema change, never with a request to trust the
+model — an engineer with a deadline will accept the first and ignore the second.

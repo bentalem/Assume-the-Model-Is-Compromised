@@ -211,10 +211,125 @@ the engineers who have to act on it.
 
 **Demonstrate it.** `python scripts/learn_rls_ownership.py demo`
 
-### 2.6–2.10
+### 2.6 Tool authority
 
-Tool authority · untrusted content · high-impact actions · evidence · secrets and the control plane ·
-proving it. Written as each module completes.
+**The claim.** A tool is not a function. It is a grant of standing authority to something that is
+untrusted input and steerable by the text it reads.
+
+The function already exists in the UI. What changed is the caller: a human acting once, on purpose,
+through a form with one field — replaced by a model acting a hundred times a second, choosing every
+argument, influenced by content an attacker wrote. *"It's the same API the UI uses"* is true and
+beside the point. The threat model changed; the API did not.
+
+**Three dimensions. Rate the tool before reading a line of code.**
+
+| | narrow → wide |
+|---|---|
+| **Reach** | one id → a query the attacker composes → everything |
+| **Effect** | read → write → irreversible write → **effect outside the system** |
+| **Rate** | what do a thousand calls compose into |
+
+The move from *identifier* to *query* is the most important transition on this page: an id-taking
+tool reaches only what is already known; a query-taking tool lets the attacker choose the set, which
+makes it a bulk-extraction primitive wearing the name of a lookup.
+
+> **Permission is evaluated per call. Damage accumulates across calls.** Your findings live in that
+> gap.
+
+**Where authority leaks — five parameter classes.** Open the schema, scan the parameters:
+
+| class | examples | why |
+|---|---|---|
+| 1 identity | `user_id`, `organization_id`, `role`, `on_behalf_of`, `approved_by` | the model decides who it is. Always a finding |
+| 2 **interpreter** | `query`, `sql`, `path`, `url`, `command`, `template`, `regex`, `jq` | anything handed to an interpreter turns a specific tool generic |
+| 3 scope | `limit`, `fields`, `include`, `expand`, `depth`, `format=full` | no new access; a great deal more per call |
+| 4 free text going out | email body, comment, webhook payload | an exfiltration channel |
+| 5 decision | `skip_validation`, `force`, `override_limit`, `reason` | the model writes the justification for its own action |
+
+**Any `object` / `dict` / `map` / `json` parameter with no schema is itself the finding.** Not a
+request for clarification — a finding. It is a generic tool that does not look generic, which is
+worse than one that does.
+
+**The question, memorised:**
+
+> *What is the worst thing one legal call to this tool can do, for the most privileged user, when the
+> attacker chooses every argument?*
+
+Each clause kills an excuse. **"legal"** — this is not a bug hunt, the tool doing its job is the
+finding. **"one"** — isolate before chaining. **"most privileged"** — "our users can't" holds until a
+manager opens a chat. **"attacker chooses"** — ends "but the model wouldn't ask for that".
+
+The answer must be **one concrete sentence**, never a severity rating. "Tool 5 is risky" is what the
+room already thinks. *"The model chooses both the recipient and the body, so member A's claims
+history can be sent to member B's inbox from the company's own address"* stops the meeting.
+
+**Composition — what almost nobody reviews.** Every tool is defensible alone; the finding is the
+pair. Write the tools in two columns — what brings data **into** context, what sends anything **out**
+— and every pair is a candidate.
+
+```
+broad read  +  any outbound write  =  a channel
+```
+
+Internal writes count. A note written to a ticket is text a different agent reads tomorrow:
+persistent injection. And a tool that bounds only the *recipient* (`member_id`, no `to` field) feels
+safe and is not — it bounded the recipient, not the content, and the recipient is a parameter too.
+
+**Read tools are authority.** Against *"it's read-only, so the risk is low"*: (1) aggregation — a
+million authorised records is a database leak; (2) context is the asset, and filtering afterwards is
+not access control, the content already arrived; (3) reads feed writes; (4) "read-only" describes
+today, and the width has already been decided by the time a write tool is added next quarter.
+
+**Five narrowings.** Say which one you mean, or the client hears only a refusal:
+
+| narrow by | from | to |
+|---|---|---|
+| resource | `search(q)` | `get(id)` |
+| field | the whole record | policy obligations |
+| volume | client-chosen | a server-set `max_results` |
+| effect | `issue_refund` | `propose_refund` + approval |
+| time | a standing approval | one that expires |
+
+**The wrong answers.** "It's in the system prompt" (principle 2). "The description says only the
+current customer" — the description is a prompt; the schema is the contract. "GET only" —
+`GET /users?limit=100000`. "We gave it a read-only MCP server for the database" — a generic tool,
+rule 7. "The model wouldn't" — we watched one fold after a single line of user frustration.
+
+**Arguing it.** Three real objections, and the move that works on all of them:
+
+> **Concede the true half loudly, then move the claim to the half that actually changed.**
+
+*"Same SMTP since 2019"* — true, and not a comment about their mail system. In 2019 the recipient
+came from a record and the content from a template; the pairing was derived. Now the model chooses
+both, after reading what a customer wrote.
+
+*"Remove search and the agent uses the old portal in another tab, and I lose the log"* — **the
+strongest objection you will hear, and it is correct.** A control that pushes work onto an
+unmonitored path is a net loss. Concede it completely, then: nobody said remove it. Then take the
+gift — *what does that portal limit that your tool does not?* If the portal requires three
+characters and logs every search, their agent is less bounded than the system they call legacy.
+
+*"Those reports passed a security review"* — the review asked whether the query was safe when a
+trained analyst ran it with sane parameters. Still true. It never asked whether it is safe when a
+steerable component supplies the parameters. And the agent is not only *choosing*: `parameters` with
+no schema means it is **supplying the input**. Also, the saved list has grown since the review.
+
+**The worked example.** Seven registered tools. Five take a single identifier; exactly one takes a
+query; one writes internally; one proposes and cannot execute. What is absent is the design: no
+`issue_refund`, no `search_orders`, no `get_customer_by_email` (a reverse lookup is a verification
+oracle), no `fields=` or `include=*` — the field set comes from policy — and **nothing that sends
+anything outside the system**, so the composition table has no right-hand column.
+
+**The finding against ourselves.** `search_customers` accepts a two-character `q`, returns 25, and
+pages with a cursor. Every call is authorised; the accumulation is the leak. Present: a page cap,
+a reduced field set (no email), same-organization enforcement. Absent: a minimum query length, a
+per-session volume ceiling, and monitoring on paging. *The technique finds things in a system whose
+every layer was tested — which is the point of having a technique.*
+
+### 2.7–2.10
+
+Untrusted content · high-impact actions · evidence · secrets and the control plane · proving it.
+Written as each module completes.
 
 ---
 
@@ -243,23 +358,29 @@ Grouped by what they expose. None require access to the code.
 ### Tools
 
 11. Show me the registered tool list — the registration, not the description.
-12. For each tool: what is the worst thing it can do in one call, for the most privileged user?
-13. Is there any tool that takes free-form SQL, a URL, a file path, or a shell string?
+12. For each tool: **what is the worst thing one legal call can do, for the most privileged user,
+    when the attacker chooses every argument?** Answer in one concrete sentence, not a rating.
+13. Is there any tool that takes free-form SQL, a URL, a file path, a template, or a shell string?
+    **Any parameter typed `object` with no schema?**
 14. Which tools change state, and which of those are reversible?
+15. Which tools take a **query** rather than an identifier? For each: who sets the page size, is
+    there a minimum query length, and is there any ceiling per session?
+16. Draw two columns — what brings data *into* the model's context, what sends anything *out*.
+    **Which pairs exist?** (Internal writes belong in the right column too.)
 
 ### Content and blast radius
 
-15. What untrusted text reaches the model? Tickets, documents, file names, tool results?
-16. If a customer writes an instruction into a ticket and the model follows it, what is the worst
+17. What untrusted text reaches the model? Tickets, documents, file names, tool results?
+18. If a customer writes an instruction into a ticket and the model follows it, what is the worst
     outcome — and whose permissions bound it?
-17. Can the agent retrieve documents the asking user may not read, even if you filter afterwards?
+19. Can the agent retrieve documents the asking user may not read, even if you filter afterwards?
     (Post-filtering is not access control. The content already entered the context.)
 
 ### Evidence
 
-18. Reconstruct one request end to end from your logs. Who, what, decided by which rule, outcome.
-19. Can a user of the system delete or edit an audit record?
-20. Does your monitoring read what the agent *says*, or what the enforcement layer *recorded*?
+20. Reconstruct one request end to end from your logs. Who, what, decided by which rule, outcome.
+21. Can a user of the system delete or edit an audit record?
+22. Does your monitoring read what the agent *says*, or what the enforcement layer *recorded*?
 
 ---
 
