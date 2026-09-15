@@ -39,11 +39,11 @@ ask a client are a consequence of knowing that, not a route to it.
 | 3 | Authorization | The decision is a question, and policy is one link in a chain | done |
 | 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | done |
 | 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | done |
-| 6 | Untrusted content | Injection matters only where a boundary is missing | |
-| 7 | High-impact actions | propose → approve → execute, and payload binding | |
-| 8 | Evidence | An audit trail that can reconstruct, and a model's narration that cannot | |
-| 9 | Secrets and the control plane | What a runtime service must never be able to change | |
-| 10 | Proving it | Tests that do not lie, and what counts as evidence | |
+| 6 | Untrusted content | Injection matters only where a boundary is missing | done |
+| 7 | High-impact actions | propose → approve → execute, and payload binding | written |
+| 8 | Evidence | An audit trail that can reconstruct, and a model's narration that cannot | written |
+| 9 | Secrets and the control plane | What a runtime service must never be able to change | written |
+| 10 | Proving it | Tests that do not lie, and what counts as evidence | written |
 
 Module 5 is the one that distinguishes the role. Reading a tool schema and saying "that is more
 authority than this job needs" is what a client is paying for, and few people do it well.
@@ -72,7 +72,8 @@ control is unnecessary. That resistance is the part of the job that cannot be le
 | 3 | done | Policy as code: the input, obligations, the matrix, an outage, and a broken rule |
 | 4 | done | Tenant isolation — one demonstration: the RLS configuration that filters nothing |
 | 5 | done | Tool authority — a review of a client's six tools, then the client argued back |
-| 6–10 | not started | Next: untrusted content — why injection matters only where a boundary is missing |
+| 6 | done | Untrusted content — and a live session that beat it without any injection at all |
+| 7–10 | written | In the handbook as 2.8–2.11, to read rather than run. Exercises on request |
 
 ### What module 2 produced
 
