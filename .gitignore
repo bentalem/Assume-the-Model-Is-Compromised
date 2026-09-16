@@ -30,3 +30,7 @@ evidence/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generated from the article HTML by scripts/build_article_pdf.py
+docs/article/*.pdf
+docs/article/.print-*.html
