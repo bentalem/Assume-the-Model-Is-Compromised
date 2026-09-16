@@ -16,9 +16,26 @@ user   here are the characters
 
 The agent ran fifteen searches and returned a consolidated list of customers.
 
+![The agent's reply: a table titled "Customer directory search results" listing five customers with reference numbers and assigned teams, followed by a line naming the searches that returned nothing.](img/01-enumeration.png)
+
+*The reply, unedited. **Seventeen steps**, five customers across two teams, and a tidy summary of
+which searches came back empty — which is itself a map of where not to look next.*
+
 There was no prompt injection. No jailbreak. No bug. Every one of those fifteen calls was properly
 authenticated, properly authorised, correctly scoped to the right tenant, and correctly written to
 the audit trail as `allowed`. A security review of any single call would have passed it.
+
+```
+at       | action          | decision | reason                             | policy
+---------+-----------------+----------+------------------------------------+-------------
+16:16:12 | customer.search | allowed  | same_organization_and_allowed_role | 2026-09-07.1
+16:16:12 | customer.search | allowed  | same_organization_and_allowed_role | 2026-09-07.1
+16:16:12 | customer.search | allowed  | same_organization_and_allowed_role | 2026-09-07.1
+        ... fifteen rows, every one of them allowed ...
+```
+
+That is what the incident looks like from the inside: not an alert, not an error, not a denial.
+Fifteen correct decisions in the same second.
 
 > **Permission is evaluated one call at a time. Damage accumulates across calls. Nothing in a
 > per-call authorization model can see the difference.**
@@ -80,6 +97,20 @@ The test system was run both ways, and the difference was stark. Under passthrou
 A asking for tenant B's order received a 404 every time. Under a service account, the agent returned
 the other tenant's order into the wrong session. Same model, same prompt, same tools, same policy.
 **One header value.**
+
+![The agent asked to show order ORD-3001. Its timeline shows two get_order calls, then the reply that the order was not found or is not visible to this account.](img/03-cross-tenant.png)
+
+*Asking for another tenant's order under passthrough. The first tool call invented a query parameter
+that does not exist in the schema and was rejected with `400 unknown_query_parameter`; the model
+corrected itself, and the second call returned **404** — **the same answer an order that does not
+exist would produce.** The reply carries no hint that the record is real and belongs to somebody
+else.*
+
+That rejected parameter is worth a second look, because it is a control most APIs do not have. An
+unknown query parameter is normally ignored, which is polite and wrong here: a model that sends
+`include_item=true` would get a clean 200, see no items, and conclude it had asked for them.
+Rejecting what you do not recognise turns a silent misunderstanding into an error the model can
+actually correct — which is exactly what it did.
 
 Service identity is legitimate where no user exists — scheduled agents, queue watchers — or where a
 legacy system cannot accept a user token. A workable rule: **service identity for anything that
@@ -151,6 +182,13 @@ already thinks, and it changes nothing. *"The model chooses both the recipient a
 so customer A's records can be emailed to customer B from the company's own address"* stops a
 meeting.
 
+![The agent's expanded reasoning: under "Planning searches" it states it needs a maximum of 15 searches, possibly in parallel, and that pagination might help since each search should be limited to about 50 results. Below, the first request is a JSON object containing q ab and limit 50.](img/02-tool-calls.png)
+
+*The same session with the agent's own planning expanded. It decided on **fifteen searches, possibly
+in parallel**, and noted that **pagination might help**. Then look at the request it actually sent:
+`"limit": 50`. The page size was the model's to choose — policy capped the result at 25, silently,
+but nothing capped the number of pages.*
+
 ### Where authority leaks
 
 Open the tool schema and scan the parameters for five classes.
@@ -217,6 +255,12 @@ confidence — a team with a filter stops narrowing authority, which is the only
 the size of the damage.
 
 > **A filter is detection, not control. Alert on it; do not depend on it.**
+
+![The agent asked to summarise ticket TKT-1001 returns an ordinary support summary, ending with a note that the conversation contains several unrelated or unverified requests for data access, credential disclosure and refund actions, and that no valid refund approval or completed refund is recorded.](img/04-injection-ticket.png)
+
+*A ticket carrying ten planted injections, summarised. The last bullet is the agent **reporting** the
+attempts rather than following them — and there is no filter anywhere in this system. Nothing was
+blocked, because none of the instructions pointed at anything that exists.*
 
 ### Three kinds, and the difference matters
 
@@ -307,7 +351,21 @@ leaves a state change nobody recorded — precisely the case you will be asked a
 same transaction, a failed audit write means a failed change.
 
 **Interpretable** matters a year later. "The rules allowed it" is not an answer unless you can say
-which rules were live at that moment.
+which rules were live at that moment. It also tells you *which layer acted*, which is not otherwise
+visible. These two rows are from the sessions above:
+
+```
+action          | decision | reason                             | policy_version
+----------------+----------+------------------------------------+---------------
+customer.search | allowed  | same_organization_and_allowed_role  | 2026-09-07.1
+order.read      | denied   | resource_not_visible                | (none)
+```
+
+The denial has **no policy version, and that is the information.** It was refused by the resource
+lookup before policy was ever asked — the caller could not see that the record existed, so there was
+nothing to have an opinion about. A denial from policy would read
+`not_a_member_of_resource_organization` and carry a version. From outside, both are an identical 404.
+Inside, they are different systems, and only the reason code tells you which one you are looking at.
 
 Two things are specific to agents. First, **record the tool calls, not just the final answer** —
 after an incident the interesting question is which calls were made and in what order. Second, be

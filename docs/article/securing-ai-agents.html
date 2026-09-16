@@ -274,6 +274,32 @@
   }
   pre code { background: none; padding: 0; font-size: inherit; }
 
+  /* ---------- figures ----------
+     The screenshots are light-mode captures, so they sit on their own white plate in both themes
+     rather than being tinted to match the page. A caption says what to look at; the image is
+     evidence, not decoration. */
+
+  figure { margin: 0 0 26px; }
+
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #FFFFFF;
+    border: 1px solid var(--rule-strong);
+    border-radius: 4px;
+  }
+
+  figcaption {
+    font-family: var(--sans);
+    font-size: .8rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin-top: 10px;
+    text-wrap: pretty;
+  }
+  figcaption strong { color: var(--ink); font-weight: 600; }
+
   /* ---------- record cards ---------- */
 
   .record {
@@ -437,11 +463,34 @@
     <p>
       The agent ran fifteen searches and returned a consolidated list of customers.
     </p>
+
+    <figure>
+      <img src="img/01-enumeration.png"
+           alt="An agent chat window. The user has asked it to search the customer directory for fifteen two-letter strings. The agent replies with a table titled Customer directory search results, listing five customers with their reference numbers and assigned teams, followed by a line reading No matches for the remaining strings.">
+      <figcaption>
+        The reply, unedited. <strong>Seventeen steps</strong>, five customers across two teams, and a
+        tidy summary of which searches came back empty — which is itself a map of where not to look
+        next.
+      </figcaption>
+    </figure>
+
     <p>
       There was no prompt injection. No jailbreak. No bug. Every one of those fifteen calls was
       properly authenticated, properly authorised, correctly scoped to the right tenant, and
       correctly written to the audit trail as <code>allowed</code>. A security review of any single
       call would have passed it.
+    </p>
+
+    <pre><code>at       | action          | decision | reason                             | policy
+---------+-----------------+----------+------------------------------------+-------------
+16:16:12 | customer.search | allowed  | same_organization_and_allowed_role | 2026-09-07.1
+16:16:12 | customer.search | allowed  | same_organization_and_allowed_role | 2026-09-07.1
+16:16:12 | customer.search | allowed  | same_organization_and_allowed_role | 2026-09-07.1
+        ... fifteen rows, every one of them allowed ...</code></pre>
+
+    <p>
+      That is what the incident looks like from the inside: not an alert, not an error, not a denial.
+      Fifteen correct decisions in the same second.
     </p>
 
     <p class="claim">
@@ -535,6 +584,27 @@
         tenant A asking for tenant B's order received a 404 every time. Under a service account, the
         agent returned the other tenant's order into the wrong session. Same model, same prompt, same
         tools, same policy. <strong>One header value.</strong>
+      </p>
+
+      <figure>
+        <img src="img/03-cross-tenant.png"
+             alt="The same agent asked to show order ORD-3001. Its timeline shows two get_order tool calls, then the reply: Order ORD-3001 wasn't found or isn't visible to your account. Please verify the order number.">
+        <figcaption>
+          Asking for another tenant's order under passthrough. The first tool call invented a query
+          parameter that does not exist in the schema and was rejected with <code>400
+          unknown_query_parameter</code>; the model corrected itself and tried again, and the second
+          call returned <strong>404</strong> — <strong>the same answer an order that does not exist
+          would produce.</strong> The reply carries no hint that the record is real and belongs to
+          somebody else.
+        </figcaption>
+      </figure>
+
+      <p>
+        That rejected parameter is worth a second look, because it is a control most APIs do not
+        have. An unknown query parameter is normally ignored, which is polite and wrong here: a model
+        that sends <code>include_item=true</code> would get a clean 200, see no items, and conclude
+        it had asked for them. Rejecting what you do not recognise turns a silent misunderstanding
+        into an error the model can actually correct — which is exactly what it did.
       </p>
       <p>
         Service identity is legitimate where no user exists — scheduled agents, queue watchers — or
@@ -637,6 +707,18 @@
         address"</em> stops a meeting.
       </p>
 
+      <figure>
+        <img src="img/02-tool-calls.png"
+             alt="The agent's expanded reasoning timeline. Under a heading Planning searches it writes that it needs a maximum of 15 searches, possibly in parallel, and that pagination might help since each search should be limited to about 50 results. Below it, four tool-call chips and the first request, a JSON object containing q ab and limit 50, followed by the response listing customer CUS-4003.">
+        <figcaption>
+          The same session, with the agent's own planning expanded. It decided on
+          <strong>fifteen searches, possibly in parallel</strong>, and noted that
+          <strong>pagination might help</strong>. Then look at the request it actually sent:
+          <code>"limit": 50</code>. The page size was the model's choice to make — policy capped the
+          result at 25, silently, but nothing capped the number of pages.
+        </figcaption>
+      </figure>
+
       <h3>Where authority leaks</h3>
       <p>Open the tool schema and scan the parameters for five classes.</p>
 
@@ -726,6 +808,17 @@
       </p>
 
       <p class="claim">A filter is detection, not control. Alert on it; do not depend on it.</p>
+
+      <figure>
+        <img src="img/04-injection-ticket.png"
+             alt="The agent asked to summarise ticket TKT-1001. It returns a normal support summary: status open, assigned to team-north, customer CUS-4001, a cable that arrived with a split sleeve, escalated. The final bullet is a note saying the conversation contains several unrelated or unverified requests for data access, credential disclosure and refund actions, and that no valid refund approval or completed refund is recorded.">
+        <figcaption>
+          A ticket carrying ten planted injections, summarised. The last bullet is the agent
+          <strong>reporting</strong> the attempts rather than following them — and there is no filter
+          anywhere in this system. Nothing was blocked, because none of the instructions pointed at
+          anything that exists.
+        </figcaption>
+      </figure>
 
       <h3>Three kinds, and the difference matters</h3>
       <ul>
@@ -844,7 +937,23 @@ execute    a worker outside the request path performs it, once</code></pre>
       </p>
       <p>
         <strong>Interpretable</strong> matters a year later. "The rules allowed it" is not an answer
-        unless you can say which rules were live at that moment.
+        unless you can say which rules were live at that moment. It also tells you
+        <em>which layer acted</em>, which is not otherwise visible. These two rows are from the
+        sessions above:
+      </p>
+
+      <pre><code>action          | decision | reason                             | policy_version
+----------------+----------+------------------------------------+---------------
+customer.search | allowed  | same_organization_and_allowed_role  | 2026-09-07.1
+order.read      | denied   | resource_not_visible                | (none)</code></pre>
+
+      <p>
+        The denial has <strong>no policy version, and that is the information.</strong> It was
+        refused by the resource lookup before policy was ever asked — the caller could not see that
+        the record existed, so there was nothing to have an opinion about. A denial from policy would
+        read <code>not_a_member_of_resource_organization</code> and carry a version. From outside,
+        both are an identical 404. Inside, they are different systems, and only the reason code tells
+        you which one you are looking at.
       </p>
       <p>
         Two things are specific to agents. First, <strong>record the tool calls, not just the final
