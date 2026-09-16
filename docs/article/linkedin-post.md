@@ -26,11 +26,17 @@ Permission is evaluated one call at a time. Damage accumulates across calls. Not
 authorization model can see the difference — and no injection filter would have noticed anything at
 all.
 
-That gap is where most real agent findings live, and it is not the gap the industry is discussing.
+Injection was never the vulnerability there. It is the delivery method. The vulnerability is
+authority that can be reached without a check.
 
-I wrote up the seven decisions that actually determine whether an agent is safe to deploy, along
-with four failures that pass code review — including row-level security that is configured, visible
-in every schema dump, and filtering nothing.
+The write-up goes through the seven decisions that decide whether an agent is safe to deploy: whose
+token the tool call carries, what one legal call to each tool can do, where tenant isolation actually
+lives, what an audit trail has to be able to prove. Every claim in it was tested against a working
+system rather than argued from first principles — including four failures that pass code review.
+
+Worth half an hour if you are building or reviewing an agent.
+
+https://github.com/bentalem/Assume-the-Model-Is-Compromised
 
 ---
 
@@ -79,6 +85,20 @@ call, a test that lied in its own name, and instruments that reported conclusion
 did not support.
 
 ---
+
+## On voice
+
+The first draft of option A ended with "I stopped thinking..." and "I wrote up...". Both were cut.
+Nothing in a post should be about the effort that went into it: the story and the phrase *tested
+against a working system* are what earn the reader's trust, and an author's pride competes with them
+rather than adding to them.
+
+Two softer closing lines, if the current one reads too firm:
+
+- *If you build or review agents, the first two decisions are the ones I would start with.*
+- *Comments and disagreement welcome — especially on the parts you think are wrong.*
+
+The second opens a conversation instead of closing one, which is usually worth more than the post.
 
 ## Notes on posting
 
