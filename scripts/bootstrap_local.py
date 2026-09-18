@@ -54,10 +54,19 @@ def run(args: list[str], timeout: int = 1800) -> subprocess.CompletedProcess:
     )
 
 
+def postgres_volume_exists() -> bool:
+    """True when a postgres_data volume for this compose project is already present."""
+    result = run(["docker", "volume", "ls", "--format", "{{.Name}}"], timeout=60)
+    if result.returncode != 0:
+        return False
+    return any(line.strip().endswith("postgres_data") for line in result.stdout.splitlines())
+
+
 def generate_secrets() -> None:
     step("Checking local secrets")
     SECRETS_DIR.mkdir(exist_ok=True)
 
+    created = []
     for name in SECRET_NAMES:
         path = SECRETS_DIR / name
         if path.exists() and path.read_text(encoding="utf-8").strip():
@@ -68,6 +77,23 @@ def generate_secrets() -> None:
         value = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
         path.write_text(value, encoding="utf-8", newline="")
         detail(f"{name} (generated)")
+        created.append(name)
+
+    # PostgreSQL applies POSTGRES_PASSWORD_FILE only when it initialises an empty data directory.
+    # The volume outlives `docker compose down`, so a regenerated bootstrap password — a deleted
+    # .secrets/, a second clone, a run that switched between sudo and not — leaves the database
+    # holding the old one. Every connection then fails with "password authentication failed", and
+    # nothing in the error says why. Catch it here, where it is still one command to fix.
+    if "postgres_bootstrap_password" in created and postgres_volume_exists():
+        print()
+        print(f"{RED}The database volume already exists, but its password was just regenerated.{RESET}")
+        print(f"{GREY}PostgreSQL keeps the password it was first initialised with, so the two no{RESET}")
+        print(f"{GREY}longer match and the migration will fail to authenticate.{RESET}")
+        print()
+        print(f"{YELLOW}Rebuild the database:  python scripts/bootstrap_local.py --reset{RESET}")
+        print(f"{GREY}That destroys the local database. Everything in it is seed data.{RESET}")
+        print()
+        raise SystemExit(1)
 
     env = REPO / ".env"
     if not env.exists():
@@ -211,6 +237,22 @@ def main() -> int:
     if result.returncode != 0:
         print(result.stdout[-3000:])
         print(result.stderr[-3000:])
+        # "service migrate didn't complete successfully: exit 2" says nothing about the cause, and
+        # the container that holds the reason has already exited. Fetch it rather than making the
+        # reader go looking.
+        combined = result.stdout + result.stderr
+        if "migrate" in combined:
+            logs = run(["docker", "compose", "logs", "--no-color", "--tail", "40", "migrate"])
+            print()
+            print(f"{YELLOW}migrate said:{RESET}")
+            print(logs.stdout[-3000:])
+            if "password authentication failed" in logs.stdout:
+                print(f"{RED}The database is holding a different password than .secrets/ has.{RESET}")
+                print(f"{GREY}PostgreSQL keeps the password its data directory was created with,{RESET}")
+                print(f"{GREY}and that volume survives `docker compose down`.{RESET}")
+                print()
+                print(f"{YELLOW}Rebuild it:  python scripts/bootstrap_local.py --reset{RESET}")
+                print(f"{GREY}That destroys the local database. Everything in it is seed data.{RESET}")
         raise SystemExit(f"{RED}docker compose up failed{RESET}")
     detail("containers started")
 

@@ -70,6 +70,11 @@ the database keeps working.
 | `--reset` | Destroy the volumes first. The database is rebuilt from migrations and seeds. |
 | `--rebuild` | Rebuild images without the layer cache. |
 
+> **If a first attempt failed and you deleted `.secrets/`, use `--reset`.** PostgreSQL applies the
+> password only when it first creates its data directory, and that volume survives
+> `docker compose down`. New secrets plus an old volume means every connection is refused. The
+> bootstrap detects this and says so, but `--reset` is the fix either way.
+
 It finishes by printing the URLs. Then prove the environment is actually correct:
 
 ```bash
@@ -532,6 +537,7 @@ trail recorded `allowed`, twice. That gap is the most valuable thing Part B can 
 |---|---|
 | Bootstrap hangs waiting for the migration job | Docker has too little memory. Raise it to 8 GB, then `--reset`. |
 | Bootstrap hangs waiting for the Keycloak realm | Keycloak is slow on a first start. Wait a few minutes, then read its logs. |
+| `migrate` exits 2, `password authentication failed for user "supportpilot_admin"` | The database volume outlived a regenerated `.secrets/`. PostgreSQL keeps the password its data directory was created with. `python scripts/bootstrap_local.py --reset` rebuilds it — the only thing lost is seed data. |
 | Keycloak restarts forever; `api` and `approval` stay in `Created` | Read its logs. `Key material not provided to setup HTTPS` means `.secrets/tls/` has no certificate — `bootstrap_local.py` makes one, so this means it could not. Run `pip install cryptography`, then `python scripts/enable_keycloak_tls.py --certificate-only`, then bootstrap again. |
 | `permission denied … /var/run/docker.sock` | Linux, and your user is not in the `docker` group. See A1. |
 | `V-01` fails | A container is not running. `docker compose ps`, then that container's logs. |
