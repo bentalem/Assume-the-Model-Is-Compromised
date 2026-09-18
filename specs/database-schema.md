@@ -283,7 +283,7 @@ GRANT SELECT, INSERT ON app.internal_notes TO sp_api_role;
 ```
 
 The `author_id = app.current_user_id()` check is what makes an author supplied by the model
-impossible to honor — the database refuses it even if application code is wrong (`P3-03`).
+impossible to honor — the database refuses it even if application code is wrong.
 
 ## 0008 — Actions, approvals, jobs, executions
 
@@ -392,7 +392,7 @@ The worker cannot read customer or order data (`TS3-04`). It gets what it needs 
 
 ## Seed data (`database/seeds/`)
 
-Matches [../docs/08-local-build-runbook.md §2](../docs/08-local-build-runbook.md#2-test-data-baseline)
+Matches [../LAB.md](../LAB.md#3--what-you-now-have)
 exactly. Repeatable — running it twice produces the same state.
 
 - Organizations `cedar`, `northwind`.

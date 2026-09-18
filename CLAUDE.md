@@ -47,7 +47,7 @@ one, that is the finding — stop and write it down rather than working around i
 - **Every capability ships with tests**: one positive, one negative, one cross-tenant. A change is not
   done without them.
 - **Fixed test data.** Use the baseline in
-  [`docs/08-local-build-runbook.md`](docs/08-local-build-runbook.md#2-test-data-baseline):
+  [`LAB.md`](LAB.md#3--what-you-now-have):
   `cedar` / `northwind`, alice / bob / fiona / dana / mallory, `ORD-2001` / `ORD-3001`, `TKT-1001`.
   Do not invent organizations or users inside a test.
 - **Control-plane changes are not ordinary code changes.** A new tool, a new grant, a new policy rule,

@@ -241,7 +241,7 @@ OPA 200, malformed     → 503 unavailable, audit decision=denied reason=policy_
 
 ## Tests (`policy/tests/`)
 
-Policy tests run before a bundle may be published (`P1-13`, `TS-2`). Required coverage:
+Policy tests run before a bundle may be published. Required coverage:
 
 - Every action × every role, in tenant and out of tenant.
 - Default deny for an unknown action and an unknown role.

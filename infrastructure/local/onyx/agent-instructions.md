@@ -1,8 +1,8 @@
 # SupportPilot agent instructions
 
-Paste the block below into the Onyx agent's **System Prompt**. It is task `P1-16`: instructions that
+Paste the block below into the Onyx agent's **System Prompt**. These are instructions that
 explain when to use a tool and how to treat a tool error **without claiming authority the agent does
-not have** (SP-BUILD-001 §7).
+not have**.
 
 Two things to keep in mind while reading it.
 
@@ -17,7 +17,7 @@ other tenants' data" line: the agent cannot, and writing rules the model has no 
 teaches whoever reads them next that the prompt is where security lives.
 
 Changing this text is a control-plane change: prompt diff, tool-impact review, and an injection
-regression run (SP-OPS-001 §10).
+regression run.
 
 ---
 
@@ -100,7 +100,7 @@ tools returned, and do not round or reformat amounts. When you are unsure, say s
 
 ## Budgets
 
-Set these on the agent alongside the prompt (`P2-12`):
+Set these on the agent alongside the prompt:
 
 | Setting | Value | Why |
 |---|---|---|

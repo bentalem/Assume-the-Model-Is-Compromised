@@ -8,8 +8,8 @@ each module can point at a real enforcement point rather than a principle.
 
 ## The reference
 
-[`handbook.md`](handbook.md) is the thing to open before a review. This file tracks where we are;
-the handbook holds what was learned, and grows as each module closes.
+[`handbook.md`](handbook.md) is the thing to open before a review. This file is the order to work
+through; the handbook holds the material each module establishes.
 
 ## The one idea (module 0)
 
@@ -30,20 +30,20 @@ way — scoping, threat model, then controls — which put a client roleplay in 
 was anything to reason with. Learn what the controls are and how they fail first; the questions you
 ask a client are a consequence of knowing that, not a route to it.
 
-| # | Module | The claim it establishes | State |
+| # | Module | The claim it establishes | Format |
 |---|---|---|---|
-| 0 | The one idea | The model is untrusted input | done |
-| 1 | The trust boundary | The model proposes; it has no identity and no authority | done |
-| 2 | Identity | A token says who, not what. Roles come from the database | done |
-| 2b | Agent identity | Which token is attached to the tool call decides the blast radius | done |
-| 3 | Authorization | The decision is a question, and policy is one link in a chain | done |
-| 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | done |
-| 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | done |
-| 6 | Untrusted content | Injection matters only where a boundary is missing | done |
-| 7 | High-impact actions | propose → approve → execute, and payload binding | written |
-| 8 | Evidence | An audit trail that can reconstruct, and a model's narration that cannot | written |
-| 9 | Secrets and the control plane | What a runtime service must never be able to change | written |
-| 10 | Proving it | Tests that do not lie, and what counts as evidence | written |
+| 0 | The one idea | The model is untrusted input | exercise |
+| 1 | The trust boundary | The model proposes; it has no identity and no authority | exercise |
+| 2 | Identity | A token says who, not what. Roles come from the database | exercise |
+| 2b | Agent identity | Which token is attached to the tool call decides the blast radius | exercise |
+| 3 | Authorization | The decision is a question, and policy is one link in a chain | exercise |
+| 4 | Tenant isolation | Why the database enforces what the policy must not be trusted alone to | exercise |
+| 5 | **Tool authority** | Reading a schema and saying "that is more power than this job needs" | exercise |
+| 6 | Untrusted content | Injection matters only where a boundary is missing | exercise |
+| 7 | High-impact actions | propose → approve → execute, and payload binding | reading |
+| 8 | Evidence | An audit trail that can reconstruct, and a model's narration that cannot | reading |
+| 9 | Secrets and the control plane | What a runtime service must never be able to change | reading |
+| 10 | Proving it | Tests that do not lie, and what counts as evidence | reading |
 
 Module 5 is the one that distinguishes the role. Reading a tool schema and saying "that is more
 authority than this job needs" is what a client is paying for, and few people do it well.
@@ -60,24 +60,15 @@ an expiry — comes after all of it, for the reason at the top of this section.
 5. An exercise: you decide, and the decision gets attacked.
 6. The evidence that settles it.
 
-In exercises Claude plays the client: one with a deadline, a working system, and a reason why each
-control is unnecessary. That resistance is the part of the job that cannot be learned from reading.
+In the exercises, have an AI assistant play the client: one with a deadline, a working system, and a
+reason why each control is unnecessary. That resistance is the part of the job that cannot be learned
+from reading, and it is the one part a script cannot give you.
 
-## Progress
+## What the modules establish
 
-| Module | State | Notes |
-|---|---|---|
-| 0–1 | done | The trust boundary; five live probes in Onyx, which found a real integration bug |
-| 2 | done | Identity, and then agent identity — which turned out to be the larger half |
-| 3 | done | Policy as code: the input, obligations, the matrix, an outage, and a broken rule |
-| 4 | done | Tenant isolation — one demonstration: the RLS configuration that filters nothing |
-| 5 | done | Tool authority — a review of a client's six tools, then the client argued back |
-| 6 | done | Untrusted content — and a live session that beat it without any injection at all |
-| 7–10 | written | In the handbook as 2.8–2.11, to read rather than run. Exercises on request |
+### Module 2 — identity, and then agent identity
 
-### What module 2 produced
-
-Planned as "how a token becomes a verified subject". It split in two, and the second half was worth
+It starts as "how a token becomes a verified subject", and splits in two. The second half is worth
 more than the first.
 
 **2a — the token.** Three stages people conflate: authentication (is it real), identification (who
@@ -99,7 +90,7 @@ architectures, and the difference between them is one header value:
 
 `scripts/learn_service_account.py` builds A in the lab and measures it.
 
-### The session that taught the most
+### The session that teaches the most
 
 Signed in as the service account, the agent returned northwind's order to a cedar session. Then,
 asked again via the planted instruction in TKT-1001, it **refused** — with a genuinely good reason:
@@ -118,7 +109,7 @@ Two things worth carrying from that:
   says would have shown a denial that never happened. Only the audit trail, written by the API
   before the model sees the result, is evidence.
 
-### What module 1 actually produced
+### Module 1 — the trust boundary, and a real bug
 
 Five probes typed into the Onyx chat, not a walkthrough:
 
@@ -147,10 +138,10 @@ sending `include_item=true` would get a clean 200 with no items and conclude it 
 Unknown query parameters are now rejected — the same `extra="forbid"` rule the responses already
 had, applied to the request side.
 
-### What module 4 produced
+### Module 4 — tenant isolation, and classifying it correctly
 
-Compressed to a single demonstration, because row-level security is ordinary multi-tenancy
-engineering and the question that opened the module was the right one: *this is not really an agent
+One demonstration, because row-level security is ordinary multi-tenancy engineering and the
+obvious question is the right one: *this is not really an agent
 control, is it?* No. It is the control that makes an agent's mistakes survivable — worth knowing
 precisely, worth classifying correctly in a report, and not worth four exercises.
 
@@ -164,16 +155,16 @@ The carried lesson is the classification, not the mechanism: **"generic multi-te
 parts are narrow — untrusted input that is also control flow, tools as ambient authority,
 non-determinism — and a reviewer who cannot tell them apart writes reports engineers stop reading.
 
-### What module 5 produced
+### Module 5 — tool authority
 
-The module that defines the role, and the only one so far with no equivalent in classical security.
+The module that defines the role, and the only one with no equivalent in classical security.
 
 The technique: three dimensions (reach, effect, rate), five parameter classes where authority leaks,
 and one question asked of every tool — *what is the worst thing one legal call can do, for the most
 privileged user, when the attacker chooses every argument?* Answered in a concrete sentence, never a
 severity rating.
 
-**The exercise was a real review**, not a walkthrough: six tools from a health insurer's support
+**The exercise is a real review**, not a walkthrough: six tools from a health insurer's support
 agent, graded cold. Four of the six were correctly refused — the query tool, the attachment-widening
 tool, the free-string status write, and the outbound email. Two things were missed, and both were
 the lesson:

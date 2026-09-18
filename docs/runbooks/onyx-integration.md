@@ -1,6 +1,17 @@
 # Connecting Onyx to SupportPilot
 
-> Tasks `P1-04` (individual OAuth forwarding) and `P1-16` (action registration).
+> Optional. Everything else in the lab works without Onyx, because the enforcement boundary is
+> API to OPA to PostgreSQL and every control can be proven with no model in the loop. Add Onyx when
+> you want the agent to choose its own tool calls.
+
+**Onyx runs as its own Compose project**, joined to SupportPilot's `app` network on demand rather
+than defined in `compose.yaml`. It is the *caller*, not part of the enforcement boundary, and its
+standard deployment is a large stack of its own — web, API server, workers, Postgres, Vespa, Redis,
+MinIO, Nginx. Keeping it separate means the lab starts in a minute instead of ten, and that nothing
+release-critical depends on it being up.
+
+Budget about thirty minutes the first time. Four of the steps below exist because of real behaviour
+in Onyx that is not obvious, and each is explained where it appears.
 
 ## What has to be true
 
@@ -173,7 +184,7 @@ different name needs a matching redirect URI in Keycloak.
 ## Step 3 — register the action
 
 Sign in as your **Onyx admin** for this, not as alice. Support agents are not administrators — that
-is the control-plane separation in SP-ARCH-001 §5, and it is why alice has no admin role here.
+is the control-plane separation the architecture depends on, and it is why alice has no admin role here.
 
 **Admin Panel → Actions → Add OpenAPI Action.**
 
