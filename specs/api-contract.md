@@ -42,6 +42,23 @@ If step 10 fails, step 11 never happens — no effect without evidence.
 { "error": { "code": "not_found", "request_id": "req-123" } }
 ```
 
+A `400 invalid_request` carries one extra field, and only that code does:
+
+```json
+{ "error": { "code": "invalid_request", "request_id": "req-123",
+             "rejected": [ { "field": "body.amount", "error": "string_type" } ] } }
+```
+
+`field` and `error` name which part of the request failed and how. **The submitted value is never
+included** — a rejected body is attacker-influenced content, and echoing it back is how a validation
+handler becomes a reflection gadget. The field path and the error type are already implied by the
+published action document, so naming them tells the caller nothing it was not given.
+
+This is deliberate and it is not a relaxation. A caller that cannot tell a number sent where a
+string was required from a field it invented cannot correct itself, and neither can the operator
+reading the logs: three different mistakes arriving as one indistinguishable word is a dead end, not
+a control. The same rejection is logged, with the same two fields and the same omission.
+
 | HTTP | `code` | Used for |
 |---|---|---|
 | 400 | `invalid_request` | Schema, pattern, range, or enum violation |

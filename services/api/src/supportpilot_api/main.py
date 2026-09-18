@@ -119,17 +119,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(approvals_router.router)
 
     # --------------------------------------------------------------------------------------------
-    # Error handling. Every response body is {"error": {"code", "request_id"}} and nothing else.
+    # Error handling. Every response body is {"error": {"code", "request_id"}} — plus, for a
+    # schema rejection only, a "rejected" list naming the field and the kind of failure. Never a
+    # submitted value, never an internal message, never a stack frame.
     # --------------------------------------------------------------------------------------------
     def _request_id(request: Request) -> str:
         raw = request.headers.get("x-request-id", "")
         cleaned = "".join(ch for ch in raw if ch.isalnum() or ch in "-_")[:64]
         return cleaned or "req-unassigned"
 
-    def _error(status: int, code: str, request: Request) -> JSONResponse:
+    def _error(
+        status: int, code: str, request: Request, rejected: list[dict] | None = None
+    ) -> JSONResponse:
+        error: dict = {"code": code, "request_id": _request_id(request)}
+        if rejected:
+            error["rejected"] = rejected
         return JSONResponse(
             status_code=status,
-            content={"error": {"code": code, "request_id": _request_id(request)}},
+            content={"error": error},
             headers={"X-Request-Id": _request_id(request)},
         )
 
@@ -143,10 +150,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def handle_validation_error(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        # The default handler echoes the offending value and the field path. Both are dropped:
-        # a schema violation reveals nothing beyond "invalid_request" (T-007).
-        logger.info("request_rejected", extra={"path": request.url.path})
-        return _error(400, "invalid_request", request)
+        # Which field, and what kind of failure — never the value that was sent.
+        #
+        # The value is the part that matters: a rejected body is attacker-influenced content, and
+        # FastAPI's default handler echoes it straight back. The field path and the error type are
+        # different: both are already in the action document the caller was given, so naming them
+        # discloses nothing it did not already have.
+        #
+        # Withholding them was not a control, it was a dead end. A number sent where a string was
+        # required, a value outside an enum, and a field the caller invented are three different
+        # mistakes that produced one indistinguishable "invalid_request" — in the response and, at
+        # the time, in the log as well. An agent cannot correct what it cannot see, and neither
+        # could an operator.
+        rejected = [
+            {"field": ".".join(str(part) for part in error["loc"]), "error": error["type"]}
+            for error in exc.errors()
+        ][:10]
+        logger.info(
+            "request_rejected",
+            extra={"path": request.url.path, "rejected": rejected},
+        )
+        return _error(400, "invalid_request", request, rejected)
 
     @app.exception_handler(Exception)
     async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
