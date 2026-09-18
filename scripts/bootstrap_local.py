@@ -159,7 +159,6 @@ def wait_for_api(timeout_seconds: int = 240) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bring up the SupportPilot local environment.")
-    parser.add_argument("--with-onyx", action="store_true", help="also start Onyx (ADR-0002)")
     parser.add_argument("--rebuild", action="store_true", help="rebuild images without cache")
     parser.add_argument("--reset", action="store_true",
                         help="destroy volumes first; the database is rebuilt from migrations")
@@ -170,21 +169,19 @@ def main() -> int:
 
     generate_secrets()
 
-    profile = ["--profile", "onyx"] if args.with_onyx else []
-
     if args.reset:
         step("Removing containers and volumes")
-        run(["docker", "compose", *profile, "down", "-v"], timeout=300)
+        run(["docker", "compose", "down", "-v"], timeout=300)
 
     if args.rebuild:
         step("Rebuilding images without cache")
-        result = run(["docker", "compose", *profile, "build", "--no-cache"])
+        result = run(["docker", "compose", "build", "--no-cache"])
         if result.returncode != 0:
             print(result.stdout[-3000:], result.stderr[-3000:])
             raise SystemExit(f"{RED}image build failed{RESET}")
 
     step("Starting services")
-    result = run(["docker", "compose", *profile, "up", "-d", "--build"])
+    result = run(["docker", "compose", "up", "-d", "--build"])
     if result.returncode != 0:
         print(result.stdout[-3000:])
         print(result.stderr[-3000:])
@@ -201,8 +198,9 @@ def main() -> int:
     print(f"  {GREY}                 http://localhost:8080 also served, for the test harness{RESET}")
     print("  Approval portal  http://localhost:8090")
     print(f"  API              {GREY}internal only — reachable from the app network, by design{RESET}")
-    if args.with_onyx:
-        print("  Onyx             http://localhost:3000")
+    print()
+    print(f"{GREY}Onyx is not started here. It ships as its own compose project;{RESET}")
+    print(f"{GREY}see LAB.md part B if you want a model in the loop.{RESET}")
     print()
     print(f"{YELLOW}Next: python scripts/verify_local.py{RESET}")
     print()

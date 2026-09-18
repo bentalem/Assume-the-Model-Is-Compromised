@@ -9,9 +9,6 @@
     to stderr as a terminating error, and docker writes ordinary progress there — so a PowerShell
     implementation aborts on a successful build.
 
-.PARAMETER WithOnyx
-    Also start Onyx (see docs/decisions/0002-onyx-in-the-local-environment.md).
-
 .PARAMETER Rebuild
     Rebuild images without the layer cache.
 
@@ -20,7 +17,6 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$WithOnyx,
     [switch]$Rebuild,
     [switch]$Reset
 )
@@ -28,7 +24,6 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $arguments = @((Join-Path $PSScriptRoot 'bootstrap_local.py'))
-if ($WithOnyx) { $arguments += '--with-onyx' }
 if ($Rebuild)  { $arguments += '--rebuild' }
 if ($Reset)    { $arguments += '--reset' }
 

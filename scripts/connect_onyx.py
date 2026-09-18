@@ -260,7 +260,7 @@ def main() -> int:
     ok(f"Onyx     ->   {endpoints['token_endpoint']}")
 
     # --- 5. What you must do in the Onyx admin UI --------------------------------------------
-    action_document = (REPO / "openapi" / "supportpilot-actions.yaml")
+    action_document = (REPO / "openapi" / "supportpilot-actions.json")
     print()
     print("-" * 74)
     print(f"{BOLD}Keycloak and networking are ready. Two steps remain in the Onyx admin UI.{RESET}")

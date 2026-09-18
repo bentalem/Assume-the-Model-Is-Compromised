@@ -188,7 +188,7 @@ def main() -> int:
         if not rows:
             raise Missing(
                 "no OpenAPI action registered. Admin Panel -> Actions -> Add OpenAPI Action, "
-                "paste openapi/supportpilot-actions.yaml, and turn ON "
+                "paste openapi/supportpilot-actions.json, and turn ON "
                 "'Pass through user's OAuth token'."
             )
         passthrough = [l for l in rows.splitlines() if "|true|" in l]
@@ -221,7 +221,7 @@ def main() -> int:
         if missing:
             raise Missing(
                 f"the registered schema is out of date — missing {', '.join(sorted(missing))}. "
-                f"Re-paste openapi/supportpilot-actions.yaml (run scripts/export_openapi.py first)."
+                f"Re-paste openapi/supportpilot-actions.json (run scripts/export_openapi.py first)."
             )
         return f"'{detail[0]}': {len(present)} operations, passthrough on, no custom headers"
 

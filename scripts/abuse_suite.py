@@ -11,8 +11,7 @@ injected text could widen authorization, add a tool, or leak a secret, one of th
 A note on scope. Without Onyx in the loop there is no model here, and that is deliberate: the
 release does not depend on a model refusing anything (SP-OPS-001 §1). What is tested is the trusted
 side — the API, policy, and database — which is where the guarantee actually lives. The
-model-in-the-loop cases (`P1-16`, `TS7-08` loop budgets) need `--profile onyx` and are marked as
-such rather than silently claimed.
+model-in-the-loop cases need Onyx running and are marked as skipped rather than silently claimed.
 
 Run: python scripts/abuse_suite.py
 """
@@ -340,7 +339,7 @@ def main() -> int:
     # --- Cases that genuinely need a model in the loop ---------------------------------------
     skipped(
         "TS7-08", "Tool-call budget stops a loop",
-        "needs Onyx running (docker compose --profile onyx up -d) — task P2-12/P1-16",
+        "needs Onyx running — see LAB.md part B",
     )
     skipped(
         "TS7-14", "The model treats tool results as data, not instructions",

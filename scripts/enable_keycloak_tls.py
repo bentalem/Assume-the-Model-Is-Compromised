@@ -158,9 +158,14 @@ def patch_compose() -> None:
     path.write_text(content, encoding="utf-8")
     ok("compose.yaml updated: Keycloak serves HTTPS on 8443, API trusts the certificate")
 
+def patch_env() -> None:
     # .env wins over the ${VAR:-default} forms in compose, so leaving it behind silently keeps the
     # API on the old HTTP issuer and every token is rejected as claims_or_signature_invalid — a
     # failure that looks like a signing problem and is not.
+    #
+    # This runs unconditionally. It used to sit at the end of patch_compose(), below the early
+    # return for an already-patched compose file — so on exactly the repositories where the stale
+    # issuer can occur, re-running the script rewrote nothing.
     replacements = {
         "KEYCLOAK_ISSUER=http://localhost:8080/realms/supportpilot":
             "KEYCLOAK_ISSUER=https://localhost:8443/realms/supportpilot",
@@ -180,6 +185,13 @@ def patch_compose() -> None:
 
 
 def write_onyx_override() -> None:
+    # Only ever create this file. It used to be rewritten on every run, which replaced the
+    # checked-in version with an older one: SSL_CERT_FILE pointing at keycloak.crt instead of
+    # ca-bundle.crt (so every model-provider call died with CERTIFICATE_VERIFY_FAILED), and no
+    # MCP_SERVER_ALLOW_PRIVATE_NETWORK default.
+    if ONYX_OVERRIDE.exists():
+        ok("Onyx overlay already present; left as it is")
+        return
     ONYX_OVERRIDE.parent.mkdir(parents=True, exist_ok=True)
     ONYX_OVERRIDE.write_text(
         """# SupportPilot overlay for Onyx.
@@ -243,6 +255,7 @@ def main() -> int:
 
     step("Updating compose.yaml")
     patch_compose()
+    patch_env()
 
     step("Writing the Onyx override")
     write_onyx_override()
