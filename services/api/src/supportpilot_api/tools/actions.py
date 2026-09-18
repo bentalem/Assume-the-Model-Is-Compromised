@@ -55,7 +55,12 @@ class ProposeRefundRequest(BaseModel):
     currency: str = Field(
         min_length=3, max_length=3, description="ISO currency code; must match the order"
     )
-    reason: RefundReason
+    reason: RefundReason = Field(
+        description=(
+            "Why the refund is proposed. One of the listed values exactly — not free text, "
+            "and not the customer's wording."
+        )
+    )
     note: str | None = Field(default=None, max_length=500)
 
     @field_validator("amount")

@@ -569,7 +569,13 @@
             "description": "The note text. Staff-only; never shown to the customer."
           },
           "expected_ticket_status": {
-            "$ref": "#/components/schemas/TicketStatus",
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ],
             "description": "The ticket status the caller believes is current. The write is refused if the ticket has moved on, so a note is never attached to a ticket that changed underneath."
           }
         },
@@ -838,7 +844,15 @@
             "description": "ISO currency code; must match the order"
           },
           "reason": {
-            "$ref": "#/components/schemas/RefundReason"
+            "type": "string",
+            "enum": [
+              "damaged_on_arrival",
+              "not_delivered",
+              "wrong_item",
+              "duplicate_charge",
+              "other"
+            ],
+            "description": "Why the refund is proposed. One of the listed values exactly — not free text, and not the customer's wording."
           },
           "note": {
             "anyOf": [
@@ -889,17 +903,6 @@
           "expires_at"
         ],
         "title": "ProposeRefundResponse"
-      },
-      "RefundReason": {
-        "type": "string",
-        "enum": [
-          "damaged_on_arrival",
-          "not_delivered",
-          "wrong_item",
-          "duplicate_charge",
-          "other"
-        ],
-        "title": "RefundReason"
       },
       "Shipment": {
         "properties": {
@@ -1042,16 +1045,6 @@
           "messages"
         ],
         "title": "TicketResponse"
-      },
-      "TicketStatus": {
-        "type": "string",
-        "enum": [
-          "open",
-          "pending",
-          "resolved",
-          "closed"
-        ],
-        "title": "TicketStatus"
       }
     }
   }

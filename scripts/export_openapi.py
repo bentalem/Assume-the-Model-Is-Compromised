@@ -70,6 +70,74 @@ def generate() -> dict:
     return json.loads(line)
 
 
+def inline_enum_refs(spec: dict) -> int:
+    """Replace `$ref`s to plain enum schemas with the enum itself.
+
+    Pydantic emits an Enum field as a reference into components/schemas. That is correct OpenAPI and
+    it is a trap here: whether the caller ever sees the allowed values depends on whether its client
+    resolves the reference. Onyx's did not, so `reason` reached the model as a field with no type and
+    no list of values — and a refund proposal came back as `invalid_request` with the model saying,
+    accurately, that the schema did not tell it what to send.
+
+    A tool schema is read by something that cannot ask a follow-up question. It has to be
+    self-contained at the property, not one lookup away.
+
+    Only simple enums are inlined; object schemas keep their references, because inlining those
+    would duplicate whole response models for no gain.
+    """
+    schemas = spec.get("components", {}).get("schemas", {})
+    simple = {
+        name: definition
+        for name, definition in schemas.items()
+        if set(definition) <= {"type", "enum", "title", "description"} and "enum" in definition
+    }
+    inlined = 0
+
+    def walk(node):
+        nonlocal inlined
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+        for key, value in list(node.items()):
+            if isinstance(value, dict):
+                # Pydantic writes either {"$ref": ...} or, when the field carries its own
+                # description, {"allOf": [{"$ref": ...}], "description": ...}. Both hide the values.
+                reference, siblings = None, {}
+                if "$ref" in value:
+                    reference = value["$ref"]
+                    siblings = {k: v for k, v in value.items() if k != "$ref"}
+                elif (
+                    isinstance(value.get("allOf"), list)
+                    and len(value["allOf"]) == 1
+                    and isinstance(value["allOf"][0], dict)
+                    and "$ref" in value["allOf"][0]
+                ):
+                    reference = value["allOf"][0]["$ref"]
+                    siblings = {k: v for k, v in value.items() if k != "allOf"}
+                if reference:
+                    name = reference.rsplit("/", 1)[-1]
+                    if name in simple:
+                        merged = {k: v for k, v in simple[name].items() if k != "title"}
+                        # A description written on the field wins over the enum's own.
+                        merged.update(siblings)
+                        node[key] = merged
+                        inlined += 1
+                        continue
+            walk(value)
+
+    walk(spec.get("paths", {}))
+    for definition in schemas.values():
+        walk(definition.get("properties", {}))
+
+    for name in simple:
+        if not json.dumps(spec).count(f'"#/components/schemas/{name}"'):
+            schemas.pop(name, None)
+    return inlined
+
+
 def audit(spec: dict) -> list[str]:
     findings: list[str] = []
     seen: set[str] = set()
@@ -143,6 +211,13 @@ def audit(spec: dict) -> list[str]:
         if schema.get("additionalProperties") is True:
             findings.append(f"schema {schema_name}: allows additional properties")
         for property_name, prop in (schema.get("properties") or {}).items():
+            # A bare reference for a value set is how `reason` reached the model with no values.
+            if "$ref" in prop and prop["$ref"].rsplit("/", 1)[-1] not in spec.get(
+                "components", {}
+            ).get("schemas", {}):
+                findings.append(
+                    f"schema {schema_name}.{property_name}: dangling reference {prop['$ref']}"
+                )
             if prop.get("type") == "array" and "maxItems" not in prop:
                 findings.append(
                     f"schema {schema_name}.{property_name}: unbounded array (needs maxItems)"
@@ -183,6 +258,8 @@ def to_yaml(spec: dict) -> str:
 def main() -> int:
     check_only = "--check" in sys.argv
     spec = generate()
+
+    inlined = inline_enum_refs(spec)
 
     findings = audit(spec)
     if findings:

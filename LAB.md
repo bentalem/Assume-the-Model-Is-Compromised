@@ -446,6 +446,12 @@ routable address removes the need for it.
 The document carries `servers: http://api:8000`, the API's address on the internal network. The API
 publishes no host port on purpose; this is the only route to it.
 
+> **A stale paste is the quiet failure.** An older schema registers cleanly and simply lacks whatever
+> changed, so the agent silently cannot do part of its job — and the rejection it gets back names a
+> field, not the reason the field is wrong. Whenever you change a tool, re-run
+> `python scripts/export_openapi.py` and paste the document again. `verify_onyx_flow.py` checks that
+> all seven operations are present, but it cannot see that a field's allowed values moved.
+
 Do this as your Onyx admin, not as alice. A user-facing account that can register a tool is a
 control-plane boundary that does not exist, which is exactly what the architecture is built to avoid.
 
