@@ -75,6 +75,31 @@ def generate_secrets() -> None:
         detail(".env created from .env.example")
 
 
+def ensure_tls() -> None:
+    """Keycloak cannot start without its certificate.
+
+    compose.yaml configures HTTPS unconditionally, and the certificate lives under .secrets/, which
+    is not in version control. On a fresh clone the bind mount is therefore an empty directory and
+    Keycloak dies with "Key material not provided to setup HTTPS" in a restart loop, taking the API
+    and the approval portal with it because they wait for it to become healthy.
+    """
+    step("Checking Keycloak's TLS material")
+    cert, key = SECRETS_DIR / "tls" / "keycloak.crt", SECRETS_DIR / "tls" / "keycloak.key"
+    if cert.exists() and key.exists():
+        detail("certificate already present")
+        return
+    result = run([sys.executable, str(REPO / "scripts" / "enable_keycloak_tls.py"),
+                  "--certificate-only"], timeout=300)
+    if result.returncode != 0 or not (cert.exists() and key.exists()):
+        print(result.stdout[-2000:])
+        print(result.stderr[-2000:])
+        raise SystemExit(
+            f"{RED}could not generate Keycloak's certificate{RESET}\n"
+            f"{GREY}It needs the cryptography package:  pip install cryptography{RESET}"
+        )
+    detail("certificate generated into .secrets/tls/")
+
+
 def wait_for_migration(timeout_seconds: int = 300) -> None:
     step("Waiting for the migration job")
     deadline = time.time() + timeout_seconds
@@ -168,6 +193,7 @@ def main() -> int:
         raise SystemExit(f"{RED}docker is not on PATH{RESET}")
 
     generate_secrets()
+    ensure_tls()
 
     if args.reset:
         step("Removing containers and volumes")

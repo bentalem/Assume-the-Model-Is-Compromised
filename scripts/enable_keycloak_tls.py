@@ -70,7 +70,8 @@ def generate_certificate() -> None:
     alternatives = [x509.DNSName(n) for n in SAN_DNS] + [
         x509.IPAddress(ipaddress.ip_address(a)) for a in SAN_IP
     ]
-    now = datetime.datetime.now(datetime.UTC)
+    # datetime.UTC is 3.11+; timezone.utc works everywhere and means the same thing.
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     certificate = (
         x509.CertificateBuilder()
@@ -237,8 +238,13 @@ networks:
 
 
 def main() -> int:
+    # compose.yaml ships with HTTPS already configured, so Keycloak cannot start at all until this
+    # certificate exists. bootstrap_local.py calls us with --certificate-only before it brings the
+    # stack up; a person running the whole script later gets the compose and Onyx work as well.
+    certificate_only = "--certificate-only" in sys.argv
+
     print()
-    print(f"{BOLD}Enabling TLS on Keycloak{RESET}")
+    print(f"{BOLD}{'Generating Keycloak TLS material' if certificate_only else 'Enabling TLS on Keycloak'}{RESET}")
     print("-" * 74)
 
     step("Generating the certificate")
@@ -250,8 +256,19 @@ def main() -> int:
         cwd=REPO, capture_output=True, text=True, timeout=120,
     )
     if result.returncode != 0:
-        raise SystemExit(result.stdout + result.stderr)
-    ok(result.stdout.strip().splitlines()[-1].strip())
+        if certificate_only:
+            # The bundle is only needed once Onyx is in the picture. Keycloak itself starts without
+            # it, so a missing `certifi` must not block the base lab.
+            print(f"{GREY}    CA bundle not built (needed only for Onyx): "
+                  f"pip install certifi, then python scripts/build_ca_bundle.py{RESET}")
+        else:
+            raise SystemExit(result.stdout + result.stderr)
+    else:
+        ok(result.stdout.strip().splitlines()[-1].strip())
+
+    if certificate_only:
+        print()
+        return 0
 
     step("Updating compose.yaml")
     patch_compose()

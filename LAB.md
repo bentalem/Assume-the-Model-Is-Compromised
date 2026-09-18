@@ -29,8 +29,20 @@ point of where the enforcement boundary sits.
 | Docker Desktop or Docker Engine, Compose v2 | Seven containers | `docker compose version` prints v2 |
 | 8 GB of memory available to Docker | Keycloak and PostgreSQL are the heavy ones | Docker Desktop → Settings → Resources |
 | ~20 GB of free disk | Images and volumes | `docker system df` |
-| Python 3.11 or newer, on the host | Every script here is host-side Python | `python --version` |
+| Python 3.10 or newer, on the host | Every script here is host-side Python | `python --version` |
 | Three Python packages | The scripts talk to the stack and make certificates | `pip install httpx cryptography certifi` |
+| On Linux: your user in the `docker` group | Otherwise every Docker call needs `sudo`, and the scripts do not use it | `docker ps` works without `sudo` |
+
+On Linux, if `docker ps` answers `permission denied while trying to connect to the Docker API`, add
+yourself to the group and start a new session:
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker      # or log out and back in
+```
+
+Running the scripts under `sudo` instead works, but then the files they write into `.secrets/` are
+owned by root and the next non-root run fails confusingly. The group is the better fix.
 
 Windows, macOS and Linux all work. Where a `.ps1` wrapper exists it only calls the Python script, so
 `python scripts/<name>.py` is always the portable form and is what this guide uses.
@@ -290,18 +302,21 @@ resolve the name a minute later, it has cached the failure — restart it.
 
 ## B3 · Give Keycloak TLS
 
+Keycloak already serves HTTPS — `bootstrap_local.py` generated its certificate in Part A, because
+the stack cannot start without one. This step makes sure the rest of the TLS wiring is in place and
+builds the bundle Onyx needs:
+
 ```bash
 python scripts/enable_keycloak_tls.py
 ```
 
-**Why.** Onyx refuses a plain-HTTP identity provider: the check is hardcoded, applies to every
-discovered endpoint, and there is no setting that relaxes it. That is correct of Onyx — an OIDC
-discovery document fetched over HTTP is trivially forgeable, and it names the endpoints where
-credentials are exchanged.
+**Why HTTPS at all.** Onyx refuses a plain-HTTP identity provider: the check is hardcoded, applies to
+every discovered endpoint, and no setting relaxes it. That is correct of Onyx — an OIDC discovery
+document fetched over HTTP is trivially forgeable, and it names the endpoints where credentials are
+exchanged.
 
-The script generates a self-signed certificate valid for `localhost`, `keycloak`,
-`supportpilot-keycloak` and `host.docker.internal`, builds a CA bundle, patches the compose file if
-it has not already been patched, and recreates Keycloak and the API.
+The certificate covers `localhost`, `keycloak`, `supportpilot-keycloak` and `host.docker.internal`,
+so the browser reaching one name and a container reaching another validate against the same file.
 
 > **The CA bundle matters.** `SSL_CERT_FILE` *replaces* the trust store rather than adding to it, so
 > pointing Onyx at the Keycloak certificate alone leaves it trusting exactly one certificate — and
@@ -517,6 +532,8 @@ trail recorded `allowed`, twice. That gap is the most valuable thing Part B can 
 |---|---|
 | Bootstrap hangs waiting for the migration job | Docker has too little memory. Raise it to 8 GB, then `--reset`. |
 | Bootstrap hangs waiting for the Keycloak realm | Keycloak is slow on a first start. Wait a few minutes, then read its logs. |
+| Keycloak restarts forever; `api` and `approval` stay in `Created` | Read its logs. `Key material not provided to setup HTTPS` means `.secrets/tls/` has no certificate — `bootstrap_local.py` makes one, so this means it could not. Run `pip install cryptography`, then `python scripts/enable_keycloak_tls.py --certificate-only`, then bootstrap again. |
+| `permission denied … /var/run/docker.sock` | Linux, and your user is not in the `docker` group. See A1. |
 | `V-01` fails | A container is not running. `docker compose ps`, then that container's logs. |
 | A check fails after you changed something | That is the lab working. Find out which layer changed before you change anything back. |
 | Cross-tenant reads suddenly succeed | You ran `learn_authorization.py break` and not `restore`. |
