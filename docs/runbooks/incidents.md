@@ -171,6 +171,6 @@ configuration in Onyx.
 - [ ] Evidence snapshot stored with the incident reference.
 - [ ] A regression test exists that would have caught it.
 - [ ] The threat model is updated if a new path was found (`ST-01`).
-- [ ] The risk register in [../10-risk-and-decisions.md](../10-risk-and-decisions.md) reflects what
+- [ ] The threat model in [../architecture/](../architecture/) reflects what
       was learned.
 - [ ] Controls are re-enabled only after the new test passes.

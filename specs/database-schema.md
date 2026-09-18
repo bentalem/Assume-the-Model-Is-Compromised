@@ -1,7 +1,7 @@
 # Database schema contract
 
 Normative for `database/migrations/`. Derived from
-[../docs/03-data-identity-authorization.md](../docs/03-data-identity-authorization.md).
+[../docs/architecture/](../docs/architecture/).
 
 ## Rules that shape every table
 

@@ -1,7 +1,7 @@
 # Policy contract
 
 Normative for `policy/supportpilot/` and the API's OPA client. Derived from
-[../docs/03-data-identity-authorization.md §3–4](../docs/03-data-identity-authorization.md#3-authorization-model).
+[../docs/architecture/](../docs/architecture/#what-actually-decides).
 
 ## The contract in one sentence
 

@@ -85,7 +85,7 @@ The override file sets `MCP_SERVER_ALLOW_PRIVATE_NETWORK=true`, which derives
 **Admin Panel → Security → SSRF Protection** wins over it, so if the error persists after applying
 the override, change it there instead. Settings are cached briefly, so restart `api_server` after.
 
-Recorded as **AC-02** in [../10-risk-and-decisions.md](../10-risk-and-decisions.md#5-accepted-conditions),
+Recorded as **AC-02**: a local-only deviation that a routable production IdP removes,
 because a relaxed guard is exactly the kind of local convenience that reaches production unexamined.
 
 ### Prerequisites

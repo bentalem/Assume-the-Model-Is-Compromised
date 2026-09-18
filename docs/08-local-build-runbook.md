@@ -19,7 +19,7 @@
 
 ## 2. Test data baseline
 
-Fixed. Every example here and every test in [09-test-plan.md](09-test-plan.md) depends on these names.
+Fixed. Every example here and every suite in `scripts/` depends on these names.
 
 | Object | Value | Purpose |
 |---|---|---|
@@ -36,7 +36,7 @@ Fixed. Every example here and every test in [09-test-plan.md](09-test-plan.md) d
 
 ## 3. Step 1 — Repository and networks
 
-1. Create the repository tree from [04 §2](04-build-and-deployment.md#2-repository-structure).
+1. Create the repository tree shown in [../LAB.md](../LAB.md#repository-map).
 2. Add code owners for `policy/`, `database/`, `openapi/`, `infrastructure/`.
 3. Pin every base image to a digest; record digests in `compose.yaml`.
 4. Define four networks; attach each service only to what it needs.
