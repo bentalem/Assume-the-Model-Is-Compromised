@@ -1,3 +1,7 @@
+> **This repository is also a lab.** The system described below runs on one machine — Onyx, Keycloak,
+> a policy engine, PostgreSQL with row-level security, a worker — and every control in it can be
+> removed so you can watch what fails. Start at **[LAB.md](LAB.md)**.
+
 # Assume the Model Is Compromised
 
 ### Seven decisions that determine whether an AI agent is safe to deploy — and why almost none of them are about the model
