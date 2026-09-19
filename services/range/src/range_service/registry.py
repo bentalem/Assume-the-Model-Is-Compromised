@@ -335,3 +335,44 @@ register_observation(
         fields=("reason",),
     )
 )
+
+
+# ==================================================================================================
+# Track 6 · separation of duty (6.2)
+#
+# These observations attempt a write. That is unusual here and deliberate: the subject of the
+# challenge is what refuses the write, so a read could only describe it. Each attempt rolls itself
+# back, and the permitted case is deleted by hand rather than left behind.
+# ==================================================================================================
+
+register_observation(
+    Observation(
+        id="actions.pending",
+        summary="Action requests and their state, newest first",
+        run=lambda: db.select("pending_actions"),
+        columns=("action_id", "action_type", "resource", "state", "risk", "payload_hash"),
+        row_cap=10,
+    )
+)
+
+register_observation(
+    Observation(
+        id="approval.self_attempt",
+        summary="Attempt to approve a request as the person who raised it",
+        run=lambda: db.select("attempt_self_approval"),
+        columns=("attempt", "outcome", "refused_by", "detail"),
+        row_cap=1,
+        fields=("refused_by", "outcome"),
+    )
+)
+
+register_observation(
+    Observation(
+        id="approval.independent_attempt",
+        summary="The same approval by a different person — the control group",
+        run=lambda: db.select("attempt_independent_approval"),
+        columns=("attempt", "outcome", "refused_by", "detail"),
+        row_cap=1,
+        fields=("refused_by", "outcome"),
+    )
+)

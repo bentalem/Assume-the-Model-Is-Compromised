@@ -1,0 +1,58 @@
+id = "6.2-self-approval"
+track = 6
+number = "6.2"
+title = "Self-approval, three times over"
+points = 30
+
+summary = """
+The person who asked for the refund tries to approve it. Three independent things refuse — and the \
+interesting question is why anyone would build the third."""
+
+objective = """
+Attempt the self-approval and find out what refuses it. Then run the control group, and give the \
+component that actually stopped it — not the layer you would have guessed."""
+
+skip_test = """
+why a control enforced in three places is not redundant, and which of the three would still hold if \
+someone deleted the other two this afternoon."""
+
+hints = [
+  "Before you decide what refused it, run the same approval with a different approver. What does that tell you about the refusal?",
+  "The error text is quoted from the thing that raised it. What kind of component raises an exception with a message like that?",
+  "If the policy engine were bypassed and the portal were replaced by a script, which of the three would still be in the way?",
+]
+
+# No controls. Attempting the write is the exercise, and both attempts undo themselves.
+
+[[observation]]
+observation = "actions.pending"
+label = "Action requests and their state"
+detail = "What is waiting for approval, with the payload hash each approval would bind to."
+
+[[observation]]
+observation = "approval.self_attempt"
+label = "Approve the request as the person who raised it"
+detail = "A direct insert, bypassing the API and the portal entirely. Rolls back either way."
+
+[[observation]]
+observation = "approval.independent_attempt"
+label = "The same approval by a different person"
+detail = "The control group. Without it you cannot tell a rule about people from a broken table."
+
+[flag]
+kind = "value"
+label = "what refused the self-approval"
+observation = "approval.self_attempt"
+field = "refused_by"
+
+[[source]]
+path = "database/migrations/0008_actions.sql"
+lines = [62, 86]
+highlight = [80, 83]
+caption = "The third refusal, and the comment explaining why a CHECK constraint could not do it"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [319, 342]
+highlight = [325, 328]
+caption = "The first refusal — the same rule, expressed where business rules live"

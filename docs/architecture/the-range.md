@@ -168,13 +168,20 @@ they exercise all three flag kinds and both halves of the console:
 |---|---|---|---|
 | 2.1 | The policy that filters nothing | `value` | two controls |
 | 2.3 | Four questions | `value` | one, unnamed |
+| 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
 
 Track 7 is read-only by design. Its subject is what the trail can and cannot show, and a challenge
 that broke something first would be answering a different question.
 
-Fifteen `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
+6.2 is the one exception to observations being read-only: it *attempts* an approval, because the
+subject of the challenge is what refuses the write. Both attempts undo themselves, neither takes an
+argument, and the permitted case is deleted by hand — a challenge that silently approved a refund
+the first time somebody pressed Run would not be a teaching tool. `range_suite.py` checks that
+nothing is left behind.
+
+Fourteen `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
 learner to make a request *through the API*, which the Range deliberately cannot reach. That is not
 an oversight in the boundary; it is the "Range-driven agent turns" capability in
 `.dev/ctf/design.md` §5, and it has to be built as its own reviewed change rather than by putting

@@ -255,7 +255,12 @@ def _check_flag(challenge, answer: str) -> tuple[bool, str]:
         normalised = {value.rstrip("0").rstrip(".") if "." in value else value for value in values}
         candidate = answer.rstrip("0").rstrip(".") if "." in answer else answer
         if candidate in normalised or answer in values:
-            return True, "Correct — and note that you could not have read this a minute ago."
+            # Only a challenge that arms something can claim the answer was previously unreachable.
+            # Saying it on a read-only challenge would be the service telling the learner something
+            # untrue about its own controls, in a course about exactly that.
+            if challenge.controls:
+                return True, "Correct — and note that you could not have read this a minute ago."
+            return True, "Correct."
         return False, "Not a value this observation returns right now."
 
     if flag.kind == "reason":
