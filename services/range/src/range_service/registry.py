@@ -294,3 +294,44 @@ def observation_values(observation_id: str, field_name: str) -> list[str]:
     if observation is None:
         raise KeyError(observation_id)
     return [str(row.get(field_name)) for row in observation.run() if row.get(field_name) is not None]
+
+
+# ==================================================================================================
+# Track 7 · evidence
+#
+# Read-only. Nothing in this track arms anything: the subject is what the trail can and cannot show,
+# and a challenge that broke something first would be answering a different question.
+# ==================================================================================================
+
+register_observation(
+    Observation(
+        id="audit.recent",
+        summary="The last 30 decisions recorded by the API and the worker",
+        run=lambda: db.select("recent_decisions"),
+        columns=("at", "actor", "action", "resource", "decision", "reason", "policy_version"),
+        row_cap=30,
+        fields=("reason",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="audit.ord_3001",
+        summary="Every recorded decision about ORD-3001",
+        run=lambda: db.select_one_arg("decisions_for_resource", "ORD-3001"),
+        columns=("at", "actor", "action", "decision", "reason", "policy_version"),
+        row_cap=30,
+        fields=("reason",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="audit.ord_2001",
+        summary="Every recorded decision about ORD-2001",
+        run=lambda: db.select_one_arg("decisions_for_resource", "ORD-2001"),
+        columns=("at", "actor", "action", "decision", "reason", "policy_version"),
+        row_cap=30,
+        fields=("reason",),
+    )
+)

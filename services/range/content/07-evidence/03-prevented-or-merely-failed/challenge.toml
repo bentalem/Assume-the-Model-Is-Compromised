@@ -1,0 +1,58 @@
+id = "7.3-prevented-or-merely-failed"
+track = 7
+number = "7.3"
+title = "Prevented, or merely failed"
+points = 30
+
+summary = """
+Two write attempts. Both blocked. One was stopped by a control and one was malformed on the way in \
+— and reporting the wrong one is how a security report loses its reader."""
+
+objective = """
+Two requests below were both refused. Exactly one of them was refused by an authorization control. \
+Use the audit trail to decide which, and give the reason code that control recorded."""
+
+skip_test = """
+what an audit trail looks like for a request that never reached the authorization pipeline, and why \
+that is the most important row in an investigation."""
+
+hints = [
+  "One of the two produced a decision. What would the other one have produced, and where would it be?",
+  "If a request is rejected before identity is established, which layer could possibly have written a row about it?",
+  "For the one that was prevented: does its row carry a policy version, and what does the answer tell you about which layer refused?",
+]
+
+# Read-only, like the rest of track 7. The trail already holds what this challenge is about; arming
+# something would be answering a different question.
+
+[[observation]]
+observation = "audit.ord_3001"
+label = "Every recorded decision about ORD-3001"
+detail = "The cross-tenant read. Look at what was written, and at the policy version column."
+
+[[observation]]
+observation = "audit.ord_2001"
+label = "Every recorded decision about ORD-2001"
+detail = "An order this user may read. Useful as the control group for what a normal row looks like."
+
+[[observation]]
+observation = "audit.recent"
+label = "The last 30 decisions from the API and the worker"
+detail = "The whole trail, newest first. Look for the request that is not here."
+
+[flag]
+kind = "reason"
+label = "the reason code recorded by the control that acted"
+reason_code = "resource_not_visible"
+
+[[source]]
+path = "services/api/src/supportpilot_api/main.py"
+lines = [142, 150]
+highlight = [146, 149]
+caption = "Where a malformed request is refused — note what it logs, and what it does not write"
+
+[[source]]
+path = "database/migrations/0004_audit_events.sql"
+lines = [1, 30]
+highlight = [22, 27]
+caption = "The audit row itself. A decision, a reason, and a policy version that is nullable"

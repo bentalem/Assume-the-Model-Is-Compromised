@@ -64,6 +64,16 @@ def select(function: str) -> list[dict[str, Any]]:
     return _call(function)
 
 
+def select_one_arg(function: str, value: str) -> list[dict[str, Any]]:
+    """Read a registered function that takes one value.
+
+    Both the function name and the value are literals from registry.py — a resource identifier a
+    challenge declared, never something a request supplied. The value is bound as a parameter
+    regardless, because the day someone forgets that rule should not also be the day it matters.
+    """
+    return _call(function, (value,))
+
+
 def record_event(request_id: str, action: str, mutation_id: str, decision: str, reason: str) -> None:
     """Write the Range's own action to the lab's audit trail, as `actor_type='range'`.
 
