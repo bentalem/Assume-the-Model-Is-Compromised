@@ -170,6 +170,7 @@ they exercise all three flag kinds and both halves of the console:
 | 2.3 | Four questions | `value` | one, unnamed |
 | 6.1 | Approve one payload, execute another | `reason` | one control |
 | 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
+| 6.4 | The approval that outlived its payload | `reason` | one control |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
 
@@ -190,7 +191,7 @@ than a missing column: an indicator that fires on clean rows teaches people to i
 which is what it actually checks. Detecting tampering stays in the worker, which recomputes the hash —
 and the challenge's own Stage 01 explains why the console must not try to do that job.
 
-Thirteen `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
+Twelve `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
 learner to make a request *through the API*, which the Range deliberately cannot reach. That is not
 an oversight in the boundary; it is the "Range-driven agent turns" capability in
 `.dev/ctf/design.md` §5, and it has to be built as its own reviewed change rather than by putting

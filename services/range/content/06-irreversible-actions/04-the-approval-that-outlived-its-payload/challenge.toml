@@ -1,0 +1,55 @@
+id = "6.4-approval-that-outlived-it"
+track = 6
+number = "6.4"
+title = "The approval that outlived its payload"
+points = 25
+
+summary = """
+An approval that never expires is not an approval. It is a capability, sitting in a table, waiting \
+for someone to find it."""
+
+objective = """
+Move the approval window into the past and find the reason code the worker records when it refuses \
+to execute a request whose window has closed."""
+
+skip_test = """
+why an approval needs a deadline at all when the thing it approves has not changed, and which clock \
+that deadline is measured against."""
+
+hints = [
+  "The request is unchanged. The approver is unchanged. The payload hash still matches. What is different?",
+  "Which component compares the deadline to a clock, and whose clock is it?",
+  "Why would a queued action still be sitting there hours later? List the ordinary reasons before the malicious one.",
+]
+
+[[control]]
+mutation = "action.approval.expire"
+label = "Move the approval window two hours into the past"
+detail = "The request stays pending and nothing else about it changes."
+
+[[observation]]
+observation = "actions.approval_window"
+label = "The approval window against the server's clock"
+detail = "When it closes, what time the database thinks it is, and how long is left."
+
+[[observation]]
+observation = "actions.payload_binding"
+label = "What the approval is bound to"
+detail = "Unchanged by this challenge — useful for seeing that nothing else is wrong."
+
+[flag]
+kind = "reason"
+label = "the reason code the worker records"
+reason_code = "approval_expired"
+
+[[source]]
+path = "services/worker/src/supportpilot_worker/jobs/processor.py"
+lines = [218, 237]
+highlight = [226, 227]
+caption = "The expiry check, in the same block as separation of duty and payload integrity"
+
+[[source]]
+path = "database/migrations/0008_actions.sql"
+lines = [180, 195]
+highlight = [186, 190]
+caption = "The window is also in the query that decides what an approver may act on"

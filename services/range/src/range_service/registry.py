@@ -412,3 +412,38 @@ register_observation(
         fields=("amount",),
     )
 )
+
+
+# ==================================================================================================
+# Track 6 · approval expiry (6.4)
+# ==================================================================================================
+
+def _probe_window() -> str:
+    rows = db.select("approval_window")
+    if not rows:
+        return UNKNOWN
+    return CORRECT if rows[0]["window_status"] == "open" else ARMED
+
+
+register_mutation(
+    Mutation(
+        id="action.approval.expire",
+        summary="Move a pending request's approval window two hours into the past",
+        apply=lambda: db.call("arm_expire_approval"),
+        restore=lambda: db.call("restore_approval_window"),
+        probe=_probe_window,
+        touches=("app.action_requests",),
+        armed_means="The request is still pending and its window has closed. Nothing else changed.",
+    )
+)
+
+register_observation(
+    Observation(
+        id="actions.approval_window",
+        summary="When the pending approval expires, against the server's own clock",
+        run=lambda: db.select("approval_window"),
+        columns=("action_id", "state", "expires_at", "server_now", "window_status", "minutes"),
+        row_cap=1,
+        fields=("window_status",),
+    )
+)
