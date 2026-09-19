@@ -30,9 +30,16 @@ networks:
   data:
     driver: bridge
     internal: true
-  # Range -> the container proxy, and nothing else. Separate from `app` on purpose: the Range must
-  # not be able to reach the API, and a network it shares with nothing is the cheapest way to say so.
+  # Range -> the container proxy, and nothing else.
   control:
+    driver: bridge
+    internal: true
+  # Range -> PostgreSQL, and nothing else.
+  #
+  # The Range cannot simply join `data`: the API is on `data` too, and sharing it would let the
+  # Range reach the API. V-17 caught exactly that during the first run of this file, which is the
+  # argument for writing the boundary check before the service has any authority to abuse.
+  range_data:
     driver: bridge
     internal: true
 
@@ -59,6 +66,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - data
+      # The Range reaches PostgreSQL here rather than on `data`, so that joining the database does
+      # not also join everything else attached to it.
+      - range_data
     healthcheck:
       test:
         ["CMD-SHELL", "pg_isready -U ${POSTGRES_BOOTSTRAP_USER:-supportpilot_admin} -d ${DATABASE_NAME:-supportpilot}"]
@@ -328,8 +338,8 @@ services:
   # makes it the largest piece of authority in this file. Read its boundaries here rather than
   # taking them on trust:
   #
-  #   * `edge` and `data` only. NOT on `app`, so it cannot reach the API; NOT on `policy`, so it
-  #     cannot reach OPA directly. `control` reaches one thing, described below.
+  #   * `edge`, `range_data` and `control`. NOT on `app` or `policy`, and NOT on `data` — the API
+  #     is on `data`, so sharing it would have handed the Range a route to the API. V-17 proves it.
   #   * Its database role owns nothing and holds no privilege on any table (migration 0010).
   #   * It is absent from openapi/supportpilot-actions.*, so the model has no route that names it.
   #   * SUPPORTPILOT_ENV must be `local` or the process exits before it binds a port.
@@ -356,14 +366,24 @@ services:
       RANGE_DB_PASSWORD_FILE: /run/secrets/range_db_password
       RANGE_CONTENT_DIR: /app/content
       DOCKER_PROXY_URL: http://docker-proxy:2375
+      RANGE_REPO_DIR: /repo
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     secrets:
       - range_db_password
+    volumes:
+      # Stage 03 shows the lab's own source with its real path and line numbers, read at request
+      # time so the material cannot drift from the system. Four directories, read-only, named one by
+      # one — mounting the repository root would have handed the Range .secrets/, which is the whole
+      # reason this is a list rather than a single line.
+      - ./database:/repo/database:ro
+      - ./services:/repo/services:ro
+      - ./policy:/repo/policy:ro
+      - ./scripts:/repo/scripts:ro
     ports:
       - "127.0.0.1:8095:8095"
     networks:
       - edge
-      - data
+      - range_data
       - control
 
   # The only thing on `control`. See infrastructure/local/docker-proxy/README.md for why the Range

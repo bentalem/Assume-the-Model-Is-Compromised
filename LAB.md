@@ -518,3 +518,25 @@ Start with [`docs/architecture/`](docs/architecture/) to understand the system, 
 No autonomous refunds without approval. No free-form SQL from the model. No general shell,
 file-system or cloud-administration tool. No model training. And no production deployment — this is
 Compose on one machine, holding invented data, built to be attacked.
+
+---
+
+## The Range — practice, rather than reading
+
+The lab proves its controls to a machine. The Range proves them to you.
+
+```bash
+docker compose --profile range up -d
+```
+
+Then open **http://127.0.0.1:8095**.
+
+It arms the lab's own controls into broken states, lets you watch what changes, shows the source for
+why, and puts everything back. Challenge 2.1 is the one to start with: a tenant policy that is
+correctly written, visible in every schema dump, attached to the right role — and returning every
+tenant's rows.
+
+You never need a terminal for any of it. The service is profile-gated, refuses to start outside a
+local environment, and cannot reach the API; see
+[docs/architecture/the-range.md](docs/architecture/the-range.md) for why a service that can break the
+others is the one most worth reviewing.

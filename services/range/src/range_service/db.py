@@ -50,6 +50,20 @@ def _call(function: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
             return list(cur.fetchall())
 
 
+def call(function: str) -> None:
+    """Invoke a registered no-argument function for its effect.
+
+    `function` is always a literal from registry.py. Nothing derived from a request reaches it, and
+    there is no variant of this that takes an argument naming a table, a role or a container.
+    """
+    _call(function)
+
+
+def select(function: str) -> list[dict[str, Any]]:
+    """Read the rows of a registered no-argument set-returning function."""
+    return _call(function)
+
+
 def record_event(request_id: str, action: str, mutation_id: str, decision: str, reason: str) -> None:
     """Write the Range's own action to the lab's audit trail, as `actor_type='range'`.
 

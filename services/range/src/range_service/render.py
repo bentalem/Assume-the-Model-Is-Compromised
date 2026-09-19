@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 from collections import defaultdict
 
+from . import source
 from .content import Challenge, TRACKS
 from .markdown import render as md
 from .theme import STYLESHEET
@@ -143,13 +144,33 @@ def _stage_01(challenge: Challenge, active: int) -> str:
     )
 
 
-def _stage_02(challenge: Challenge) -> str:
+def _result_table(columns: list[str], rows: list[list[str]]) -> str:
+    if not rows:
+        return "no rows"
+    widths = [max(len(column), *(len(row[index]) for row in rows)) for index, column in enumerate(columns)]
+    head = "  ".join(column.ljust(widths[index]) for index, column in enumerate(columns))
+    rule = "  ".join("-" * width for width in widths)
+    body = "\n".join(
+        "  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row)) for row in rows
+    )
+    return f"{head}\n{rule}\n{body}\n\n{len(rows)} row(s)"
+
+
+def _stage_02(
+    challenge: Challenge,
+    state: dict[str, str] | None = None,
+    result: str = "",
+    ran: str = "",
+    flag_note: str = "",
+    flag_ok: bool | None = None,
+) -> str:
     """The console.
 
-    Phase 0 renders it inert: the controls are declared by the content and shown with their registry
-    ids, and nothing can be armed because no mutation is registered yet. Showing the ids now is not
-    filler — it is the part a reviewer should check, and it makes the next phase a wiring change
-    rather than a redesign.
+    Left: the environment controls and the objective. Right: the result and the flag field.
+
+    The state line is not decoration. A learner who forgets that two controls are still armed spends
+    the rest of the session measuring a broken system and drawing conclusions from it, so the panel
+    says how many are away from their correct setting, on every render, read from the system.
     """
     if not challenge.controls and not challenge.observations:
         return (
@@ -159,54 +180,136 @@ def _stage_02(challenge: Challenge) -> str:
             "</section>"
         )
 
-    controls = "".join(
-        '<div class="control">'
-        f'<div class="text"><div class="label">{E(control.label)}</div>'
-        f'<div class="detail">{E(control.detail)}</div>'
-        f'<code class="mut">{E(control.mutation)}</code></div>'
-        '<button type="button" class="arm" disabled>Arm</button>'
-        "</div>"
-        for control in challenge.controls
-    )
+    state = state or {}
+    armed = [mid for mid, value in state.items() if value == "armed"]
+    unknown = [mid for mid, value in state.items() if value == "unknown"]
+
+    if unknown:
+        banner = (
+            '<div class="state unknown"><span class="dot"></span>'
+            f"Environment state unreadable for {len(unknown)} control(s) — treat every result below "
+            "as unexplained</div>"
+        )
+    elif armed:
+        banner = (
+            '<div class="state armed"><span class="dot"></span>'
+            f"Environment armed · {len(armed)} change{'s' if len(armed) != 1 else ''} away from correct</div>"
+        )
+    else:
+        banner = (
+            '<div class="state held"><span class="dot"></span>'
+            "Environment correct · every control at its designed setting</div>"
+        )
+
+    controls = ""
+    for control in challenge.controls:
+        value = state.get(control.mutation, "unknown")
+        is_armed = value == "armed"
+        action = "restore" if is_armed else "arm"
+        label = "Restore" if is_armed else "Arm"
+        css = "restore" if is_armed else "arm"
+        armed_line = (
+            f'<div class="detail" style="color:var(--armed)">Armed: {E(control.detail)}</div>'
+            if is_armed
+            else f'<div class="detail">{E(control.detail)}</div>'
+        )
+        controls += (
+            '<form method="post" class="control" '
+            f'action="/c/{E(challenge.id)}/{action}#stage-02">'
+            f'<input type="hidden" name="mutation" value="{E(control.mutation)}">'
+            f'<div class="text"><div class="label">{E(control.label)}</div>'
+            f"{armed_line}"
+            f'<code class="mut">{E(control.mutation)} · {E(value)}</code></div>'
+            f'<button type="submit" class="{css}">{label}</button>'
+            "</form>"
+        )
 
     observations = "".join(
-        '<div class="control">'
+        '<form method="post" class="control" '
+        f'action="/c/{E(challenge.id)}/observe#stage-02">'
+        f'<input type="hidden" name="observation" value="{E(obs.observation)}">'
         f'<div class="text"><div class="label">{E(obs.label)}</div>'
         f'<div class="detail">{E(obs.detail)}</div>'
         f'<code class="mut">{E(obs.observation)}</code></div>'
-        '<button type="button" disabled>Run</button>'
-        "</div>"
+        '<button type="submit">Run</button>'
+        "</form>"
         for obs in challenge.observations
+    )
+
+    reset = (
+        f'<form method="post" action="/c/{E(challenge.id)}/reset#stage-02" style="margin-top:14px">'
+        '<button type="submit" class="restore">Reset the environment</button>'
+        '<span class="detail" style="margin-left:10px">Restores every control and reports what it '
+        "changed.</span></form>"
     )
 
     flag = ""
     if challenge.flag:
+        note = ""
+        if flag_note:
+            colour = "var(--held)" if flag_ok else "var(--broken)"
+            note = f'<p class="detail" style="color:{colour};margin:8px 0 0">{E(flag_note)}</p>'
         flag = (
-            f'<div class="flagform">'
-            f'<input type="text" placeholder="{E(challenge.flag.label)}" disabled>'
-            '<button type="button" disabled>Check</button></div>'
+            f'<form method="post" class="flagform" action="/c/{E(challenge.id)}/flag#stage-02">'
+            f'<input type="text" name="answer" placeholder="{E(challenge.flag.label)}" '
+            'autocomplete="off">'
+            "<button type=\"submit\">Check</button></form>" + note
         )
+
+    ran_line = (
+        f'<p class="detail" style="margin:0 0 8px"><code>{E(ran)}</code></p>' if ran else ""
+    )
 
     return (
         '<section class="stage" id="stage-02">'
-        '<header><span class="num">STAGE 02</span><h2>Break it</h2>'
-        '<span class="note">objective below</span></header>'
-        '<div class="state unknown"><span class="dot"></span>'
-        "Environment state unavailable — no mutation is registered yet</div>"
+        '<header><span class="num">STAGE 02</span><h2>Break it</h2></header>'
+        f"{banner}"
         '<div class="body">'
         f'<p class="prose"><strong>Objective.</strong> {E(challenge.objective)}</p>'
         '<div class="console">'
         '<div class="panel"><h3>Environment</h3><div class="inner">'
-        f"{controls}{observations}"
-        '<p class="inert-note" style="margin-top:12px">Controls are inert in this build. Each one is '
-        "a registry id; the browser will send the id and nothing else — no table, no role, no "
-        "container, no statement.</p>"
+        f"{controls}{observations}{reset}"
         "</div></div>"
         '<div class="panel"><h3>Result</h3><div class="inner">'
-        '<div class="result">Nothing run yet.</div>'
+        f"{ran_line}"
+        f'<div class="result">{E(result) if result else "Nothing run yet."}</div>'
         f"{flag}"
         "</div></div>"
         "</div></div></section>"
+    )
+
+
+def _source_panel(ref) -> str:
+    """One source reference, read from the running stack at request time.
+
+    A reference that no longer resolves says so, loudly, in the place the code would have been. The
+    alternative — an empty panel — would let the material drift away from the lab without anybody
+    noticing, which is the one thing this whole mechanism exists to prevent.
+    """
+    head = (
+        f'<div class="path">{E(ref.path)} · lines {ref.lines[0]}–{ref.lines[1]}'
+        f'{" · " + E(ref.caption) if ref.caption else ""}</div>'
+    )
+    try:
+        lines = source.read_lines(ref.path, ref.lines[0], ref.lines[1])
+    except source.SourceUnavailable as exc:
+        return (
+            '<div class="panel source" style="margin-bottom:14px">'
+            f"{head}"
+            f'<div class="inner"><p class="inert-note">Source unavailable — {E(str(exc))}</p></div>'
+            "</div>"
+        )
+
+    rows = "".join(
+        f'<tr{" class=\"hit\"" if ref.highlight and ref.highlight[0] <= number <= ref.highlight[1] else ""}>'
+        f'<td class="n">{number}</td><td>{E(text)}</td></tr>'
+        for number, text in lines
+    )
+    return (
+        '<div class="panel source" style="margin-bottom:14px">'
+        f"{head}"
+        f'<div class="sourcelines"><table><tbody>{rows}</tbody></table></div>'
+        "</div>"
     )
 
 
@@ -215,16 +318,7 @@ def _stage_03(challenge: Challenge, active: int) -> str:
     if not tabs and not challenge.sources:
         return ""
 
-    sources = "".join(
-        '<div class="panel source" style="margin-bottom:14px">'
-        f'<div class="path">{E(ref.path)} · lines {ref.lines[0]}–{ref.lines[1]}'
-        f'{" · " + E(ref.caption) if ref.caption else ""}</div>'
-        '<div class="sourcelines"><table><tbody>'
-        '<tr><td class="n">—</td><td>source is fetched from the running stack; '
-        "not wired in this build</td></tr>"
-        "</tbody></table></div></div>"
-        for ref in challenge.sources
-    )
+    sources = "".join(_source_panel(ref) for ref in challenge.sources)
 
     body = ""
     if tabs:
@@ -255,13 +349,22 @@ def _hints(challenge: Challenge) -> str:
     )
 
 
-def challenge_page(challenge: Challenge, tab_01: int = 0, tab_03: int = 0) -> str:
+def challenge_page(
+    challenge: Challenge,
+    tab_01: int = 0,
+    tab_03: int = 0,
+    state: dict[str, str] | None = None,
+    result: str = "",
+    ran: str = "",
+    flag_note: str = "",
+    flag_ok: bool | None = None,
+) -> str:
     body = (
         masthead(f"{challenge.number} · {challenge.track_name}")
         + f'<h2 style="margin:0 0 4px;font-size:1.34rem;letter-spacing:-.015em">{E(challenge.title)}</h2>'
         + f'<p style="margin:0 0 22px;color:var(--muted);max-width:44rem">{E(challenge.summary)}</p>'
         + _stage_01(challenge, tab_01)
-        + _stage_02(challenge)
+        + _stage_02(challenge, state, result, ran, flag_note, flag_ok)
         + _stage_03(challenge, tab_03)
         + _hints(challenge)
         + footer(f"{challenge.id} · {challenge.points} points · track {challenge.track:02d}")

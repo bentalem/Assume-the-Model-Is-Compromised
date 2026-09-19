@@ -48,14 +48,14 @@ label = "Read app.orders as the role that owns it"
 detail = "A cedar tenant context is set first, exactly as the API sets it on every request."
 
 [[observation]]
-observation = "orders.as_api"
-label = "Read app.orders as sp_api_role"
-detail = "The same statement, the same context, a role that owns nothing."
-
-[[observation]]
 observation = "orders.catalogue"
 label = "Show owner, enabled and forced for every table"
 detail = "The four-question query, run against the live catalogue rather than described."
+
+[[observation]]
+observation = "roles.attributes"
+label = "Show superuser and BYPASSRLS for every lab role"
+detail = "The other half of the same audit: two more ways to be exempt from a policy."
 
 # ------------------------------------------------------------------------------------------------
 # The flag is northwind's order total. It lives in the seed data and the Range asks the database for

@@ -10,10 +10,22 @@ Everything below follows from that one sentence.
 
 ---
 
+## The documents
+
+| File | Covers |
+|---|---|
+| this one | components, networks, the request pipeline, the layers that say no |
+| [the-range.md](the-range.md) | The Range — the practice surface, and the boundaries on the one service that can break the others |
+
+---
+
 ## The shape of the system
 
 Seven components on four networks. The networks are the first control: most of the isolation here is
 enforced by the fact that two containers simply cannot reach each other.
+
+The Range adds an eighth, profile-gated and deliberately fenced off; it has its own document above
+because it is the service most worth reviewing.
 
 ```mermaid
 flowchart LR

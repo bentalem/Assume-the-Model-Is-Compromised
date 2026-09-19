@@ -26,12 +26,13 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
-from . import db, render
+from . import db, registry, render
 from .content import Challenge, load_all
 
 logging.basicConfig(
@@ -116,6 +117,25 @@ def index() -> HTMLResponse:
     return HTMLResponse(render.page("Catalogue", render.catalogue(_challenges)))
 
 
+def _tabs(request: Request) -> tuple[int, int]:
+    def tab(name: str) -> int:
+        raw = request.query_params.get(name, "0")
+        return int(raw) if raw.isdigit() else 0
+
+    return tab("stage-01"), tab("stage-03")
+
+
+def _render(challenge, request: Request, **kwargs) -> HTMLResponse:
+    """Render a challenge with the live environment state, always read from the system."""
+    tab_01, tab_03 = _tabs(request)
+    try:
+        state = registry.state()
+    except Exception:  # noqa: BLE001 — an unreadable state is shown as unknown, never as correct
+        logger.exception("could not probe environment state")
+        state = {mid: registry.UNKNOWN for mid in registry.MUTATIONS}
+    return HTMLResponse(render.challenge_page(challenge, tab_01, tab_03, state=state, **kwargs))
+
+
 @app.get("/c/{challenge_id}", response_class=HTMLResponse, include_in_schema=False)
 def challenge(challenge_id: str, request: Request) -> HTMLResponse:
     found = _by_id.get(challenge_id)
@@ -123,12 +143,110 @@ def challenge(challenge_id: str, request: Request) -> HTMLResponse:
         return HTMLResponse(
             render.not_found(f"No challenge with id {challenge_id!r} is loaded."), status_code=404
         )
+    return _render(found, request)
 
-    def tab(name: str) -> int:
-        raw = request.query_params.get(name, "0")
-        return int(raw) if raw.isdigit() else 0
 
-    return HTMLResponse(render.challenge_page(found, tab("stage-01"), tab("stage-03")))
+# --------------------------------------------------------------------------------------------------
+# The console.
+#
+# Every one of these takes an identifier and nothing else, and the identifier is checked twice:
+# against the ids this challenge declares, and against the registry. A mutation id that is real but
+# not part of this challenge is refused — the console is not a general remote control that happens
+# to be rendered next to a lesson.
+# --------------------------------------------------------------------------------------------------
+
+def _declared_mutations(challenge) -> set[str]:
+    return {control.mutation for control in challenge.controls}
+
+
+def _declared_observations(challenge) -> set[str]:
+    return {obs.observation for obs in challenge.observations}
+
+
+@app.post("/c/{challenge_id}/{action}", response_class=HTMLResponse, include_in_schema=False)
+async def console(challenge_id: str, action: str, request: Request) -> HTMLResponse:
+    found = _by_id.get(challenge_id)
+    if found is None:
+        return HTMLResponse(render.not_found(f"No challenge {challenge_id!r}."), status_code=404)
+    if action not in {"arm", "restore", "observe", "reset", "flag"}:
+        return HTMLResponse(render.not_found(f"Unknown action {action!r}."), status_code=404)
+
+    form = await request.form()
+    request_id = f"range-{uuid.uuid4()}"
+
+    try:
+        if action in {"arm", "restore"}:
+            mutation_id = str(form.get("mutation", ""))
+            if mutation_id not in _declared_mutations(found):
+                return HTMLResponse(
+                    render.not_found(f"{mutation_id!r} is not a control of this challenge."),
+                    status_code=400,
+                )
+            fn = registry.apply if action == "arm" else registry.restore
+            probe = fn(mutation_id, request_id)
+            return _render(found, request, ran=f"{action} {mutation_id} → {probe}")
+
+        if action == "observe":
+            observation_id = str(form.get("observation", ""))
+            if observation_id not in _declared_observations(found):
+                return HTMLResponse(
+                    render.not_found(f"{observation_id!r} is not an observation of this challenge."),
+                    status_code=400,
+                )
+            columns, rows = registry.observe(observation_id)
+            return _render(
+                found, request,
+                result=render._result_table(columns, rows),
+                ran=f"observation {observation_id}",
+            )
+
+        if action == "reset":
+            changed = registry.reset(request_id)
+            detail = ", ".join(changed) if changed else "nothing was armed"
+            return _render(found, request, ran=f"reset → restored: {detail}")
+
+        # action == "flag"
+        answer = str(form.get("answer", "")).strip()
+        ok, note = _check_flag(found, answer)
+        return _render(found, request, flag_note=note, flag_ok=ok)
+
+    except Exception as exc:  # noqa: BLE001 — the learner is told, and the log carries the trace
+        logger.exception("console action failed: %s %s", action, challenge_id)
+        return _render(found, request, ran=f"{action} failed: {type(exc).__name__}")
+
+
+def _check_flag(challenge, answer: str) -> tuple[bool, str]:
+    """Check an answer against the database rather than against a literal in a content file.
+
+    A `value` flag names an observation and a column; the answer has to match a value that
+    observation currently returns. That is what makes the flag unobtainable while the control holds:
+    when the environment is correct, the observation simply does not produce it.
+    """
+    flag = challenge.flag
+    if flag is None:
+        return False, "This challenge has no flag."
+    if not answer:
+        return False, "Enter a value."
+
+    if flag.kind == "value":
+        values = registry.observation_values(flag.observation, flag.field)
+        normalised = {value.rstrip("0").rstrip(".") if "." in value else value for value in values}
+        candidate = answer.rstrip("0").rstrip(".") if "." in answer else answer
+        if candidate in normalised or answer in values:
+            return True, "Correct — and note that you could not have read this a minute ago."
+        return False, "Not a value this observation returns right now."
+
+    if flag.kind == "reason":
+        return (
+            (True, "Correct.") if answer == flag.reason_code
+            else (False, "Not the reason code recorded for that decision.")
+        )
+
+    # written: scored against a rubric of required points, not a string match.
+    hits = [point for point in flag.rubric if point.lower() in answer.lower()]
+    if len(hits) >= max(1, len(flag.rubric) - 1):
+        return True, f"Covers {len(hits)} of {len(flag.rubric)} required points."
+    return False, f"Covers {len(hits)} of {len(flag.rubric)} required points — say more."
 
 
 def run() -> None:
