@@ -1,0 +1,49 @@
+id = "7.4-the-test-that-lied"
+track = 7
+number = "7.4"
+title = "The test that lied in its own name"
+points = 35
+
+summary = """
+A passing suite. Every case green. One of them claims something far larger than it checks, and it \
+is the case that matters most."""
+
+objective = """
+Read the abuse suite below. Find the case whose name asserts more than its assertions can support, \
+name it, and say what it actually proves. There is nothing to arm: the suite passes, and that is \
+the problem."""
+
+skip_test = """
+what a passing test proves about the control it covers, and what it proves about the claim in its \
+name."""
+
+hints = [
+  "Read the names first, with the bodies covered. Which one is a statement about the world rather than about a request?",
+  "For that case: write down, line by line, what it would take for it to fail. Is the claim in the name on that list?",
+  "One of its assertions checks that a mechanism works correctly. What is that mechanism for?",
+]
+
+# No controls. This challenge is read-only on purpose: the failure is in the instrument, not the
+# system, and arming something would suggest otherwise.
+
+[[observation]]
+observation = "roles.attributes"
+label = "Confirm the lab is in its normal state"
+detail = "Nothing here is armed. The suite you are about to read passes against this."
+
+[flag]
+kind = "written"
+label = "which case, and what it actually proves"
+rubric = ["TS7-09", "cursor", "cap"]
+
+[[source]]
+path = "scripts/abuse_suite.py"
+lines = [256, 279]
+highlight = [256, 256]
+caption = "One case from the abuse suite. Read the name, then read what it checks."
+
+[[source]]
+path = "scripts/abuse_suite.py"
+lines = [271, 279]
+highlight = [273, 278]
+caption = "The second half of the same case"
