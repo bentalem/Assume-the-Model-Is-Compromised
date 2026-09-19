@@ -11,7 +11,12 @@ tool calls.
 > trusted services perform every real action.
 
 The article this lab was built for is [`README.md`](README.md). Read it first if you have not — it
-explains *why* each control is where it is. This file gets the system running so you can break it.
+explains *why* each control is where it is.
+
+**This file does one job: get the system installed, running and verified, and tell you what you are
+looking at.** What to do with it once it runs lives elsewhere — [`docs/learning/`](docs/learning/)
+for working through the material, and [`docs/architecture/`](docs/architecture/) for how the pieces
+fit.
 
 **This guide has two halves.** Part A is the lab itself and takes about fifteen minutes. Part B adds
 Onyx and a real model, and takes about an hour the first time. **Part A is complete on its own** —
@@ -123,119 +128,10 @@ Three of these carry most of the lessons:
 
 The architecture, with diagrams: [`docs/architecture/`](docs/architecture/).
 
-## A4 · Your first ten minutes
+Learning your way around the system, rather than installing it, is
+[`docs/learning/`](docs/learning/).
 
-Three commands, in order. The shortest path to understanding what the lab is for.
-
-**See a token become a subject.**
-
-```bash
-python scripts/learn_identity.py token
-python scripts/learn_identity.py forge
-```
-
-The first signs in as alice and prints every claim in her access token. The second tampers with a
-claim — changing her organization — and sends it. Watch the API refuse. The tenant does not come from
-the token's claims; it comes from the database, keyed by the verified subject.
-
-**Watch a control fail.**
-
-```bash
-python scripts/learn_authorization.py outage
-```
-
-It stops OPA mid-flight and repeats a request alice is *fully entitled* to make. You should get `503`
-and no data. There is no cached allow and no local fallback. If the order ever comes back, something
-has a fallback somebody forgot to mention.
-
-**Watch a control that is present and doing nothing.**
-
-```bash
-python scripts/learn_rls_ownership.py
-```
-
-PostgreSQL exempts a table's **owner** from its own row policies unless `FORCE` is also set. An
-application connecting as the role that ran the migrations therefore gets no filtering at all — while
-the policies sit in the schema, correctly written, present in every dump.
-
-That third one is the single most useful thing in this repository. It is a real finding, it survives
-code review, and it has nothing to do with AI.
-
-## A5 · The practice track
-
-Each script is a module. Independent; run them in any order, but this order builds.
-
-### Identity — whose token is on the call?
-
-```bash
-python scripts/learn_identity.py token        # decode alice's token, every claim
-python scripts/learn_identity.py forge        # tamper with a claim, watch the refusal
-python scripts/learn_identity.py audience     # a valid token for the wrong service
-python scripts/learn_identity.py demote bob   # take bob's manager role away, live
-```
-
-`demote` is the one to sit with. Roles are loaded from the database on every request, so removing a
-membership takes effect on the next call — no token reissue, no cache to wait out.
-
-### Service accounts — what the easy wiring costs
-
-```bash
-python scripts/learn_service_account.py build
-```
-
-This builds a second agent wired the common way: one credential for every user. Then ask it, as a
-Cedar user, for `ORD-3001`. Same model, same prompt, same tools, same policy — one header value
-different, and the tenant boundary is gone.
-
-Written walkthrough: [`docs/learning/exercise-02-whose-token.md`](docs/learning/exercise-02-whose-token.md).
-Allow twenty minutes; the comparison table is the point.
-
-### Authorization — policy as code
-
-```bash
-python scripts/learn_authorization.py input     # the exact input and decision, from OPA's log
-python scripts/learn_authorization.py matrix    # every user against every resource, as a grid
-python scripts/learn_authorization.py fields    # obligations: the same record, two roles
-python scripts/learn_authorization.py outage    # stop OPA mid-flight
-python scripts/learn_authorization.py break     # install a policy that allows cross-tenant reads
-python scripts/learn_authorization.py restore   # put the real policy back
-```
-
-`break` then `restore` is the exercise. Install the bad policy, confirm the cross-tenant read now
-succeeds at the policy layer — then notice the *database* still refuses it. Two layers is not a
-slogan. **Always run `restore` afterwards**, or every later result is measured against a broken
-policy.
-
-### Tenant isolation — the failure that passes review
-
-```bash
-python scripts/learn_rls_ownership.py
-```
-
-Afterwards you have four questions for any team that says they use row-level security: which role
-does the application connect as, does that role own the tables, is `FORCE` set, does the role hold
-`BYPASSRLS`. One catalogue query answers all four, and you do not need access to their application.
-
-## A6 · Where to start breaking it
-
-Beyond the scripted modules. Roughly in order of how much each one teaches.
-
-1. **Stop OPA**, then read an order you are entitled to read. `503`, no data, no partial answer.
-2. **Point the API at the migration role** instead of `sp_api_role` and read across tenants.
-3. **Drop `FORCE`** from one table's row-level security and try again.
-4. **Ask the agent for fifteen customer searches in one message** (needs Part B). Every call will be
-   authenticated, authorised, correctly tenant-scoped and correctly logged — and you will have the
-   directory. This is the opening of the article, and there is no injection anywhere in it.
-5. **Approve a refund, then change the amount** in the database before the worker claims it. The hash
-   check should refuse it twice over — against the stored hash and against the approved one.
-6. **Give the agent a service-account token** instead of the user's own, then ask as alice for
-   `ORD-3001`.
-
-When something does not happen, always establish **whether it was prevented or whether it merely
-failed**. A malformed request that never reached the authorization pipeline is not evidence that
-authorization worked. That distinction has produced more false findings here than anything else.
-
-## A7 · The suites
+## A4 · Proving it works
 
 | Command | What it proves |
 |---|---|
@@ -253,7 +149,7 @@ as an error — while 219 tests passed throughout, because every one of them bui
 
 > **A test that constructs the request is testing your assumptions, not your system.**
 
-## A8 · Starting over
+## A5 · Starting over
 
 ```bash
 python scripts/bootstrap_local.py --reset    # back to a known state, database rebuilt
@@ -509,7 +405,7 @@ The realm is deliberately ephemeral. A `--reset`, or anything that recreates Key
 the client secret and drops the network attachment. Re-run `python scripts/connect_onyx.py`, then
 **paste the new secret into the SSO provider row in Onyx** — that part is not automated.
 
-## B13 · The five things to ask it
+## B13 · Check that it behaves
 
 | Ask | What should happen |
 |---|---|
@@ -548,7 +444,7 @@ trail recorded `allowed`, twice. That gap is the most valuable thing Part B can 
 | `permission denied … /var/run/docker.sock` | Linux, and your user is not in the `docker` group. See A1. |
 | `V-01` fails | A container is not running. `docker compose ps`, then that container's logs. |
 | A check fails after you changed something | That is the lab working. Find out which layer changed before you change anything back. |
-| Cross-tenant reads suddenly succeed | You ran `learn_authorization.py break` and not `restore`. |
+| Cross-tenant reads suddenly succeed | A policy was replaced and not put back. `python scripts/learn_authorization.py restore` reinstalls the real one. |
 | Everything is confusing | `python scripts/bootstrap_local.py --reset`. |
 
 Start with `docker compose ps` and `docker compose logs --tail 100 api` — substitute `keycloak`,
