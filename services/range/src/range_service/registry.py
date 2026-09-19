@@ -171,6 +171,43 @@ register_observation(
 
 
 # ==================================================================================================
+# Track 2 · the audit (2.3)
+#
+# The same shape of failure, moved to a table nobody is thinking about, with no hint about which.
+# ==================================================================================================
+
+def _probe_order_items_force() -> str:
+    rows = db.select("table_security_order_items")
+    if not rows:
+        return UNKNOWN
+    return CORRECT if rows[0]["rls_forced"] else ARMED
+
+
+register_mutation(
+    Mutation(
+        id="rls.order_items.force_off",
+        summary="Drop FORCE from app.order_items",
+        apply=lambda: db.call("arm_order_items_force_off"),
+        restore=lambda: db.call("restore_order_items_force"),
+        probe=_probe_order_items_force,
+        touches=("app.order_items",),
+        armed_means="One table in sixteen is now exempt for its owner. The catalogue will say which.",
+    )
+)
+
+register_observation(
+    Observation(
+        id="catalogue.unforced",
+        summary="Tables that are not fully protected, and in which way",
+        run=lambda: db.select("catalogue_unforced"),
+        columns=("table_name", "owner", "rls_enabled", "rls_forced", "problem"),
+        row_cap=64,
+        fields=("table_name",),
+    )
+)
+
+
+# ==================================================================================================
 # Operations
 # ==================================================================================================
 

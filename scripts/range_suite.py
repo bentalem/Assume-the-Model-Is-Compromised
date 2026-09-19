@@ -193,6 +193,27 @@ def main() -> int:
     rows = sql("SELECT count(*) FROM app.audit_events WHERE actor_type = 'range'")
     check("the Range's own actions are in the lab's audit trail", int(rows or 0) > 0, f"{rows} row(s)")
 
+    # ---------------------------------------------------------------------------------------------
+    # The last thing, and the one that matters most: what state is the lab actually in now?
+    #
+    # Everything above tested reset by calling it and reading the console back. This asks the
+    # database directly, after the suite has finished, because a suite that leaves the lab armed
+    # while reporting success is the exact failure this file exists to prevent — and it is also the
+    # failure that is easiest to write by accident.
+    # ---------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}the state this suite leaves behind{RESET}")
+    unprotected = sql(
+        "SELECT coalesce(string_agg(relname, ', '), 'none') FROM pg_class c "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'app' AND c.relkind = 'r' AND c.relname <> 'schema_migrations' "
+        "AND NOT (c.relrowsecurity AND c.relforcerowsecurity)"
+    )
+    check(
+        "every table in app is enabled and forced when the suite exits",
+        unprotected == "none",
+        f"still unprotected: {unprotected}",
+    )
+
     print()
     if failures:
         print(f"  {RED}{len(failures)} check(s) failed{RESET}")

@@ -91,6 +91,28 @@ def startup() -> None:
         # Not fatal. The catalogue and every Stage 01 render without a database, and a learner
         # reading the material should not be stopped by a service that is still coming up.
         logger.error("database not reachable: %s", detail)
+        return
+
+    # Say so if the lab is already broken.
+    #
+    # This exists because it happened: a session left two controls armed, nothing said anything, and
+    # the next thing to notice was the migration job refusing to run its smoke tests half an hour
+    # later. A service whose whole job is arming controls should be the first to report that it left
+    # some armed, not the last.
+    try:
+        armed = [mid for mid, value in registry.state().items() if value != registry.CORRECT]
+    except Exception:  # noqa: BLE001
+        logger.exception("could not probe the environment on startup")
+        return
+
+    if armed:
+        logger.warning(
+            "THE LAB IS ARMED on startup: %s — every measurement taken against it is of a broken "
+            "system. Reset from any challenge page to restore it.",
+            ", ".join(armed),
+        )
+    else:
+        logger.info("environment correct: all %d control(s) at their designed setting", len(registry.MUTATIONS))
 
 
 @app.get("/healthz", include_in_schema=False)

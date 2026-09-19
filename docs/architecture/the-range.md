@@ -138,8 +138,30 @@ that works behind a console that cannot reach it is still a broken product.
 
 ---
 
+## Two findings from building it, worth keeping
+
+**An observation that under-reported the worse failure.** `catalogue.unforced` asked for tables that
+were *enabled but not forced*. A table with row security disabled entirely does not match that, so
+while `app.orders` sat at `enabled=false, forced=false` the audit view returned **nothing** — the
+most reassuring possible answer to the worst possible state. It was caught because the migration
+job's smoke test refused to run and named the table while this observation said there was nothing
+to report: two instruments disagreed, and the stricter one was right. Fixed in `0015`.
+
+**Nothing noticed that the lab had been left armed.** Two controls stayed armed across a session and
+the first thing to complain was a migration job, half an hour later. A service whose entire job is
+arming controls should be the first to report that it left some armed, not the last. The Range now
+probes on startup and says so, and `range_suite.py` asks the database directly what state it is
+leaving behind rather than trusting its own reset call.
+
+The second one is the more useful lesson, and it is the lab's own: *a control that is configured is
+not a control that is running.* Reset was implemented, tested, and reported success — and the thing
+that actually proved it was asking the database afterwards.
+
+---
+
 ## State
 
-**Phase 0 and Phase 1 are done**: the service, its boundaries, the content model, and challenge 2.1
-end to end. Eighteen `Ready` challenges remain to author as content, then the lab capabilities in
-`.dev/ctf/design.md` §5 that the other eleven need.
+**Phases 0 and 1 are done**, plus challenge 2.3: the service, its boundaries, the content model, and
+two challenges end to end with `value` flags that are provably unobtainable unarmed. Seventeen
+`Ready` challenges remain to author as content, then the lab capabilities in `.dev/ctf/design.md` §5
+that the other eleven need.
