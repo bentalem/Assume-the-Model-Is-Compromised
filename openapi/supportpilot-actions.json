@@ -344,7 +344,33 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateNoteRequest"
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "title": "Body",
+                    "description": "The note text. Staff-only; never shown to the customer."
+                  },
+                  "expected_ticket_status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "pending",
+                      "resolved",
+                      "closed"
+                    ],
+                    "description": "The ticket status the caller believes is current. The write is refused if the ticket has moved on, so a note is never attached to a ticket that changed underneath."
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "body",
+                  "expected_ticket_status"
+                ],
+                "title": "CreateNoteRequest",
+                "description": "The request body.\n\nNote what is absent: author, organization, user id, timestamp. All are server-derived. With\n`extra=\"forbid\"`, a model that tries to supply one gets a 400 rather than a quiet drop."
               }
             }
           }
@@ -390,7 +416,61 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProposeRefundRequest"
+                "properties": {
+                  "order_number": {
+                    "type": "string",
+                    "maxLength": 16,
+                    "minLength": 8,
+                    "pattern": "^ORD-[0-9]{4,12}$",
+                    "title": "Order Number"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "maxLength": 16,
+                    "title": "Amount",
+                    "description": "Decimal amount as a string, e.g. '49.90'. Never a float."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "maxLength": 3,
+                    "minLength": 3,
+                    "title": "Currency",
+                    "description": "ISO currency code; must match the order"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "damaged_on_arrival",
+                      "not_delivered",
+                      "wrong_item",
+                      "duplicate_charge",
+                      "other"
+                    ],
+                    "description": "Why the refund is proposed. One of the listed values exactly — not free text, and not the customer's wording."
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Note"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "order_number",
+                  "amount",
+                  "currency",
+                  "reason"
+                ],
+                "title": "ProposeRefundRequest",
+                "description": "The refund proposal body.\n\nAbsent by design: any identity field, any approval field, any destination. The destination is\nderived server-side from the order at execution time — a caller-supplied payout target is how\nrefund fraud works."
               }
             }
           },

@@ -132,6 +132,28 @@ def inline_enum_refs(spec: dict) -> int:
     for definition in schemas.values():
         walk(definition.get("properties", {}))
 
+    # And the request bodies themselves, for the same reason one level up.
+    #
+    # A body published as a reference is a POST with no fields as far as an unresolving client is
+    # concerned. Onyx's model invented them: it put the currency inside the amount, omitted the
+    # currency field, and wrote the reason as prose. Nothing was wrong with the schema — the model
+    # never saw it. Response schemas keep their references: the caller reads those, it does not
+    # have to construct them.
+    for path_item in spec.get("paths", {}).values():
+        for operation in path_item.values():
+            if not isinstance(operation, dict):
+                continue
+            body = operation.get("requestBody", {}).get("content", {})
+            for media in body.values():
+                reference = media.get("schema", {}).get("$ref")
+                if not reference:
+                    continue
+                name = reference.rsplit("/", 1)[-1]
+                definition = schemas.get(name)
+                if definition and definition.get("type") == "object":
+                    media["schema"] = json.loads(json.dumps(definition))
+                    inlined += 1
+
     for name in simple:
         if not json.dumps(spec).count(f'"#/components/schemas/{name}"'):
             schemas.pop(name, None)
