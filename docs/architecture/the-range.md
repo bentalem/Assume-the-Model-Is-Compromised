@@ -191,7 +191,26 @@ than a missing column: an indicator that fires on clean rows teaches people to i
 which is what it actually checks. Detecting tampering stays in the worker, which recomputes the hash —
 and the challenge's own Stage 01 explains why the console must not try to do that job.
 
-Twelve `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
+### What the remaining challenges need
+
+Twelve `Ready` challenges remain, and they are not all the same kind of remaining.
+
+**Blocked on Range-driven agent turns** (§5). 1.3, 3.1, 5.x and 8.1 all need the learner to make a
+request *through the API*, which the Range deliberately cannot reach. That is the boundary working,
+not a gap in it — the capability has to be built as its own reviewed change rather than by putting
+the Range back on the `app` network. V-17 caught that exact shortcut once already.
+
+**Blocked on seeded evidence.** 7.1 asks a learner to reconstruct a request from the audit trail,
+and the trail on a fresh lab is empty: the rows that exist here now were produced by
+`verify_local.py` and an afternoon's use. A challenge whose flag depends on whether somebody
+happened to run the verification suite is a challenge that fails for the next learner, so 7.1 needs
+a seeded evidence path — a fixed set of audit rows that ship with the lab — before it can be
+written honestly.
+
+That constraint is worth stating rather than working around. The alternative was a flag that
+usually works.
+
+**Ready to author now.** 1.1, 1.2, 1.4 and 6.3, which need no capability the Range does not have. Several of them — 1.3, 3.1, 5.x — need the
 learner to make a request *through the API*, which the Range deliberately cannot reach. That is not
 an oversight in the boundary; it is the "Range-driven agent turns" capability in
 `.dev/ctf/design.md` §5, and it has to be built as its own reviewed change rather than by putting
