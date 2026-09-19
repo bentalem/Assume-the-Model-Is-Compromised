@@ -1,0 +1,56 @@
+id = "6.1-approve-one-execute-another"
+track = 6
+number = "6.1"
+title = "Approve one payload, execute another"
+points = 35
+
+summary = """
+Get forty-five dollars approved, then change it to four thousand five hundred before the worker \
+claims it. The approval is still valid. The refund is not."""
+
+objective = """
+Alter the pending payload without touching the hash, then find the reason code the worker records \
+when it refuses to execute it. The answer is in the worker's source, not in the database — and \
+knowing why is the challenge."""
+
+skip_test = """
+what an approval is actually binding to when somebody says "the refund was approved", and at which \
+moment that binding is checked."""
+
+hints = [
+  "The approval recorded a hash. When is that hash next compared to anything, and by which component?",
+  "The observation can tell you the payload changed. Can it tell you the hash no longer matches? Why not?",
+  "The worker refuses in two different ways here, with two different reason codes. Which one fires first, and what is the other one for?",
+]
+
+[[control]]
+mutation = "action.payload.tamper"
+label = "Change the approved amount from 45.00 to 4500.00"
+detail = "Updates the payload only. payload_hash is left exactly as it was."
+
+[[observation]]
+observation = "actions.payload_binding"
+label = "What the pending approval is bound to"
+detail = "The amount, the hash the approval binds to, and whether the amount is still the proposed one."
+
+[[observation]]
+observation = "actions.pending"
+label = "Action requests and their state"
+detail = "Nothing changes state here. The request is still PENDING_APPROVAL either way."
+
+[flag]
+kind = "reason"
+label = "the reason code the worker records"
+reason_code = "payload_hash_mismatch_stored"
+
+[[source]]
+path = "services/worker/src/supportpilot_worker/jobs/processor.py"
+lines = [222, 237]
+highlight = [229, 235]
+caption = "The integrity check, immediately before the provider is called"
+
+[[source]]
+path = "database/migrations/0008_actions.sql"
+lines = [45, 60]
+highlight = [51, 53]
+caption = "Why the approval stores the hash again rather than pointing at it"

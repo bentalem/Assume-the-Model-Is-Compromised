@@ -376,3 +376,39 @@ register_observation(
         fields=("refused_by", "outcome"),
     )
 )
+
+
+# ==================================================================================================
+# Track 6 · payload binding (6.1)
+# ==================================================================================================
+
+def _probe_payload() -> str:
+    rows = db.select("payload_binding")
+    if not rows:
+        return UNKNOWN
+    return CORRECT if rows[0]["matches_proposal"].startswith("yes") else ARMED
+
+
+register_mutation(
+    Mutation(
+        id="action.payload.tamper",
+        summary="Change the amount on a pending refund, leaving the hash alone",
+        apply=lambda: db.call("arm_tamper_payload"),
+        restore=lambda: db.call("restore_payload"),
+        probe=_probe_payload,
+        touches=("app.action_requests",),
+        armed_means="The payload says 4500.00. The hash still says what 45.00 hashed to.",
+    )
+)
+
+register_observation(
+    Observation(
+        id="actions.payload_binding",
+        summary="What each pending approval is bound to, and what its payload says now",
+        run=lambda: db.select("payload_binding"),
+        columns=("action_id", "state", "amount", "currency", "payload_hash", "approved_hash",
+                 "matches_proposal"),
+        row_cap=5,
+        fields=("amount",),
+    )
+)

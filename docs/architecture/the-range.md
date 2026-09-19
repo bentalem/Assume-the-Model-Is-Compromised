@@ -168,6 +168,7 @@ they exercise all three flag kinds and both halves of the console:
 |---|---|---|---|
 | 2.1 | The policy that filters nothing | `value` | two controls |
 | 2.3 | Four questions | `value` | one, unnamed |
+| 6.1 | Approve one payload, execute another | `reason` | one control |
 | 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
@@ -181,7 +182,15 @@ argument, and the permitted case is deleted by hand — a challenge that silentl
 the first time somebody pressed Run would not be a teaching tool. `range_suite.py` checks that
 nothing is left behind.
 
-Fourteen `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
+A third finding, from 6.1 and the same family as the first two: `payload_binding` reported
+"payload changed, hash did not" for any pending request whose amount was not 45.00 — including one
+proposed at 1.00 that nothing had touched. A false positive in an investigative tool, which is worse
+than a missing column: an indicator that fires on clean rows teaches people to ignore the indicator.
+`0019` restricts it to the request the mutation acts on and renames the column to `matches_proposal`,
+which is what it actually checks. Detecting tampering stays in the worker, which recomputes the hash —
+and the challenge's own Stage 01 explains why the console must not try to do that job.
+
+Thirteen `Ready` challenges remain to author as content. Several of them — 1.3, 3.1, 5.x — need the
 learner to make a request *through the API*, which the Range deliberately cannot reach. That is not
 an oversight in the boundary; it is the "Range-driven agent turns" capability in
 `.dev/ctf/design.md` §5, and it has to be built as its own reviewed change rather than by putting
