@@ -1,0 +1,11 @@
+# Pinned runtime dependencies, vendored as wheels under vendor/wheels and installed with
+# --no-index, exactly as the other services are.
+#
+# There is deliberately no YAML or Markdown dependency. Challenge metadata is TOML, read with the
+# standard library's tomllib, and the Markdown subset the content uses is rendered by a small
+# reviewed module in this package. A security lab is a poor place to add a parser it does not need.
+fastapi==0.115.6
+uvicorn==0.34.0
+psycopg[binary,pool]==3.2.3
+# Form posts arm and restore controls; every field is an identifier from a closed set.
+python-multipart==0.0.20

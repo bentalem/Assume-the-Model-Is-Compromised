@@ -11,3 +11,9 @@ evidence/
 **/.pytest_cache/
 **/tests/
 **/*.md
+
+# ...except the Range's challenge content, which *is* the product. The rule above exists to keep
+# documentation out of images; these files are data the service reads at runtime, and excluding them
+# ships a Range with manifests and no material. The loud skip in content.py caught this once
+# already, which is the only reason it is a comment rather than an outage.
+!services/range/content/**/*.md

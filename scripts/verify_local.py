@@ -133,8 +133,20 @@ def get_token(username: str, password: str, scope: str = "openid") -> str:
         return json.load(response)["access_token"]
 
 
-def check(check_id: str, description: str):
+def check(check_id: str, description: str, skip_unless=None):
+    """Register and run one check.
+
+    `skip_unless` is for checks that only apply when an optional service is up. A skip is reported
+    and is not a failure — but it is also not a pass, and it is counted separately, because a run
+    that quietly skipped the boundary checks on the most privileged service in the lab must not
+    look identical to one that proved them.
+    """
+
     def decorator(fn):
+        if skip_unless is not None and not skip_unless():
+            results.append((check_id, "SKIP", "service not running"))
+            print(f"  {check_id:<6} {GREY}SKIP{RESET}  {description}")
+            return fn
         try:
             detail = fn() or ""
             results.append((check_id, "PASS", detail))
@@ -407,13 +419,63 @@ def main() -> int:
         return "customers, orders, and tickets all refused for sp_worker_role"
 
     # ----------------------------------------------------------------------------------------
+    # The Range. These run only when it is up, because it is profile-gated — but when it is up,
+    # they are the most important checks in this file. A service that can arm controls into broken
+    # states is the largest piece of authority in the repository, and each of these asserts one of
+    # the boundaries that keeps it from being a second superuser.
+    # ----------------------------------------------------------------------------------------
+    def range_running() -> bool:
+        proc = compose("ps", "--format", "{{.Service}}", timeout=30)
+        return "range" in proc.stdout.split()
+
+    @check("V-17", "The Range cannot reach the API or OPA", skip_unless=range_running)
+    def _():
+        probe = (
+            "import socket\n"
+            "for host, port in (('api', 8000), ('opa', 8181)):\n"
+            "    s = socket.socket(); s.settimeout(3)\n"
+            "    try:\n"
+            "        s.connect((host, port)); print('REACHED', host)\n"
+            "    except Exception:\n"
+            "        print('BLOCKED', host)\n"
+        )
+        proc = compose("exec", "-T", "range", "python", "-c", probe, timeout=60)
+        if "REACHED" in proc.stdout:
+            raise CheckFailed(f"the Range reached a service it must not: {proc.stdout.strip()}")
+        return "api and opa unreachable from the Range"
+
+    @check("V-18", "sp_range_role holds no privilege on any app table", skip_unless=range_running)
+    def _():
+        for table in ("app.orders", "app.customers", "app.audit_events"):
+            if not psql_fails(f"SELECT 1 FROM {table} LIMIT 1", "sp_range_role"):
+                raise CheckFailed(
+                    f"sp_range_role read {table} directly; its reach must be EXECUTE on "
+                    "reviewed functions and nothing else"
+                )
+        return "orders, customers and audit_events all refused for sp_range_role"
+
+    @check("V-19", "The Range is absent from the action document", skip_unless=range_running)
+    def _():
+        document = (REPO / "openapi" / "supportpilot-actions.json").read_text(encoding="utf-8")
+        for token in ("range", "8095"):
+            if token in document.lower():
+                raise CheckFailed(
+                    f"the action document mentions {token!r}; the model must have no route "
+                    "that names the Range"
+                )
+        return "no route the model can name"
+
+    # ----------------------------------------------------------------------------------------
     print("-" * 74)
     passed = sum(1 for _, result, _ in results if result == "PASS")
     failed = sum(1 for _, result, _ in results if result == "FAIL")
+    skipped = sum(1 for _, result, _ in results if result == "SKIP")
     total = passed + failed
 
+    tail = f"  {GREY}({skipped} skipped — an optional service was not running){RESET}" if skipped else ""
+
     if failed == 0:
-        print(f"  {GREEN}ALL CHECKS PASSED  ({passed}/{total}){RESET}")
+        print(f"  {GREEN}ALL CHECKS PASSED  ({passed}/{total}){RESET}{tail}")
     else:
         print(f"  {RED}{passed} PASSED, {failed} FAILED  (of {total}){RESET}")
         print(f"  {YELLOW}A failing check is a phase blocker, not a warning.{RESET}")
@@ -428,6 +490,7 @@ def main() -> int:
                 "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                 "passed": passed,
                 "failed": failed,
+                "skipped": skipped,
                 "checks": [
                     {"id": i, "result": r, "detail": d} for i, r, d in results
                 ],

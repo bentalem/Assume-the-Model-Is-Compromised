@@ -123,3 +123,74 @@ END
 $$;
 
 RESET ROLE;
+
+-- ==================================================================================================
+-- The Range (0010).
+--
+-- The Range can arm controls into broken states, which is the largest piece of authority in this
+-- repository. These assertions are what keeps it from quietly becoming a second superuser: if a
+-- later change grants it a table, an attribute, or ownership, the migration job fails here rather
+-- than the Range failing in front of a learner.
+-- ==================================================================================================
+DO $$
+DECLARE
+  offenders text;
+  n integer;
+BEGIN
+  -- 1. Same dangerous-attribute rule as every other runtime role.
+  SELECT string_agg(rolname, ', ') INTO offenders
+  FROM pg_roles
+  WHERE rolname = 'sp_range_role'
+    AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls);
+  IF offenders IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: sp_range_role holds a dangerous attribute';
+  END IF;
+
+  -- 2. It owns nothing, anywhere.
+  SELECT count(*) INTO n
+  FROM pg_class c
+  WHERE pg_get_userbyid(c.relowner) = 'sp_range_role';
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'FAIL: sp_range_role owns % relation(s)', n;
+  END IF;
+
+  SELECT count(*) INTO n
+  FROM pg_namespace WHERE pg_get_userbyid(nspowner) = 'sp_range_role';
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'FAIL: sp_range_role owns % schema(s)', n;
+  END IF;
+
+  -- 3. It holds no privilege on any table in app. This is the assertion that matters most: the
+  --    Range reads another tenant's rows through a SECURITY DEFINER function or not at all, so a
+  --    direct grant here would silently replace a reviewed function with an open door.
+  SELECT string_agg(table_name || ':' || privilege_type, ', ') INTO offenders
+  FROM information_schema.table_privileges
+  WHERE grantee = 'sp_range_role' AND table_schema = 'app';
+  IF offenders IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: sp_range_role holds privileges on app tables: %', offenders;
+  END IF;
+
+  -- 4. It cannot create in the range schema; it may only enter it and call what it was granted.
+  IF has_schema_privilege('sp_range_role', 'range', 'CREATE') THEN
+    RAISE EXCEPTION 'FAIL: sp_range_role may CREATE in schema range';
+  END IF;
+  IF NOT has_schema_privilege('sp_range_role', 'range', 'USAGE') THEN
+    RAISE EXCEPTION 'FAIL: sp_range_role cannot USAGE schema range';
+  END IF;
+
+  -- 5. Every function it can call is SECURITY DEFINER and owned by the migration role. A function
+  --    that is neither runs with the Range's own rights, which would make it useless and hide the
+  --    fact that it is useless behind an empty result.
+  SELECT string_agg(p.proname, ', ') INTO offenders
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'range'
+    AND has_function_privilege('sp_range_role', p.oid, 'EXECUTE')
+    AND (NOT p.prosecdef OR pg_get_userbyid(p.proowner) <> 'sp_migrator_role');
+  IF offenders IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: range function(s) not SECURITY DEFINER owned by the migrator: %', offenders;
+  END IF;
+
+  RAISE NOTICE 'PASS: sp_range_role is bounded to EXECUTE on reviewed functions';
+END
+$$;

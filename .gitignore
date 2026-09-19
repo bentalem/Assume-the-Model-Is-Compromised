@@ -37,3 +37,6 @@ docs/article/.print-*.html
 
 # Cleanup holding area — never published
 _to_delete/
+
+# Our own working documents. The lab is published; how we build it is not.
+.dev/

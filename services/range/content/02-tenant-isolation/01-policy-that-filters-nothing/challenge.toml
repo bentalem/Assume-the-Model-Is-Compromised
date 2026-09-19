@@ -1,0 +1,90 @@
+id = "2.1-policy-that-filters-nothing"
+track = 2
+number = "2.1"
+title = "The policy that filters nothing"
+points = 30
+
+summary = """
+A tenant policy that is correctly written, visible in every schema dump, attached to the right role \
+— and returning every tenant's rows."""
+
+objective = """
+Make app.orders return a row belonging to northwind while a cedar request is in context, and read \
+that order's total. You may not write SQL and you may not change the policy: the policy is already \
+correct, and that is the point."""
+
+# The renderer supplies the "skip this only if you can already answer" framing, so this is the
+# question and nothing else.
+skip_test = """
+which *three* things all have to be true before a PostgreSQL row policy filters a query, and which \
+one of them a code review cannot see."""
+
+hints = [
+  "Which database role is in the application's connection string, and who owns the table it is reading?",
+  "PostgreSQL has two separate flags for row security, not one. What is the second one for?",
+  "You have two switches. Four combinations. Which of the four does a schema dump look identical in?",
+]
+
+# ------------------------------------------------------------------------------------------------
+# Stage 02 — the console.
+#
+# Both controls are registry ids. The browser posts the id; it never names a table, a role or a
+# statement. Two switches rather than one because the lesson is the truth table, and a learner who
+# only ever sees FORCE toggled has been shown a fact rather than taught a mechanism.
+# ------------------------------------------------------------------------------------------------
+[[control]]
+mutation = "rls.orders.force_off"
+label = "Drop FORCE from app.orders"
+detail = "Leaves row security enabled. The policy stays exactly as written."
+
+[[control]]
+mutation = "rls.orders.disable"
+label = "Disable row security on app.orders"
+detail = "Turns the feature off entirely. The policy still exists and is still correct."
+
+[[observation]]
+observation = "orders.as_owner"
+label = "Read app.orders as the role that owns it"
+detail = "A cedar tenant context is set first, exactly as the API sets it on every request."
+
+[[observation]]
+observation = "orders.as_api"
+label = "Read app.orders as sp_api_role"
+detail = "The same statement, the same context, a role that owns nothing."
+
+[[observation]]
+observation = "orders.catalogue"
+label = "Show owner, enabled and forced for every table"
+detail = "The four-question query, run against the live catalogue rather than described."
+
+# ------------------------------------------------------------------------------------------------
+# The flag is northwind's order total. It lives in the seed data and the Range asks the database for
+# it rather than carrying a literal, so it cannot drift. It is unobtainable while both mutations
+# probe `correct`: a cedar context under FORCE returns no northwind row at all.
+# ------------------------------------------------------------------------------------------------
+[flag]
+kind = "value"
+label = "northwind's order total"
+observation = "orders.as_owner"
+field = "total_amount"
+
+# ------------------------------------------------------------------------------------------------
+# Stage 03 — the lab's own source, fetched from the running stack at request time.
+# ------------------------------------------------------------------------------------------------
+[[source]]
+path = "database/migrations/0003_customers_orders.sql"
+lines = [42, 52]
+highlight = [45, 45]
+caption = "Both flags, then the policy. One line here is the whole challenge."
+
+[[source]]
+path = "database/migrations/0001_roles_and_schema.sql"
+lines = [63, 74]
+highlight = [67, 69]
+caption = "Why an unset context returns nothing rather than everything"
+
+[[source]]
+path = "services/api/src/supportpilot_api/db.py"
+lines = [66, 86]
+highlight = [74, 81]
+caption = "The context the policy reads, set transaction-locally on every request"

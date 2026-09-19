@@ -30,6 +30,11 @@ networks:
   data:
     driver: bridge
     internal: true
+  # Range -> the container proxy, and nothing else. Separate from `app` on purpose: the Range must
+  # not be able to reach the API, and a network it shares with nothing is the cheapest way to say so.
+  control:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres_data:
@@ -83,6 +88,7 @@ services:
       API_PASSWORD_FILE: /run/secrets/api_db_password
       WORKER_PASSWORD_FILE: /run/secrets/worker_db_password
       AUDITOR_PASSWORD_FILE: /run/secrets/auditor_db_password
+      RANGE_PASSWORD_FILE: /run/secrets/range_db_password
       SEED_LOCAL_DATA: ${SEED_LOCAL_DATA:-true}
     secrets:
       - postgres_bootstrap_password
@@ -90,6 +96,7 @@ services:
       - api_db_password
       - worker_db_password
       - auditor_db_password
+      - range_db_password
     networks:
       - data
 
@@ -314,6 +321,67 @@ services:
       - edge
       - app
 
+  # --------------------------------------------------------------------------------------------
+  # The Range — the practice surface.
+  #
+  # It arms the lab's controls into broken states so a learner can watch the consequence, which
+  # makes it the largest piece of authority in this file. Read its boundaries here rather than
+  # taking them on trust:
+  #
+  #   * `edge` and `data` only. NOT on `app`, so it cannot reach the API; NOT on `policy`, so it
+  #     cannot reach OPA directly. `control` reaches one thing, described below.
+  #   * Its database role owns nothing and holds no privilege on any table (migration 0010).
+  #   * It is absent from openapi/supportpilot-actions.*, so the model has no route that names it.
+  #   * SUPPORTPILOT_ENV must be `local` or the process exits before it binds a port.
+  #
+  # Profile-gated: a lab that is only being used as a lab does not need it running.
+  # --------------------------------------------------------------------------------------------
+  range:
+    <<: *python-base
+    profiles: ["range"]
+    build:
+      context: .
+      dockerfile: services/range/Dockerfile
+    image: supportpilot/range:local
+    container_name: supportpilot-range
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SUPPORTPILOT_ENV: local
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: ${DATABASE_NAME:-supportpilot}
+      RANGE_DB_USER: sp_range_role
+      RANGE_DB_PASSWORD_FILE: /run/secrets/range_db_password
+      RANGE_CONTENT_DIR: /app/content
+      DOCKER_PROXY_URL: http://docker-proxy:2375
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - range_db_password
+    ports:
+      - "127.0.0.1:8095:8095"
+    networks:
+      - edge
+      - data
+      - control
+
+  # The only thing on `control`. See infrastructure/local/docker-proxy/README.md for why the Range
+  # does not get the Docker socket itself: a service holding that socket is root on the host, which
+  # is not a smaller version of what the Range needs but an unbounded version of it.
+  docker-proxy:
+    profiles: ["range"]
+    image: haproxy:2.9-alpine
+    container_name: supportpilot-docker-proxy
+    restart: unless-stopped
+    read_only: true
+    user: root
+    volumes:
+      - ./infrastructure/local/docker-proxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - control
+
   # Onyx is NOT defined here.
   #
   # It ships as its own compose project (`name: onyx`) built from the upstream base file plus the
@@ -338,5 +406,7 @@ secrets:
     file: ./.secrets/worker_db_password
   auditor_db_password:
     file: ./.secrets/auditor_db_password
+  range_db_password:
+    file: ./.secrets/range_db_password
   keycloak_admin_password:
     file: ./.secrets/keycloak_admin_password

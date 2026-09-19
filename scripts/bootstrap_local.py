@@ -30,6 +30,7 @@ SECRET_NAMES = [
     "api_db_password",
     "worker_db_password",
     "auditor_db_password",
+    "range_db_password",
     "keycloak_admin_password",
 ]
 
