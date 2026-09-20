@@ -99,6 +99,19 @@ vulnerability the lab exists to warn about, living in the lab's own API.
 
 **Deferred, on the same grounds, with the same two acceptable shapes.**
 
+**A second reason, found later while looking for a way to build it.** After 3.3 and 3.4 were built
+without giving the API anything, 2.2 was worth another attempt on the same principle: demonstrate
+the consequence somewhere that is not the API. It does not work, and the reason is worth keeping.
+
+`SET` rather than `SET LOCAL` only shows itself when a second request lands on a connection the
+first one left dirty. The Range cannot produce that, because `db.py` opens a connection per call and
+says why: *"a pool would add a pooled-session state"* the service does not want. Demonstrating the
+bug from the Range would mean giving the Range a connection pool — reintroducing, in the teaching
+tool, the exact condition the lesson is about, and in a service that also holds the policy bundle.
+
+So 2.2 stays deferred for two independent reasons now: the API must not gain the code path, and the
+Range must not gain the pool. Either alone would be enough.
+
 (3.3 later took a third shape that neither 2.2 nor 3.4 can take: replacing a configuration artefact rather than adding a code path. See below.)
 
 ## The same reasoning applied to 3.3, which came out the other way
