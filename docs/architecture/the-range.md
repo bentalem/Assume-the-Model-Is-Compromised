@@ -219,34 +219,51 @@ and the challenge's own Stage 01 explains why the console must not try to do tha
 
 ### What the remaining challenges need
 
-Twelve `Ready` challenges remain, and they are not all the same kind of remaining.
+Seventeen of the thirty-one rows in `.dev/ctf/design.md` are built. Fourteen are not, and they are
+not all the same kind of not-built. Four of them the design marks `Ready`, and the honest position
+on each has changed now that the Range exists to test the assumption against.
 
-**Unblocked, as of ADR-0003.** The `probe` service is built: a request registry on `app`, holding a
-fixed list of named, parameterless API requests, reachable from the Range over `control` and gated by
-a shared secret. The Range still cannot reach the API — it can ask for one of a list. Challenge 3.2
-is the first to use it, and the remaining track 1, 3 and 5 challenges are now content plus a probe
-entry each.
+**Blocked on a model in the loop.** 4.3, 5.1, 5.3 and 7.2 need a conversation, not an HTTP request.
+The probe service makes requests; it cannot be steered by text it reads, which is the entire subject
+of those four. That means driving Onyx, a separate compose project and its own decision.
 
-**Still blocked on a model in the loop.** 4.3, 5.3 and 7.2 need a conversation, not an HTTP request.
-That means driving Onyx, which is a separate compose project and a larger decision.
+5.1 carries a second problem worth recording before anyone builds it. Its stated outcome is *"two
+identical refusals"* — an assertion about what the model did. `CLAUDE.md` forbids exactly that, and
+for a good reason: two identical runs produce different tool calls. If 5.1 is built, the flag has to
+be about the boundary around the model, never about the model's answer.
 
-**Blocked on seeded evidence.** 7.1 asks a learner to reconstruct a request from the audit trail,
-and the trail on a fresh lab is empty: the rows that exist here now were produced by
-`verify_local.py` and an afternoon's use. A challenge whose flag depends on whether somebody
-happened to run the verification suite is a challenge that fails for the next learner, so 7.1 needs
-a seeded evidence path — a fixed set of audit rows that ship with the lab — before it can be
-written honestly.
+**Blocked on the Range being able to write files.** 8.1 turns on the published action document
+drifting from the registered code. The Range mounts `openapi/` read-only and has no file-writing
+capability at all, by design. Arming that drift means either granting the Range write access to the
+repository working tree — where a crashed container leaves the repository holding the broken
+version, so the inverse is no longer guaranteed — or building the drift somewhere that is not the
+repository. The second is the acceptable shape, and it has not been built.
 
-That constraint is worth stating rather than working around. The alternative was a flag that
-usually works.
+**3.3 is the interesting one, and it is not Ready.** It installs a permissive policy and has the
+learner discover that row-level security refuses anyway. As a *demonstration* it is exactly what
+ADR-0004 permits: a configuration artefact at its wrong value, reversibly. The obstacle is
+mechanical rather than philosophical. OPA loads its bundle read-only from `./policy/supportpilot`,
+sits on the `policy` network, and the Range cannot reach it (`V-17`) — so arming a different policy
+means writing to the bundle directory, which is the repository working tree, with the same
+un-guaranteed inverse as 8.1. A permissive policy left behind by a crashed container is a worse
+thing to leave behind than a broken schema file.
 
-**Ready to author now.** 6.3 was, and is done. Nothing else is: 1.1, 1.2 and 1.4 all require
-presenting a token *to the API*, which puts them in the first group. Track 6 is complete.
+The shape that would work: a policy overlay on a named volume rather than on the repository, with
+the wrong bundle shipped inside the Range image, `reset` asserting the volume is empty, and a probe
+proving which behaviour is live. That is a reviewed change of its own, and it is worth doing —
+"the two layers disagreed and the second one held" is the clearest possible demonstration of
+invariant 4, and nothing currently built shows it.
 
-An earlier version of this section listed those three as unblocked. That was wrong — they were
-counted as "no new capability" because they need no new database surface, which is not the same
-question. Several of them — 1.3, 3.1, 5.x — need the
-learner to make a request *through the API*, which the Range deliberately cannot reach. That is not
-an oversight in the boundary; it is the "Range-driven agent turns" capability in
-`.dev/ctf/design.md` §5, and it has to be built as its own reviewed change rather than by putting
-the Range back on the `app` network.
+**Blocked on capability the design already names.** 2.2, 3.4, 4.2, 4.4, 5.4, 8.2, 8.3 and 8.4 each
+need something that does not exist. 2.2 and 3.4 are refused outright by ADR-0004. The rest are
+ordinary unbuilt work: an outbound tool, an unschema'd `object` parameter, a URL-taking tool, an
+MCP-style tool source, a prompt store.
+
+**Resolved.** 7.1 was blocked on seeded evidence — the trail on a fresh lab is empty, and a flag
+that depends on whether somebody happened to run the verification suite is a flag that fails for the
+next learner. `database/seeds/0004_completed_refund.sql` now ships one completed refund as fixture
+history: the action request, its approval, its job, its execution evidence and its four audit rows,
+all consistent, with a payload hash that is the real sha256 of the canonical payload. The separation
+of duty trigger accepts it because alice proposes and fiona approves — a fixture that tried to seed
+a self-approval fails the seed file rather than producing a trail the system could never have
+written.
