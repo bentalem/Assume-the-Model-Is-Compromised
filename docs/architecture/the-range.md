@@ -193,6 +193,22 @@ learner who pressed Run. Sixty observations, checked against the console's own `
 than against the word "failed" — 7.4 renders a source panel containing that string, and the first
 version of this check reported it as a broken observation.
 
+The same suite now proves the **flag integrity rule** — *a flag must be unobtainable while every
+mutation probes correct* — for every challenge that owes it, rather than for one challenge against a
+hardcoded value. Three challenges have a value flag and a control to earn it: 1.1, 2.1 and 2.3.
+
+The answer is discovered rather than written down next to the check. The observation is read with
+the environment correct, read again with the challenge's controls armed, and the flag is taken from
+the **difference** between the two result sets. That definition matters: the first version of this
+check took the first value in the column and picked a cedar order's amount out of 2.1 — a row that
+is visible whether or not anything is armed — then reported the challenge as broken when the flag
+was still accepted afterwards. What makes a flag earned is that it is in the armed result set and
+not in the correct one. Asking for the difference finds 2.1's real answer on its own, and it is the
+value the older hardcoded check asserts.
+
+A value flag on a read-only challenge carries no such obligation, and the console already says so
+rather than claiming the answer was unreachable a minute ago.
+
 One observation is empty while the environment is correct, and that is the designed answer rather
 than a fault: `catalogue.unforced` lists the tables that are not fully protected, and 2.3 exists
 because the list is empty until something is armed. The suite names the expected empty one, so a

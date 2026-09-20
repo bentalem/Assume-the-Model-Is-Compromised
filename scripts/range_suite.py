@@ -18,6 +18,7 @@ process. A registry that works and a console that cannot reach it is still a bro
 
 from __future__ import annotations
 
+import html
 import json
 import subprocess
 import sys
@@ -82,6 +83,46 @@ def _owner_of(mutation_id: str) -> str | None:
         if f"{mutation_id} · " in get(f"/c/{challenge_id}"):
             return challenge_id
     return None
+
+
+def _flag_values(body: str, field: str) -> list[str]:
+    """Read one value out of the named column of the result the console just rendered.
+
+    The result is fixed-width text, so the rule line under the header gives exact column spans.
+    Splitting on whitespace would be wrong the moment a value contains a space, which several
+    of them do.
+
+    Every value, not the first. The first version of the caller took the first one and picked a
+    cedar order's amount out of 2.1 — a row that is visible whether or not anything is armed, so
+    the flag accepted it afterwards and the check called the challenge broken. What makes a flag
+    earned is that it is in the armed result set and not in the correct one.
+    """
+    key = chr(60) + 'div class="result"' + chr(62)
+    if key not in body:
+        return []
+    block = html.unescape(body.split(key, 1)[1].split(chr(60) + "/div" + chr(62), 1)[0])
+    lines = [line for line in block.splitlines() if line.strip()]
+    if len(lines) < 3:
+        return []
+    header, rule = lines[0], lines[1]
+    if set(rule.strip()) - set("- "):
+        return []
+    spans, at = [], 0
+    for chunk in rule.split("  "):
+        spans.append((at, at + len(chunk)))
+        at += len(chunk) + 2
+    names = [header[a:b].strip() for a, b in spans]
+    if field not in names:
+        return []
+    a, b = spans[names.index(field)]
+    found = []
+    for line in lines[2:]:
+        if "row(s)" in line and line.strip().endswith("row(s)"):
+            continue
+        value = line[a:b].strip()
+        if value:
+            found.append(value)
+    return found
 
 
 def sql(statement: str) -> str:
@@ -354,6 +395,65 @@ def main() -> int:
         set(empty) <= {"2.3 catalogue.unforced"},
         ", ".join(sorted(empty)) if empty else "none",
     )
+
+    # ------------------------------------------------------------------------------------------
+    # "Flags must be unobtainable while every mutation probes correct" is a registry rule, and
+    # until now exactly one challenge tested it, against a hardcoded 512.00. Every challenge with
+    # a value flag and a control has the same obligation, so every one of them is checked here,
+    # with the answer discovered from the challenge rather than written down next to it.
+    #
+    # A value flag on a read-only challenge carries no such obligation — there is nothing to arm,
+    # and the console says so rather than claiming the answer was unreachable a minute ago.
+    # ------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}every value flag that has a control to earn it{RESET}")
+    for toml in sorted((REPO / "services" / "range" / "content").glob("*/*/challenge.toml")):
+        text = toml.read_text(encoding="utf-8")
+        if 'kind = "value"' not in text:
+            continue
+        mutations = [
+            line.split(chr(34))[1] for line in text.splitlines()
+            if line.startswith("mutation = ")
+        ]
+        if not mutations:
+            continue
+        cid = text.split('id = "', 1)[1].split(chr(34), 1)[0]
+        number = text.split('number = "', 1)[1].split(chr(34), 1)[0]
+        flag = text.split("[flag]", 1)[1]
+        observation = flag.split('observation = "', 1)[1].split(chr(34), 1)[0]
+        field = flag.split('field = "', 1)[1].split(chr(34), 1)[0]
+
+        correct_values = set(_flag_values(
+            post(f"/c/{cid}/observe", {"observation": observation}), field
+        ))
+        for mutation in mutations:
+            post(f"/c/{cid}/arm", {"mutation": mutation})
+        armed_values = set(_flag_values(
+            post(f"/c/{cid}/observe", {"observation": observation}), field
+        ))
+        revealed = sorted(armed_values - correct_values)
+
+        if not check(
+            f"{number}: breaking the control reveals a value that was not there before",
+            bool(revealed),
+            f"{observation}.{field}: {len(revealed)} value(s) that arming made visible",
+        ):
+            for mutation in mutations:
+                post(f"/c/{cid}/restore", {"mutation": mutation})
+            continue
+
+        answer = revealed[0]
+        check(
+            f"{number}: the flag is obtainable once the control is broken",
+            "Correct" in post(f"/c/{cid}/flag", {"answer": answer}),
+            f"{field}={answer}",
+        )
+        for mutation in mutations:
+            post(f"/c/{cid}/restore", {"mutation": mutation})
+        check(
+            f"{number}: the same answer is refused once the control holds again",
+            "Not a value" in post(f"/c/{cid}/flag", {"answer": answer}),
+            "a flag readable unarmed can be guessed rather than earned",
+        )
 
     print(f"\n  {GREY}the state this suite leaves behind{RESET}")
     unprotected = sql(
