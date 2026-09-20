@@ -1,0 +1,59 @@
+id = "3.2-yes-and-only-these-fields"
+track = 3
+number = "3.2"
+title = "Yes, and only these fields"
+points = 30
+
+summary = """
+Two people ask the API for the same customer record and get two different records. Neither request \
+was refused, and no code branched on a role."""
+
+objective = """
+Read the restricted customer as a support agent and as a manager, and name the field that reaches \
+one of them and not the other. Both requests succeed — the interesting part is what is missing."""
+
+skip_test = """
+what a policy engine can return other than yes or no, and why a system without that has to choose \
+between full access and none."""
+
+hints = [
+  "Both requests returned 200. If neither was refused, what part of the answer differed?",
+  "Compare the two field lists character by character. Which name appears once?",
+  "Where would you put the decision to omit that field — the query, the response model, or somewhere neither of those can see?",
+]
+
+# Read-only. Both requests are permitted; nothing needs breaking to show the difference.
+
+[[observation]]
+observation = "api.alice.restricted_customer"
+label = "Read CUS-4003 as alice, a support agent"
+detail = "A real request through the API, with alice's own token."
+
+[[observation]]
+observation = "api.bob.restricted_customer"
+label = "Read CUS-4003 as bob, a manager"
+detail = "The same record, the same endpoint, a different person."
+
+[[observation]]
+observation = "api.fiona.order"
+label = "Read an order as fiona, who approves refunds"
+detail = "For contrast: this is what a refusal looks like, rather than a narrowing."
+
+# A `value` flag would compare against the whole comma-joined field list, and the label promises a
+# single field name. `written` with a one-item rubric asks for exactly what the label says.
+[flag]
+kind = "written"
+label = "the field the manager gets and the agent does not"
+rubric = ["email"]
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [128, 160]
+highlight = [134, 142]
+caption = "The obligation: an allow that carries a narrower field list"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [46, 58]
+highlight = [53, 57]
+caption = "The two field sets, and what is absent from the restricted one"

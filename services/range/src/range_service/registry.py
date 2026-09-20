@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import db
+from . import db, probe
 
 logger = logging.getLogger("supportpilot.range.registry")
 
@@ -484,3 +484,45 @@ register_observation(
         fields=("refused_by",),
     )
 )
+
+
+# ==================================================================================================
+# Requests made through the API, via the probe service
+#
+# The Range cannot reach the API. These ask `probe` for one of its registered requests, by id, over
+# the control network. Two registries have to agree before anything happens, and neither service can
+# extend the other's vocabulary — see docs/architecture/adr-0003-range-request-probes.md.
+#
+# The result is the status, the error code and the *field names* in the response. Never values: a
+# challenge that needs data reads it from the database through an observation above, where the row
+# cap and the field list are already enforced.
+# ==================================================================================================
+
+_PROBE_COLUMNS = ("request", "as_user", "status", "error_code", "fields", "intent")
+
+
+def _register_probe(observation_id: str, probe_id: str, summary: str) -> None:
+    register_observation(
+        Observation(
+            id=observation_id,
+            summary=summary,
+            run=lambda: probe.run(probe_id),
+            columns=_PROBE_COLUMNS,
+            row_cap=1,
+            fields=("error_code", "status", "fields"),
+        )
+    )
+
+
+_register_probe("api.alice.own_order", "alice.read.own_order",
+                "alice reads her own tenant's order — the control group")
+_register_probe("api.alice.foreign_order", "alice.read.foreign_order",
+                "alice reads an order belonging to the other tenant")
+_register_probe("api.mallory.cedar_order", "mallory.read.cedar_order",
+                "the same boundary from the other side")
+_register_probe("api.alice.restricted_customer", "alice.read.restricted_customer",
+                "a support agent reads a restricted customer")
+_register_probe("api.bob.restricted_customer", "bob.read.restricted_customer",
+                "a manager reads the same restricted customer")
+_register_probe("api.fiona.order", "fiona.read.order",
+                "an approver, who does not read orders, tries to")

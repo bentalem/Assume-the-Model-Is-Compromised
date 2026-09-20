@@ -465,6 +465,45 @@ def main() -> int:
                 )
         return "no route the model can name"
 
+    def probe_running() -> bool:
+        proc = compose("ps", "--format", "{{.Service}}", timeout=30)
+        return "probe" in proc.stdout.split()
+
+    @check("V-20", "The probe service refuses a request without the shared secret",
+           skip_unless=probe_running)
+    def _():
+        # The probe sits on `app` so it can reach the API, which means everything else on `app` can
+        # open a socket to it. Network placement cannot make that one-way; the secret can, and this
+        # is the assertion that says so rather than the diagram implying it.
+        script = "\n".join(
+            [
+                "import urllib.request, urllib.error",
+                "req = urllib.request.Request(",
+                "    'http://probe:8096/probe/alice.read.own_order', method='POST')",
+                "try:",
+                "    urllib.request.urlopen(req, timeout=20); print('ACCEPTED')",
+                "except urllib.error.HTTPError as exc:",
+                "    print('REFUSED', exc.code)",
+                "except Exception as exc:",
+                "    print('UNREACHABLE', type(exc).__name__)",
+            ]
+        )
+        proc = compose("exec", "-T", "approval-portal", "python", "-c", script, timeout=60)
+        if "REFUSED 401" not in proc.stdout:
+            raise CheckFailed(
+                f"a service on app reached the probe without the secret: {proc.stdout.strip()}"
+            )
+        return "unauthenticated probe requests refused with 401"
+
+    @check("V-21", "The probe service is absent from the action document",
+           skip_unless=probe_running)
+    def _():
+        document = (REPO / "openapi" / "supportpilot-actions.json").read_text(encoding="utf-8")
+        for token in ("probe", "8096"):
+            if token in document.lower():
+                raise CheckFailed(f"the action document mentions {token!r}")
+        return "no route the model can name"
+
     # ----------------------------------------------------------------------------------------
     print("-" * 74)
     passed = sum(1 for _, result, _ in results if result == "PASS")

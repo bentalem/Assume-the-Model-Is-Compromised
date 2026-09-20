@@ -31,6 +31,7 @@ SECRET_NAMES = [
     "worker_db_password",
     "auditor_db_password",
     "range_db_password",
+    "probe_shared_secret",
     "keycloak_admin_password",
 ]
 

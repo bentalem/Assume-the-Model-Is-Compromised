@@ -172,6 +172,7 @@ they exercise all three flag kinds and both halves of the console:
 | 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
 | 6.3 | Exactly once | `value` | no — attempts a write that rolls back |
 | 6.4 | The approval that outlived its payload | `reason` | one control |
+| 3.2 | Yes, and only these fields | `written` | no — two real API requests |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
 
@@ -196,10 +197,14 @@ and the challenge's own Stage 01 explains why the console must not try to do tha
 
 Twelve `Ready` challenges remain, and they are not all the same kind of remaining.
 
-**Blocked on Range-driven agent turns** (§5). 1.3, 3.1, 5.x and 8.1 all need the learner to make a
-request *through the API*, which the Range deliberately cannot reach. That is the boundary working,
-not a gap in it — the capability has to be built as its own reviewed change rather than by putting
-the Range back on the `app` network. V-17 caught that exact shortcut once already.
+**Unblocked, as of ADR-0003.** The `probe` service is built: a request registry on `app`, holding a
+fixed list of named, parameterless API requests, reachable from the Range over `control` and gated by
+a shared secret. The Range still cannot reach the API — it can ask for one of a list. Challenge 3.2
+is the first to use it, and the remaining track 1, 3 and 5 challenges are now content plus a probe
+entry each.
+
+**Still blocked on a model in the loop.** 4.3, 5.3 and 7.2 need a conversation, not an HTTP request.
+That means driving Onyx, which is a separate compose project and a larger decision.
 
 **Blocked on seeded evidence.** 7.1 asks a learner to reconstruct a request from the audit trail,
 and the trail on a fresh lab is empty: the rows that exist here now were produced by

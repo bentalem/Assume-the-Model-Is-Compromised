@@ -53,8 +53,17 @@ probe   app        can reach the API. Holds one credential per lab user.
 - The Range still cannot reach the API. It can ask `probe` to perform one of a fixed list of
   requests, which is a different and much smaller thing.
 
-`V-17` stays exactly as it is, and gains a sibling: **the probe service must not be reachable from
-Onyx or from the API**, so the direction of the arrow is one-way.
+`V-17` stays exactly as it is.
+
+**Correction to the first draft of this ADR.** It said the probe "must not be reachable from Onyx or
+from the API", as though network placement could arrange that. It cannot: the probe sits on `app` so
+that it can reach the API, and Docker networks are bidirectional, so anything else on `app` can open
+a socket to it.
+
+What actually makes the direction one-way is a **shared secret**, mounted to exactly two services and
+compared in constant time. Reachable and usable are different properties, and only the second one is
+enforceable here. `V-20` asserts that a request without the secret is refused — which is the real
+boundary, rather than the one the network diagram implied.
 
 ## Why this is not just moving the problem
 

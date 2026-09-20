@@ -367,9 +367,12 @@ services:
       RANGE_CONTENT_DIR: /app/content
       DOCKER_PROXY_URL: http://docker-proxy:2375
       RANGE_REPO_DIR: /repo
+      PROBE_URL: http://probe:8096
+      PROBE_SHARED_SECRET_FILE: /run/secrets/probe_shared_secret
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     secrets:
       - range_db_password
+      - probe_shared_secret
     volumes:
       # Stage 03 shows the lab's own source with its real path and line numbers, read at request
       # time so the material cannot drift from the system. Four directories, read-only, named one by
@@ -386,7 +389,45 @@ services:
       - range_data
       - control
 
-  # The only thing on `control`. See infrastructure/local/docker-proxy/README.md for why the Range
+  # --------------------------------------------------------------------------------------------
+  # The probe service — a fixed vocabulary of API requests, for the Range.
+  #
+  # The Range cannot reach the API (V-17) and twelve challenges need a request made through it.
+  # This service can reach the API, holds one hand-written list of requests, and answers to an id.
+  # See docs/architecture/adr-0003-range-request-probes.md.
+  #
+  # It is on `app` because it must reach the API, which means anything else on `app` can open a
+  # socket to it. Network placement alone cannot make the direction one-way, so the shared secret
+  # does: it is mounted to this service and to the Range, and to nothing else.
+  # --------------------------------------------------------------------------------------------
+  probe:
+    <<: *python-base
+    profiles: ["range"]
+    build:
+      context: .
+      dockerfile: services/probe/Dockerfile
+    image: supportpilot/probe:local
+    container_name: supportpilot-probe
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      SUPPORTPILOT_ENV: local
+      SUPPORTPILOT_API_URL: http://api:8000
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-https://keycloak:8443}
+      KEYCLOAK_REALM: supportpilot
+      PROBE_SHARED_SECRET_FILE: /run/secrets/probe_shared_secret
+      SSL_CERT_FILE: /etc/ssl/supportpilot/ca-bundle.crt
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - probe_shared_secret
+    volumes:
+      - ./.secrets/tls:/etc/ssl/supportpilot:ro
+    networks:
+      - app
+      - control
+
+  # The only thing else on `control`. See infrastructure/local/docker-proxy/README.md for why the Range
   # does not get the Docker socket itself: a service holding that socket is root on the host, which
   # is not a smaller version of what the Range needs but an unbounded version of it.
   docker-proxy:
@@ -428,5 +469,7 @@ secrets:
     file: ./.secrets/auditor_db_password
   range_db_password:
     file: ./.secrets/range_db_password
+  probe_shared_secret:
+    file: ./.secrets/probe_shared_secret
   keycloak_admin_password:
     file: ./.secrets/keycloak_admin_password
