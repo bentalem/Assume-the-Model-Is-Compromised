@@ -1,0 +1,60 @@
+id = "1.3-roles-come-from-the-database"
+track = 1
+number = "1.3"
+title = "Roles come from the database"
+points = 30
+
+summary = """
+Revoke a manager's role while his token keeps working, then ask the same question again. The token \
+did not change. The answer did."""
+
+objective = """
+Read the restricted customer as bob, revoke his manager membership, and read it again with the same \
+credential. Give the field that stops coming back."""
+
+skip_test = """
+what a token establishes and what it does not, and how long a revoked permission keeps working in a \
+system that reads roles from the token."""
+
+hints = [
+  "What is in bob's field list before you arm anything — and did you write it down?",
+  "Nothing reissues bob's token between the two reads. So what did the second request consult that the first one did?",
+  "If the roles had been claims inside the token instead, how long would the demotion have taken to have any effect?",
+]
+
+[[control]]
+mutation = "identity.bob.revoke_manager"
+label = "Demote the manager to a support agent"
+detail = "Changes the role on the membership row. No token is touched, reissued or invalidated."
+
+[[observation]]
+observation = "identity.memberships"
+label = "What the server believes about each person"
+detail = "The memberships table. This is the only thing that decides what anyone may do."
+
+[[observation]]
+observation = "api.bob.restricted_customer"
+label = "Read CUS-4003 as bob"
+detail = "A real request with bob's own token. Run it before arming, and again after."
+
+[[observation]]
+observation = "api.alice.restricted_customer"
+label = "Read CUS-4003 as alice, who is not a manager"
+detail = "The field set bob is about to be given."
+
+[flag]
+kind = "written"
+label = "the field that stops coming back"
+rubric = ["email"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/dependencies.py"
+lines = [1, 30]
+highlight = [1, 12]
+caption = "The trust boundary: a token becomes a subject, and the subject is loaded"
+
+[[source]]
+path = "database/migrations/0002_core_tenancy.sql"
+lines = [1, 24]
+highlight = [1, 10]
+caption = "Where the roles actually live"

@@ -526,3 +526,44 @@ _register_probe("api.bob.restricted_customer", "bob.read.restricted_customer",
                 "a manager reads the same restricted customer")
 _register_probe("api.fiona.order", "fiona.read.order",
                 "an approver, who does not read orders, tries to")
+
+
+# ==================================================================================================
+# Track 1 · roles come from the database (1.3)
+# ==================================================================================================
+
+def _probe_bob_manager() -> str:
+    """Correct when somebody holds an active support_manager membership.
+
+    The mutation demotes rather than revokes, so the armed state is the *absence* of the role — not
+    a revoked row. Probing for a revoked row would have reported `correct` forever.
+    """
+    rows = db.select("memberships_for_lab_users")
+    if not rows:
+        return UNKNOWN
+    active_managers = [r for r in rows if r["role"] == "support_manager" and r["status"] == "active"]
+    return CORRECT if active_managers else ARMED
+
+
+register_mutation(
+    Mutation(
+        id="identity.bob.revoke_manager",
+        summary="Demote the manager to a support agent",
+        apply=lambda: db.call("arm_revoke_bob_manager"),
+        restore=lambda: db.call("restore_bob_manager"),
+        probe=_probe_bob_manager,
+        touches=("app.memberships",),
+        armed_means="The membership now says support_agent. Every token already issued is unchanged.",
+    )
+)
+
+register_observation(
+    Observation(
+        id="identity.memberships",
+        summary="What the server believes about each person, which is what decides",
+        run=lambda: db.select("memberships_for_lab_users"),
+        columns=("person", "role", "status", "granted"),
+        row_cap=16,
+        fields=("status",),
+    )
+)
