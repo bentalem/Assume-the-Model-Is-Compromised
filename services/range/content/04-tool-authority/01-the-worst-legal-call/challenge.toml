@@ -1,0 +1,57 @@
+id = "4.1-the-worst-legal-call"
+track = 4
+number = "4.1"
+title = "The worst legal call"
+points = 40
+
+summary = """
+Seven tools, read as what they are: seven standing grants of authority to something steerable by \
+the text it just read. One of them is not like the others."""
+
+objective = """
+Read the registered surface and find the single tool whose parameter shape grants the most \
+authority. Name it, and say in one or two sentences what one legal call to it can do and why \
+repetition matters."""
+
+skip_test = """
+the question you ask of every tool in a review, and why each clause of it is there."""
+
+hints = [
+  "Six of the seven take an identifier. What does the seventh take, and who chooses the set it returns?",
+  "Look at the parameters column for that tool. Which of them decides how much comes back, and who supplies it?",
+  "Is there anything in the surface that bounds a session rather than a single call?"
+]
+
+# Read-only. Nothing needs breaking: the authority is in the schema, visible, working as designed.
+
+[[observation]]
+observation = "tools.surface"
+label = "Every registered operation"
+detail = "Read from the published action document, not from a list somebody maintains by hand."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "One tool, called normally"
+detail = "For scale: this is what an ordinary, entirely permitted call looks like."
+
+[[observation]]
+observation = "content.registered_tools"
+label = "The modules behind those operations"
+detail = "Useful for checking that the document and the code agree about what exists."
+
+[flag]
+kind = "written"
+label = "the tool, and what one legal call can do"
+rubric = ["search_customers", "cursor", "25"]
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [102, 127]
+highlight = [108, 115]
+caption = "Where the page size is actually decided — note that it is not the caller"
+
+[[source]]
+path = "services/api/src/supportpilot_api/tools/customers.py"
+lines = [95, 115]
+highlight = [103, 108]
+caption = "The line that applies the obligation. A returned limit nobody enforces is a comment"

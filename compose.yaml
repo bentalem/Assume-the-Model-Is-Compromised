@@ -391,6 +391,9 @@ services:
       - ./services:/repo/services:ro
       - ./policy:/repo/policy:ro
       - ./scripts:/repo/scripts:ro
+      # The action document. Track 4 is about reading a tool schema and judging the authority it
+      # grants, so the learner needs the real registered surface rather than a description of it.
+      - ./openapi:/repo/openapi:ro
     ports:
       - "127.0.0.1:8095:8095"
     networks:

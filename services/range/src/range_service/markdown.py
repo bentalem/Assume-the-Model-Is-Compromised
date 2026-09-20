@@ -18,7 +18,10 @@ import html
 import re
 
 _INLINE_CODE = re.compile(r"`([^`]+)`")
-_BOLD = re.compile(r"\*\*([^*]+)\*\*")
+# Bold may contain single-asterisk emphasis: `**a maximum, per call *and* per session**`.
+# The obvious `\*\*([^*]+)\*\*` refuses any `*` inside and leaves the literal `**` on the
+# page. The content test caught exactly that, which is the only reason this is a comment.
+_BOLD = re.compile(r"\*\*((?:[^*]|\*(?!\*))+)\*\*")
 _ITALIC = re.compile(r"(?<![*\w])\*([^*]+)\*(?!\*)")
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 _SAFE_HREF = re.compile(r"^(https?://|#|/)")

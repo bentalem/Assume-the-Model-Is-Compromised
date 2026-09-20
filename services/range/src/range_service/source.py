@@ -11,8 +11,10 @@ deliberately over-privileged elsewhere:
   * **No path ever comes from a request.** Stage 03 is rendered from the SourceRef objects the
     challenge already declared at startup. There is no endpoint that takes a path, so there is
     nothing to traverse.
-  * **The mount is narrow.** The container sees four directories read-only. `.secrets/` is not
-    among them, and neither is anything else at the repository root.
+  * **The mount is narrow.** The container sees a fixed, read-only set of directories, named once
+    in `ALLOWED_PREFIXES` below rather than counted in prose here — the last time this docstring
+    carried a number, the number went stale the first time the set grew. `.secrets/` is not among
+    them, and neither is anything else at the repository root.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ REPO_ROOT = Path(os.environ.get("RANGE_REPO_DIR", "/repo"))
 
 # The directories mounted into the container. A reference outside these resolves to nothing, which
 # is reported as a missing source rather than silently rendering an empty panel.
-ALLOWED_PREFIXES = ("database/", "services/", "policy/", "scripts/")
+ALLOWED_PREFIXES = ("database/", "services/", "policy/", "scripts/", "openapi/")
 
 
 class SourceUnavailable(Exception):

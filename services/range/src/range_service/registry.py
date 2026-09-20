@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import containers, db, probe
+from . import containers, db, probe, source
 
 logger = logging.getLogger("supportpilot.range.registry")
 
@@ -729,3 +729,56 @@ _register_probe("api.agent.cedar_order", "agent.read.cedar_order",
                 "the service account reads cedar's order")
 _register_probe("api.agent.northwind_order", "agent.read.northwind_order",
                 "the same credential reads northwind's order")
+
+
+# ==================================================================================================
+# Track 4 · tool authority (4.1)
+#
+# Read from the published action document rather than from a list in this file. The point of the
+# track is judging the surface a system actually exposes, and a hand-maintained copy of it would be
+# the wrong thing to teach against — it would drift, and the drift would be invisible.
+# ==================================================================================================
+
+def _tool_surface() -> list[dict[str, Any]]:
+    import json as _json
+
+    path = source.REPO_ROOT / "openapi" / "supportpilot-actions.json"
+    if not path.is_file():
+        return [{"operation": "(the action document is not mounted)", "method": "-",
+                 "path": "-", "parameters": "-", "body": "-"}]
+
+    document = _json.loads(path.read_text(encoding="utf-8"))
+    rows: list[dict[str, Any]] = []
+    for route, operations in sorted(document.get("paths", {}).items()):
+        for method, operation in sorted(operations.items()):
+            params = [
+                f"{p['name']}:{p.get('schema', {}).get('type', '?')}"
+                for p in operation.get("parameters", [])
+            ]
+            body = "-"
+            request_body = operation.get("requestBody")
+            if request_body:
+                schema = request_body.get("content", {}).get("application/json", {}).get("schema", {})
+                ref = schema.get("$ref", "")
+                body = ref.rsplit("/", 1)[-1] if ref else "inline"
+            rows.append(
+                {
+                    "operation": operation.get("operationId", "?"),
+                    "method": method.upper(),
+                    "path": route,
+                    "parameters": ", ".join(params) or "-",
+                    "body": body,
+                }
+            )
+    return rows
+
+
+register_observation(
+    Observation(
+        id="tools.surface",
+        summary="Every registered operation, read from the published action document",
+        run=_tool_surface,
+        columns=("operation", "method", "path", "parameters", "body"),
+        row_cap=32,
+    )
+)

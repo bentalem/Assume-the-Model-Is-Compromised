@@ -108,7 +108,7 @@ What the rule was protecting — content as data, adding a challenge means addin
 **Source is fetched, never copied.** Stage 03 reads the named line range out of the running stack at
 request time, so the material cannot drift from the system it describes. The path never comes from a
 request: pages render from the `SourceRef` objects the content declared at startup, and the container
-sees four directories read-only (`database`, `services`, `policy`, `scripts`). Mounting the
+sees five directories read-only (`database`, `services`, `policy`, `scripts`, `openapi`). Mounting the
 repository root would have handed the Range `.secrets/`.
 
 ### Flags
