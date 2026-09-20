@@ -447,3 +447,40 @@ register_observation(
         fields=("window_status",),
     )
 )
+
+
+# ==================================================================================================
+# Track 6 · exactly once (6.3)
+# ==================================================================================================
+
+register_observation(
+    Observation(
+        id="execution.evidence",
+        summary="What has actually executed, and under which idempotency key",
+        run=lambda: db.select("execution_evidence"),
+        columns=("job", "idempotency_key", "provider", "outcome", "reference"),
+        row_cap=10,
+    )
+)
+
+register_observation(
+    Observation(
+        id="execution.replay_attempt",
+        summary="Record the same effect a second time, under the same key",
+        run=lambda: db.select("attempt_duplicate_effect"),
+        columns=("attempt", "outcome", "refused_by", "detail"),
+        row_cap=1,
+        fields=("refused_by",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="execution.new_key_attempt",
+        summary="The same insert under a fresh key — the control group",
+        run=lambda: db.select("attempt_new_effect"),
+        columns=("attempt", "outcome", "refused_by", "detail"),
+        row_cap=1,
+        fields=("refused_by",),
+    )
+)

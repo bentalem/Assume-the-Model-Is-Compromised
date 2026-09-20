@@ -1,0 +1,56 @@
+id = "6.3-exactly-once"
+track = 6
+number = "6.3"
+title = "Exactly once"
+points = 30
+
+summary = """
+The provider timed out. Nobody knows whether the money moved. The worker is about to try again — \
+and something has to make sure that is safe."""
+
+objective = """
+Record the same effect twice under the same idempotency key, and give the name of the constraint \
+that refuses it. Run the control group too: without it you have not proved anything about keys."""
+
+skip_test = """
+what a worker should do when a payment call times out, and which of the three "once" constraints in \
+this schema is the only one that helps."""
+
+hints = [
+  "Before you attempt anything: what are the three possible states of a payment call that timed out?",
+  "Two of the three unique constraints in this schema stop a duplicate being created. Which one stops a duplicate being recorded?",
+  "The control group inserts a row too. If it were also refused, what would that tell you about the first result?",
+]
+
+[[observation]]
+observation = "execution.evidence"
+label = "What has actually executed"
+detail = "One row per effect, each under its own idempotency key."
+
+[[observation]]
+observation = "execution.replay_attempt"
+label = "Record the same effect again, under the same key"
+detail = "Exactly what a retry after a timeout would do. Rolls back either way."
+
+[[observation]]
+observation = "execution.new_key_attempt"
+label = "The same insert under a fresh key"
+detail = "The control group. Proves the refusal is about the key and not about the row."
+
+[flag]
+kind = "value"
+label = "the constraint that refuses the replay"
+observation = "execution.replay_attempt"
+field = "refused_by"
+
+[[source]]
+path = "database/migrations/0008_actions.sql"
+lines = [118, 136]
+highlight = [131, 133]
+caption = "The constraint, and the comment that calls it the most important one in the schema"
+
+[[source]]
+path = "services/worker/src/supportpilot_worker/jobs/processor.py"
+lines = [104, 120]
+highlight = [104, 108]
+caption = "The key is reserved as 'ambiguous' before the provider is called, not after"

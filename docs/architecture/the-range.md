@@ -170,6 +170,7 @@ they exercise all three flag kinds and both halves of the console:
 | 2.3 | Four questions | `value` | one, unnamed |
 | 6.1 | Approve one payload, execute another | `reason` | one control |
 | 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
+| 6.3 | Exactly once | `value` | no — attempts a write that rolls back |
 | 6.4 | The approval that outlived its payload | `reason` | one control |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
@@ -210,7 +211,12 @@ written honestly.
 That constraint is worth stating rather than working around. The alternative was a flag that
 usually works.
 
-**Ready to author now.** 1.1, 1.2, 1.4 and 6.3, which need no capability the Range does not have. Several of them — 1.3, 3.1, 5.x — need the
+**Ready to author now.** 6.3 was, and is done. Nothing else is: 1.1, 1.2 and 1.4 all require
+presenting a token *to the API*, which puts them in the first group. Track 6 is complete.
+
+An earlier version of this section listed those three as unblocked. That was wrong — they were
+counted as "no new capability" because they need no new database surface, which is not the same
+question. Several of them — 1.3, 3.1, 5.x — need the
 learner to make a request *through the API*, which the Range deliberately cannot reach. That is not
 an oversight in the boundary; it is the "Range-driven agent turns" capability in
 `.dev/ctf/design.md` §5, and it has to be built as its own reviewed change rather than by putting

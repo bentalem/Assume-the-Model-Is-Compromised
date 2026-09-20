@@ -19,7 +19,7 @@ that deadline is measured against."""
 hints = [
   "The request is unchanged. The approver is unchanged. The payload hash still matches. What is different?",
   "Which component compares the deadline to a clock, and whose clock is it?",
-  "Why would a queued action still be sitting there hours later? List the ordinary reasons before the malicious one.",
+  "Why would a queued action still be sitting there hours later — and what are the ordinary reasons, before the malicious one?",
 ]
 
 [[control]]
