@@ -304,6 +304,57 @@ def main() -> int:
             and probe_of(page, "policy.tenant_check.remove") == "correct",
         )
 
+    # ------------------------------------------------------------------------------------------
+    # Every observation every challenge declares, actually run.
+    #
+    # The content tests prove a challenge renders and that its control ids resolve. They cannot
+    # prove an observation still returns anything, because they never call one — so a renamed SQL
+    # function or a dropped column would pass every test and fail the first learner to press Run.
+    #
+    # Success is the console's own "ran" line rather than a search for the word "failed": 7.4
+    # renders a source panel containing that very string, and the first version of this check
+    # reported it as a broken observation.
+    # ------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}every declared observation, on every challenge{RESET}")
+    marker = chr(60) + 'p class="detail" style="margin:0 0 8px"' + chr(62) + chr(60) + "code" + chr(62)
+    ran_ok = 0
+    empty = []
+    broken = []
+    for toml in sorted((REPO / "services" / "range" / "content").glob("*/*/challenge.toml")):
+        text = toml.read_text(encoding="utf-8")
+        cid = text.split('id = "', 1)[1].split('"', 1)[0]
+        number = text.split('number = "', 1)[1].split('"', 1)[0]
+        declared = sorted({
+            line.split('"')[1] for line in text.splitlines()
+            if line.startswith("observation = ")
+        })
+        for observation in declared:
+            body = post(f"/c/{cid}/observe", {"observation": observation})
+            if marker not in body:
+                broken.append(f"{number} {observation}: no result at all")
+                continue
+            tail = body.split(marker, 1)[1]
+            ran = tail.split(chr(60) + "/code" + chr(62), 1)[0].strip()
+            if ran != f"observation {observation}":
+                broken.append(f"{number} {observation}: {ran}")
+                continue
+            ran_ok += 1
+            if " row(s)" not in tail and "no rows" in tail:
+                empty.append(f"{number} {observation}")
+    check(
+        "every declared observation runs",
+        not broken,
+        "; ".join(broken) if broken else f"{ran_ok} observation(s)",
+    )
+    # An observation that is empty while the environment is correct is not a fault: 2.3 lists the
+    # tables that are not fully protected, and the whole point is that the list is empty until
+    # something is armed. It is reported rather than failed, so a new empty one gets a second look.
+    check(
+        "observations that are empty while nothing is armed are the ones expected to be",
+        set(empty) <= {"2.3 catalogue.unforced"},
+        ", ".join(sorted(empty)) if empty else "none",
+    )
+
     print(f"\n  {GREY}the state this suite leaves behind{RESET}")
     unprotected = sql(
         "SELECT coalesce(string_agg(relname, ', '), 'none') FROM pg_class c "

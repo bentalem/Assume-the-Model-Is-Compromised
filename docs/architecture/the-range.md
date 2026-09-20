@@ -186,6 +186,18 @@ they exercise all three flag kinds and both halves of the console:
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
 
+`range_suite.py` also runs **every observation every challenge declares**, on every challenge. The
+content tests prove a challenge renders and that its control ids resolve; they never call an
+observation, so a renamed SQL function or a dropped column would pass every test and fail the first
+learner who pressed Run. Sixty observations, checked against the console's own `ran` line rather
+than against the word "failed" — 7.4 renders a source panel containing that string, and the first
+version of this check reported it as a broken observation.
+
+One observation is empty while the environment is correct, and that is the designed answer rather
+than a fault: `catalogue.unforced` lists the tables that are not fully protected, and 2.3 exists
+because the list is empty until something is armed. The suite names the expected empty one, so a
+second one appearing gets a second look instead of being absorbed.
+
 Track 7 is read-only by design. Its subject is what the trail can and cannot show, and a challenge
 that broke something first would be answering a different question.
 
