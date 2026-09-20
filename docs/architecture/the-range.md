@@ -129,7 +129,7 @@ button. Migration `0013` fixed the policy rather than the test.
 
 | Suite | Covers |
 |---|---|
-| `python scripts/range_suite.py` | round trip per mutation, probe honesty against the catalogue, reset from an arbitrary armed set, flag unobtainable unarmed, refusal of undeclared ids |
+| `python scripts/range_suite.py` | round trip for **every registered mutation**, read from the service's own `/registry`; probe honesty against the catalogue; reset from an arbitrary armed set; flag unobtainable unarmed; refusal of undeclared ids; and the state the suite leaves behind |
 | `python services/range/tests/test_content.py` | manifest validation, source references resolving, the local-only refusal |
 | `python scripts/verify_local.py` | `V-17`–`V-19`, the Range's boundaries, skipped with a count when it is not running |
 
@@ -176,6 +176,7 @@ they exercise all three flag kinds and both halves of the console:
 | 1.2 | A token for another service | `written` | no — a genuine token for the wrong door |
 | 1.3 | Roles come from the database | `written` | one control, then a real API request |
 | 1.4 | The claim that changes nothing | `value` | no — three tampered tokens |
+| 3.1 | Deny by default, proved | `reason` | stops the policy engine |
 | 3.2 | Yes, and only these fields | `written` | no — two real API requests |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |

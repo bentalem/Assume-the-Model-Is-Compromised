@@ -1,0 +1,60 @@
+id = "3.1-deny-by-default-proved"
+track = 3
+number = "3.1"
+title = "Deny by default, proved"
+points = 30
+
+summary = """
+Stop the policy engine and ask for something the user is entirely entitled to have. What comes back \
+is the answer to a question most systems have never been asked."""
+
+objective = """
+Stop the policy decision point, repeat a request that succeeds in normal conditions, and give the \
+reason code the API recorded in the audit trail when it refused."""
+
+skip_test = """
+what "deny by default" has to mean beyond "no rule matched", and why externalising an authorization \
+decision makes that question urgent rather than academic."""
+
+hints = [
+  "Run the request before you stop anything. What does it return, and what should it return afterwards?",
+  "The response body says very little. Where does this lab record what a decision was and why?",
+  "Is the reason code the same one a normal refusal produces, and what does the policy_version column say?",
+]
+
+[[control]]
+mutation = "policy.opa.stop"
+label = "Stop the policy decision point"
+detail = "Stops the OPA container through the proxy allowlist. Reset starts it again and waits."
+
+[[observation]]
+observation = "policy.opa_state"
+label = "Is the policy engine running?"
+detail = "Read from the container runtime, not from what the Range believes it did."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "Read an order alice is entitled to read"
+detail = "Run it before stopping anything, so you know what a working request looks like."
+
+[[observation]]
+observation = "audit.recent"
+label = "The last 30 decisions recorded"
+detail = "The response says little on purpose. This is where the reason lives."
+
+[flag]
+kind = "reason"
+label = "the reason code recorded during the outage"
+reason_code = "policy_unavailable"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [1, 30]
+highlight = [16, 26]
+caption = "Default deny, written as a rule rather than assumed"
+
+[[source]]
+path = "services/api/src/supportpilot_api/main.py"
+lines = [136, 155]
+highlight = [151, 154]
+caption = "What the API does with an unexpected failure — and note the status it chooses"

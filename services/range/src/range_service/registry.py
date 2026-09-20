@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import db, probe
+from . import containers, db, probe
 
 logger = logging.getLogger("supportpilot.range.registry")
 
@@ -636,3 +636,56 @@ register_observation(
         fields=("error_code", "status"),
     )
 )
+
+
+# ==================================================================================================
+# Track 3 · deny by default (3.1)
+#
+# The only mutation that touches a container. It goes through the proxy allowlist, not the Docker
+# socket — see containers.py for why that distinction is the whole design.
+#
+# The restore waits for the container to be running again before it returns. An asynchronous restore
+# that returns early is a reset that reports success while the lab is still broken, which is the one
+# failure the registry exists to prevent.
+# ==================================================================================================
+
+OPA_CONTAINER = "supportpilot-opa"
+
+
+def _probe_opa() -> str:
+    try:
+        return CORRECT if containers.state(OPA_CONTAINER) == "running" else ARMED
+    except containers.ContainerError:
+        logger.exception("could not inspect %s", OPA_CONTAINER)
+        return UNKNOWN
+
+
+register_mutation(
+    Mutation(
+        id="policy.opa.stop",
+        summary="Stop the policy decision point",
+        apply=lambda: containers.stop(OPA_CONTAINER),
+        restore=lambda: containers.start(OPA_CONTAINER),
+        probe=_probe_opa,
+        touches=("supportpilot-opa",),
+        armed_means="There is no policy engine. Every authorization question now has no answer.",
+    )
+)
+
+register_observation(
+    Observation(
+        id="policy.opa_state",
+        summary="Whether the policy decision point is running, read from the container runtime",
+        run=lambda: [{"container": OPA_CONTAINER, "state": _opa_state_text()}],
+        columns=("container", "state"),
+        row_cap=1,
+        fields=("state",),
+    )
+)
+
+
+def _opa_state_text() -> str:
+    try:
+        return containers.state(OPA_CONTAINER)
+    except containers.ContainerError as exc:
+        return f"unreadable: {exc}"

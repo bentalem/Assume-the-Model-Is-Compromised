@@ -69,6 +69,21 @@ def probe_of(page: str, mutation_id: str) -> str:
     return page[index + len(marker):].split("<")[0].strip()
 
 
+def _owner_of(mutation_id: str) -> str | None:
+    """Find a challenge whose console declares this mutation.
+
+    The console deliberately refuses a mutation a challenge does not declare, so a sweep over
+    the whole registry has to arm each one through a page that owns it.
+    """
+    for fragment in get("/").split('href="/c/')[1:]:
+        challenge_id = fragment.split('"')[0]
+        # The same marker probe_of uses, so "declared on this page" means exactly what it means
+        # there — and an id that is a prefix of another cannot match the wrong one.
+        if f"{mutation_id} · " in get(f"/c/{challenge_id}"):
+            return challenge_id
+    return None
+
+
 def sql(statement: str) -> str:
     """Read the database directly, to check the console against the system it claims to describe."""
     password = (REPO / ".secrets" / "postgres_bootstrap_password").read_text(encoding="utf-8").strip()
@@ -98,6 +113,22 @@ def main() -> int:
 
     challenge_id = "2.1-policy-that-filters-nothing"
     mutations = ["rls.orders.force_off", "rls.orders.disable"]
+
+    # Every registered mutation, not a hardcoded pair.
+    #
+    # "No mutation without a proven inverse" is a hard requirement, and a suite that round-trips two
+    # ids by name leaves every mutation added afterwards untested by default - the opposite of what
+    # that rule asks for. The service lists its own vocabulary at /registry and this reads it, so a
+    # new mutation is covered the moment it is registered rather than when somebody remembers it.
+    try:
+        listing = json.loads(get("/registry"))
+        all_mutations = [m["id"] for m in listing["mutations"]]
+    except Exception as exc:  # noqa: BLE001
+        all_mutations = []
+        check("the service lists its registry", False, str(exc))
+    else:
+        check("the service lists its registry", bool(all_mutations),
+              f"{len(all_mutations)} mutation(s)")
 
     # ---------------------------------------------------------------------------------------------
     print(f"\n  {GREY}starting from a known-good environment{RESET}")
@@ -179,6 +210,22 @@ def main() -> int:
     check("the flag is unobtainable again after reset", "Not a value" in final)
 
     # ---------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}round trip, every other registered mutation{RESET}")
+    for mutation in [m for m in all_mutations if m not in mutations]:
+        owner = _owner_of(mutation)
+        if owner is None:
+            # Registered authority no console can reach or restore from. Nothing is broken by
+            # it today, and it is still a defect: reset can restore it, a learner cannot.
+            check(f"{mutation}: some challenge declares it", False,
+                  "not reachable from any console")
+            continue
+
+        armed = probe_of(post(f"/c/{owner}/arm", {"mutation": mutation}), mutation)
+        check(f"{mutation}: arms", armed == "armed", f"probe says {armed!r}")
+
+        restored = probe_of(post(f"/c/{owner}/restore", {"mutation": mutation}), mutation)
+        check(f"{mutation}: restores", restored == "correct", f"probe says {restored!r}")
+
     print(f"\n  {GREY}the declared surface{RESET}")
     refused = post(f"/c/{challenge_id}/arm", {"mutation": "rls.customers.force_off"})
     check(

@@ -129,6 +129,39 @@ def healthz() -> JSONResponse:
     )
 
 
+@app.get("/registry", include_in_schema=False)
+def registry_listing() -> JSONResponse:
+    """Every mutation and observation the service holds, with each mutation's live probe.
+
+    This exists for `scripts/range_suite.py`, and it exists because of a hard requirement: no
+    mutation without a proven inverse. The suite used to round-trip two hardcoded ids, which meant
+    every mutation added afterwards was untested by default — the opposite of what that rule asks
+    for. It now reads this and round-trips whatever it finds.
+
+    It is a read of the service's own vocabulary, not of the lab. Nothing here can change anything.
+    """
+    # One probe sweep, not one per mutation. The obvious comprehension re-probes the whole registry
+    # for every row, which for the container mutation means an HTTP round trip per row.
+    state = registry.state()
+    return JSONResponse(
+        {
+            "mutations": [
+                {
+                    "id": mutation.id,
+                    "summary": mutation.summary,
+                    "touches": list(mutation.touches),
+                    "state": state.get(mutation.id, registry.UNKNOWN),
+                }
+                for mutation in registry.MUTATIONS.values()
+            ],
+            "observations": [
+                {"id": obs.id, "summary": obs.summary, "row_cap": obs.row_cap}
+                for obs in registry.OBSERVATIONS.values()
+            ],
+        }
+    )
+
+
 @app.get("/robots.txt", include_in_schema=False)
 def robots() -> PlainTextResponse:
     return PlainTextResponse("User-agent: *\nDisallow: /\n")
