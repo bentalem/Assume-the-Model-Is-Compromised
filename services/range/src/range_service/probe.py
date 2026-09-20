@@ -29,7 +29,7 @@ def _secret() -> str:
         return handle.read().strip()
 
 
-def run(probe_id: str) -> list[dict[str, Any]]:
+def run(probe_id: str, kind: str = "probe") -> list[dict[str, Any]]:
     """Run one registered probe and return a single row describing what happened.
 
     A failure is returned as a row rather than raised. A learner looking at a result panel needs to
@@ -37,7 +37,7 @@ def run(probe_id: str) -> list[dict[str, Any]]:
     leave them guessing which half of the system was broken.
     """
     request = urllib.request.Request(
-        f"{PROBE_URL}/probe/{probe_id}",
+        f"{PROBE_URL}/{kind}/{probe_id}",
         method="POST",
         headers={"X-Range-Token": _secret()},
     )

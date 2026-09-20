@@ -567,3 +567,28 @@ register_observation(
         fields=("status",),
     )
 )
+
+
+# ==================================================================================================
+# Track 1 · tokens that are wrong in exactly one way (1.4)
+# ==================================================================================================
+
+def _register_tampered(observation_id: str, probe_id: str, summary: str) -> None:
+    register_observation(
+        Observation(
+            id=observation_id,
+            summary=summary,
+            run=lambda: probe.run(probe_id, kind="tampered"),
+            columns=_PROBE_COLUMNS,
+            row_cap=1,
+            fields=("error_code", "status"),
+        )
+    )
+
+
+_register_tampered("token.unsigned", "alice.token.unsigned",
+                   "alice's claims with alg=none and no signature")
+_register_tampered("token.resigned", "alice.token.resigned",
+                   "alice's claims re-signed with an attacker's key")
+_register_tampered("token.claimed_org", "alice.token.claimed_org",
+                   "a tenant claim rewritten, then re-signed")

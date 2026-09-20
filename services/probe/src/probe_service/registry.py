@@ -78,3 +78,32 @@ PROBES: dict[str, Probe] = dict(
         ),
     ]
 )
+
+
+# ==================================================================================================
+# Track 1 · tokens that are wrong in exactly one way
+#
+# These do not ask Keycloak for anything unusual. They take a genuine token for a genuine user and
+# change one thing about it, so the request differs from a working one in exactly one respect. That
+# is what makes the result mean something: if a tampered token is refused and an untampered one is
+# accepted, the refusal is about the tampering.
+#
+# `transform` names a function in main.py. It is a fixed identifier from this file, never a caller's
+# string — the same rule as everything else here.
+# ==================================================================================================
+
+TAMPERED: dict[str, tuple[str, str, str]] = {
+    # id -> (base user, transform name, what the learner should notice)
+    "alice.token.unsigned": (
+        "alice", "strip_signature",
+        "The same claims, with alg set to none and the signature removed.",
+    ),
+    "alice.token.resigned": (
+        "alice", "resign_with_attacker_key",
+        "The same claims, re-signed with a key the attacker chose.",
+    ),
+    "alice.token.claimed_org": (
+        "alice", "claim_other_organization",
+        "organization_id rewritten to the other tenant, then re-signed.",
+    ),
+}

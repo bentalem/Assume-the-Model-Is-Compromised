@@ -173,6 +173,7 @@ they exercise all three flag kinds and both halves of the console:
 | 6.3 | Exactly once | `value` | no — attempts a write that rolls back |
 | 6.4 | The approval that outlived its payload | `reason` | one control |
 | 1.3 | Roles come from the database | `written` | one control, then a real API request |
+| 1.4 | The claim that changes nothing | `value` | no — three tampered tokens |
 | 3.2 | Yes, and only these fields | `written` | no — two real API requests |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |

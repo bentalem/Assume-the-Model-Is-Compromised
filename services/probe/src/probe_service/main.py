@@ -23,6 +23,9 @@ Three properties, in the order they matter:
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -33,7 +36,7 @@ import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 
-from .registry import PROBES
+from .registry import PROBES, TAMPERED
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -87,7 +90,8 @@ def startup() -> None:
     global _secret
     assert_local()
     _secret = shared_secret()
-    logger.info("probe service ready with %d registered request(s)", len(PROBES))
+    logger.info("probe service ready with %d request(s) and %d tampered-token case(s)",
+                len(PROBES), len(TAMPERED))
 
 
 def _token_for(username: str) -> str:
@@ -210,4 +214,108 @@ def run() -> None:
         host="0.0.0.0",  # noqa: S104 — never published; reachable only on internal networks
         port=int(os.environ.get("PORT", "8096")),
         log_level=os.environ.get("LOG_LEVEL", "info").lower(),
+    )
+
+
+# --------------------------------------------------------------------------------------------------
+# Token transforms, for track 1.
+#
+# Each takes a genuine token and changes exactly one thing. Nothing here forges a signature the API
+# would accept — that is the point: these are the attacks, and the API is supposed to refuse all of
+# them. A transform that produced an accepted token would be a finding, not a challenge.
+# --------------------------------------------------------------------------------------------------
+
+def _b64url_decode(segment: str) -> bytes:
+    return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def strip_signature(token: str) -> str:
+    """`alg: none`. The oldest JWT attack, and still worth checking for."""
+    header, payload, _ = token.split(".")
+    new_header = _b64url_encode(json.dumps({"alg": "none", "typ": "JWT"}).encode())
+    return f"{new_header}.{payload}."
+
+
+def resign_with_attacker_key(token: str) -> str:
+    """Re-sign with HS256 and a key we chose.
+
+    This is the algorithm-confusion shape: a verifier that trusts the header's `alg` and uses the
+    issuer's *public* key as an HMAC secret would accept a token signed this way. One that pins the
+    algorithm will not.
+    """
+    header, payload, _ = token.split(".")
+    new_header = _b64url_encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    signing_input = f"{new_header}.{payload}".encode()
+    signature = hmac.new(b"attacker-chosen-key", signing_input, hashlib.sha256).digest()
+    return f"{new_header}.{payload}.{_b64url_encode(signature)}"
+
+
+def claim_other_organization(token: str) -> str:
+    """Rewrite a tenant claim and re-sign with a key we chose.
+
+    The claim is not one this API reads — tenancy comes from `app.memberships`, not from the token —
+    so this fails twice over. Both refusals are worth seeing: the signature is checked first, and
+    the claim would have changed nothing even if it had not been.
+    """
+    header, payload, _ = token.split(".")
+    claims = json.loads(_b64url_decode(payload))
+    claims["organization_id"] = "22222222-2222-2222-2222-222222222222"
+    new_payload = _b64url_encode(json.dumps(claims).encode())
+    return resign_with_attacker_key(f"{header}.{new_payload}.")
+
+
+_TRANSFORMS = {
+    "strip_signature": strip_signature,
+    "resign_with_attacker_key": resign_with_attacker_key,
+    "claim_other_organization": claim_other_organization,
+}
+
+
+@app.post("/tampered/{probe_id}", include_in_schema=False)
+def run_tampered(probe_id: str, request: Request, x_range_token: str = Header(default="")) -> JSONResponse:
+    if not secrets.compare_digest(x_range_token, _secret):
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+
+    entry = TAMPERED.get(probe_id)
+    if entry is None:
+        return JSONResponse({"error": "unknown_probe", "probe": probe_id}, status_code=404)
+
+    user, transform_name, intent = entry
+    try:
+        token = _TRANSFORMS[transform_name](_token_for(user))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("could not build tampered token for %s", probe_id)
+        return JSONResponse({"probe": probe_id, "error": f"build_failed: {type(exc).__name__}"},
+                            status_code=502)
+
+    try:
+        response = httpx.get(
+            f"{API_URL}/v1/orders/ORD-2001",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"probe": probe_id, "error": f"request_failed: {type(exc).__name__}"},
+                            status_code=502)
+
+    try:
+        body = response.json()
+    except json.JSONDecodeError:
+        body = {}
+    error = body.get("error", {}) if isinstance(body, dict) else {}
+
+    return JSONResponse(
+        {
+            "probe": probe_id,
+            "user": f"{user} (tampered)",
+            "request": "GET /v1/orders/ORD-2001",
+            "intent": intent,
+            "status": response.status_code,
+            "error_code": error.get("code", "") if isinstance(error, dict) else "",
+            "fields": sorted(body.keys()) if isinstance(body, dict) else [],
+        }
     )

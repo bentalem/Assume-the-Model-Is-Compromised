@@ -1,0 +1,63 @@
+id = "1.4-the-claim-that-changes-nothing"
+track = 1
+number = "1.4"
+title = "The claim that changes nothing"
+points = 25
+
+summary = """
+Take a real token, rewrite the tenant inside it, sign it with your own key, and send it. Then think \
+about which of the two things wrong with that the API actually noticed."""
+
+objective = """
+Run all three tampered tokens against the API alongside a genuine one, and give the error code the \
+API returns for every tampered case."""
+
+skip_test = """
+which checks a token verifier has to perform beyond "is the signature valid", and why a claim in a \
+token is not a fact about a person."""
+
+hints = [
+  "Have you run the untampered request first — and if you have not seen it succeed, what does a refusal tell you?",
+  "All three tampered cases return the same code. At which point in the verifier were all three already dead?",
+  "Suppose the signature had been perfect. What would the rewritten organization_id have changed?",
+]
+
+# Read-only. Nothing is armed: the tokens are built wrong on the way out, and the lab is untouched.
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "A genuine token, unmodified"
+detail = "The control group. Everything below differs from this in exactly one respect."
+
+[[observation]]
+observation = "token.unsigned"
+label = "The same claims, with alg=none and no signature"
+detail = "The oldest JWT attack. Still worth checking for."
+
+[[observation]]
+observation = "token.resigned"
+label = "The same claims, re-signed with an attacker's key"
+detail = "Algorithm confusion: HS256, using a key the attacker chose."
+
+[[observation]]
+observation = "token.claimed_org"
+label = "organization_id rewritten, then re-signed"
+detail = "Two things wrong at once. Only one of them mattered."
+
+[flag]
+kind = "value"
+label = "the error code returned for every tampered token"
+observation = "token.unsigned"
+field = "error_code"
+
+[[source]]
+path = "services/api/src/supportpilot_api/dependencies.py"
+lines = [1, 30]
+highlight = [1, 14]
+caption = "Three lines take a string, verify it, and load a subject. Everything above them is untrusted"
+
+[[source]]
+path = "database/migrations/0002_core_tenancy.sql"
+lines = [1, 24]
+highlight = [1, 10]
+caption = "Where the tenant actually comes from — not from any claim"

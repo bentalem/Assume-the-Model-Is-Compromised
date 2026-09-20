@@ -53,9 +53,15 @@ def main() -> int:
 
         # A hint that states the answer is a content bug. This cannot be checked mechanically, but a
         # hint that is not a question is the cheap half of it.
+        #
+        # The failure message names the offender. Without it the check reports "every hint is a
+        # question: FAIL" and leaves an author re-reading three hints to find which — which is how
+        # this one got committed twice while its output scrolled past.
+        offenders = [h for h in challenge.hints if not h.strip().endswith("?")]
         check(
             f"{challenge.number}: every hint is a question",
-            all(hint.strip().endswith("?") for hint in challenge.hints),
+            not offenders,
+            f"not a question: {offenders[0][:70]}…" if offenders else "",
         )
 
         # Source references must resolve against the repository, or Stage 03 points at nothing.
