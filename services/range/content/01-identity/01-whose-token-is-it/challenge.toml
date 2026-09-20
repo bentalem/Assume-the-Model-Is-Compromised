@@ -1,0 +1,71 @@
+id = "1.1-whose-token-is-it"
+track = 1
+number = "1.1"
+title = "Whose token is it"
+points = 35
+
+objective = """
+Ask the same two questions under each identity architecture. Give the status code the service \
+account gets for the other tenant's order once it is configured the way a service account has to be."""
+
+summary = """
+The first question to ask about any agent, and it decides more than anything else you do \
+afterwards. One header value is the whole difference."""
+
+skip_test = """
+what is in the Authorization header when an agent calls a tool, and how the blast radius of a \
+successful injection differs between the answers."""
+
+hints = [
+  "Run all four observations before arming anything. Which of them fail, and is that what you expected?",
+  "Arming changes nothing about alice. So what did it change, and why does that change the answers?",
+  "Why does a service account need membership in every tenant — is that carelessness, or arithmetic?"
+]
+
+[[control]]
+mutation = "identity.service_account.grant"
+label = "Configure the agent as a service account"
+detail = "Gives one credential membership in every tenant. Nothing about alice changes."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "alice reads her own tenant's order"
+detail = "Passthrough: the request carries alice's own token."
+
+[[observation]]
+observation = "api.alice.foreign_order"
+label = "alice reads the other tenant's order"
+detail = "The same credential, a record that is not hers."
+
+[[observation]]
+observation = "api.agent.cedar_order"
+label = "the service account reads cedar's order"
+detail = "One credential, used for every user of the system."
+
+[[observation]]
+observation = "api.agent.northwind_order"
+label = "the service account reads the other tenant's order"
+detail = "The same credential again. Compare with what alice got."
+
+[[observation]]
+observation = "identity.service_account"
+label = "What the service account can reach"
+detail = "Its memberships, per tenant. Run before and after."
+
+[flag]
+kind = "value"
+label = "the status the service account gets for the other tenant"
+observation = "api.agent.northwind_order"
+field = "status"
+
+[[source]]
+path = "services/api/src/supportpilot_api/dependencies.py"
+lines = [1, 30]
+highlight = [1, 14]
+caption = "The trust boundary. Whatever is in the header becomes the subject"
+
+[[source]]
+path = "database/migrations/0002_core_tenancy.sql"
+lines = [1, 24]
+highlight = [1, 10]
+caption = "Tenancy is a membership row, which is why breadth has to be granted rather than claimed"

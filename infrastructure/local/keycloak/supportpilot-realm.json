@@ -159,7 +159,7 @@
     {
       "clientId": "another-service",
       "name": "Another service in the same realm",
-      "description": "A teaching fixture for the audience check, and nothing else. The scenario the check exists for is two services trusting one identity provider: a token minted here is completely valid - right issuer, right signature, right user, unexpired - and the SupportPilot API must still refuse it, because it was not minted for the API. Note what is absent: no audience mapper. That absence is the fixture. Declared here rather than created at runtime through the admin API, so the fixture is configuration somebody reviewed rather than a side effect of running a script.",
+      "description": "Teaching fixture for the audience check. Tokens from here are valid but carry no SupportPilot audience, so the API must refuse them. The absent audience mapper is the fixture; see docs/architecture/ ADR-0003 and challenge 1.2.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": false,
@@ -287,6 +287,25 @@
         {
           "type": "password",
           "value": "mallory-local-password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-supportpilot"
+      ]
+    },
+    {
+      "username": "agent-service",
+      "id": "agent-service-id",
+      "email": "agent-service@supportpilot.invalid",
+      "firstName": "Agent",
+      "lastName": "Service",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "agent-service-local-password",
           "temporary": false
         }
       ],

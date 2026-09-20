@@ -184,9 +184,18 @@ services:
     secrets:
       - keycloak_admin_password
     volumes:
-      # Realm state is deliberately ephemeral: the realm is re-imported from this read-only file on
-      # every start, so identity configuration is reproducible and cannot drift through the admin
-      # UI. Changes made in the console are lost on restart — edit the realm file instead.
+      # Identity configuration lives in this read-only file so it is reproducible and reviewable.
+      #
+      # Read the next sentence carefully, because an earlier version of this comment was wrong and
+      # cost an hour: `docker compose restart keycloak` does NOT re-import. Keycloak logs
+      # "Realm 'supportpilot' already exists. Import skipped" and keeps whatever is in its embedded
+      # database, so an edit to this file has no effect at all.
+      #
+      #     docker compose up -d --force-recreate keycloak
+      #
+      # is what applies a change, because a new container gets a new embedded database and the
+      # import runs with OVERWRITE_EXISTING. Changes made in the admin console survive a restart and
+      # are lost on a recreate, which is the opposite of what the old comment claimed.
       - ./infrastructure/local/keycloak:/opt/keycloak/data/import:ro
       - ./.secrets/tls:/opt/keycloak/conf/tls:ro
     ports:

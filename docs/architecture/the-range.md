@@ -173,6 +173,7 @@ they exercise all three flag kinds and both halves of the console:
 | 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
 | 6.3 | Exactly once | `value` | no — attempts a write that rolls back |
 | 6.4 | The approval that outlived its payload | `reason` | one control |
+| 1.1 | Whose token is it | `value` | configures a service account |
 | 1.2 | A token for another service | `written` | no — a genuine token for the wrong door |
 | 1.3 | Roles come from the database | `written` | one control, then a real API request |
 | 1.4 | The claim that changes nothing | `value` | no — three tampered tokens |

@@ -689,3 +689,43 @@ def _opa_state_text() -> str:
         return containers.state(OPA_CONTAINER)
     except containers.ContainerError as exc:
         return f"unreadable: {exc}"
+
+
+# ==================================================================================================
+# Track 1 · whose token is it (1.1)
+# ==================================================================================================
+
+def _probe_service_account() -> str:
+    """Correct when the service account holds no membership anywhere."""
+    rows = db.select("service_account_reach")
+    if not rows:
+        return UNKNOWN
+    return CORRECT if all(row["tenant"] is None for row in rows) else ARMED
+
+
+register_mutation(
+    Mutation(
+        id="identity.service_account.grant",
+        summary="Give the agent one credential with membership in every tenant",
+        apply=lambda: db.call("arm_service_account"),
+        restore=lambda: db.call("restore_service_account"),
+        probe=_probe_service_account,
+        touches=("app.memberships",),
+        armed_means="One account is now a manager in both tenants. That breadth is the requirement.",
+    )
+)
+
+register_observation(
+    Observation(
+        id="identity.service_account",
+        summary="What the service account can reach, per tenant",
+        run=lambda: db.select("service_account_reach"),
+        columns=("account", "tenant", "role", "status"),
+        row_cap=8,
+    )
+)
+
+_register_probe("api.agent.cedar_order", "agent.read.cedar_order",
+                "the service account reads cedar's order")
+_register_probe("api.agent.northwind_order", "agent.read.northwind_order",
+                "the same credential reads northwind's order")

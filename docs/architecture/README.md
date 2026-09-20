@@ -17,6 +17,7 @@ Everything below follows from that one sentence.
 | this one | components, networks, the request pipeline, the layers that say no |
 | [the-range.md](the-range.md) | The Range — the practice surface, and the boundaries on the one service that can break the others |
 | [adr-0003-range-request-probes.md](adr-0003-range-request-probes.md) | How the Range makes an API request without being able to reach the API |
+| [adr-0004-deliberately-wrong-modes.md](adr-0004-deliberately-wrong-modes.md) | Why arming a control is allowed and building a broken one is not |
 
 ---
 
