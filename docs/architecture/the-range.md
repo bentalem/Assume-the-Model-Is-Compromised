@@ -179,11 +179,29 @@ they exercise all three flag kinds and both halves of the console:
 | 1.4 | The claim that changes nothing | `value` | no — three tampered tokens |
 | 3.1 | Deny by default, proved | `reason` | stops the policy engine |
 | 3.2 | Yes, and only these fields | `written` | no — two real API requests |
+| 4.1 | The worst legal call | `written` | no — the authority is in the schema |
+| 7.1 | Reconstruct it | `written` | no — read-only |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
 
 Track 7 is read-only by design. Its subject is what the trail can and cannot show, and a challenge
 that broke something first would be answering a different question.
+
+7.1 turned up a property of the audit table that is worth recording here rather than only in the
+challenge, because it is a fact about the lab and not only teaching material.
+
+`app.audit_events` declares `trace_id`, `previous_event_hash` and `event_hash`. All three are empty
+in every row the system has ever written: the API's INSERT does not name the two hash columns at
+all, and nothing supplies a trace id. **The trail is append-only but not tamper-evident**, and the
+append-only half is enforced twice — no runtime role holds `UPDATE` or `DELETE` on the table, and
+the owner, which does hold them, is stopped by `FORCE ROW LEVEL SECURITY` with no policy for either
+command. An owner's `UPDATE` therefore returns `UPDATE 0` rather than an error, which is worth
+knowing before reading it as success.
+
+This is not being fixed by adding a hash chain today. It is written down because the gap between a
+declared column and a written one is exactly what 7.1 teaches learners to look for, and a repository
+making that argument should state where it has one of its own. `range.audit_column_use()` reports
+the counts, so the claim is a query rather than a paragraph that was true when it was typed.
 
 6.2 is the one exception to observations being read-only: it *attempts* an approval, because the
 subject of the challenge is what refuses the write. Both attempts undo themselves, neither takes an

@@ -1,0 +1,58 @@
+id = "7.1-reconstruct-it"
+track = 7
+number = "7.1"
+title = "Reconstruct it"
+points = 35
+
+summary = """
+A refund was proposed, approved and paid. Nobody wrote a report about it. Everything you are going \
+to find out, you are going to find out from the trail."""
+
+objective = """
+Using the trail alone, reconstruct one completed refund: who asked, who approved, for what, under \
+which rules, what was decided, and what changed in the outside world. Then say how you know the \
+thing that was approved is the thing that was executed."""
+
+skip_test = """
+which column links the steps of one action together, and why it is not the request id."""
+
+hints = [
+  "How many different request ids appear in that chain, and what does that tell you about grouping an investigation by request?",
+  "The proposal's result_reference and the later steps' resource are the same string — so what is that string?",
+  "Three of the four rows carry a payload hash. Are they the same hash, and what would it mean if the last one differed?",
+]
+
+# Read-only, like the rest of track 7. The refund this challenge reconstructs is one the lab has
+# already executed; nothing is armed, and nothing needs to be.
+
+[[observation]]
+observation = "audit.refund_chain"
+label = "Every recorded step of the most recently executed refund"
+detail = "Four rows. Read them forwards, and watch the request id column while you do."
+
+[[observation]]
+observation = "audit.recent"
+label = "The last 30 decisions from the API and the worker"
+detail = "For context: this is the trail as an investigator first meets it, ungrouped."
+
+[[observation]]
+observation = "audit.column_use"
+label = "How many rows actually carry each column"
+detail = "Run this before you decide what the trail can answer. Three of these are always empty."
+
+[flag]
+kind = "written"
+label = "how the four steps are linked, and how you know the approved payload is the executed one"
+rubric = ["result_reference", "payload_hash", "four"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/audit/writer.py"
+lines = [27, 37]
+highlight = [29, 31]
+caption = "The columns the API actually writes. Compare this list against the table definition"
+
+[[source]]
+path = "database/migrations/0004_audit_events.sql"
+lines = [11, 30]
+highlight = [28, 29]
+caption = "The columns the table declares. Two of them appear in no INSERT anywhere in the system"

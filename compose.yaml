@@ -384,9 +384,10 @@ services:
       - probe_shared_secret
     volumes:
       # Stage 03 shows the lab's own source with its real path and line numbers, read at request
-      # time so the material cannot drift from the system. Four directories, read-only, named one by
-      # one — mounting the repository root would have handed the Range .secrets/, which is the whole
-      # reason this is a list rather than a single line.
+      # time so the material cannot drift from the system. Read-only, named one by one — mounting the
+      # repository root would have handed the Range .secrets/, which is the whole reason this is a
+      # list rather than a single line. The list must match ALLOWED_PREFIXES in source.py; a count
+      # in this comment went stale the first time the set grew, so there is no longer a count.
       - ./database:/repo/database:ro
       - ./services:/repo/services:ro
       - ./policy:/repo/policy:ro

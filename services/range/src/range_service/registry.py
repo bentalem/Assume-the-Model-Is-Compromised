@@ -327,6 +327,30 @@ register_observation(
 
 register_observation(
     Observation(
+        id="audit.refund_chain",
+        summary="Every recorded step of the most recently executed refund",
+        run=lambda: db.select("reconstruct_last_refund"),
+        columns=(
+            "at", "request_id", "actor_type", "actor", "action", "resource",
+            "decision", "reason", "policy_version", "payload_hash", "result_reference",
+        ),
+        row_cap=20,
+        fields=("reason",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="audit.column_use",
+        summary="How many audit rows actually carry each column",
+        run=lambda: db.select("audit_column_use"),
+        columns=("column_name", "populated", "total", "verdict"),
+        row_cap=12,
+    )
+)
+
+register_observation(
+    Observation(
         id="audit.ord_2001",
         summary="Every recorded decision about ORD-2001",
         run=lambda: db.select_one_arg("decisions_for_resource", "ORD-2001"),
