@@ -155,6 +155,32 @@
         "microprofile-jwt",
         "organization"
       ]
+    },
+    {
+      "clientId": "another-service",
+      "name": "Another service in the same realm",
+      "description": "A teaching fixture for the audience check, and nothing else. The scenario the check exists for is two services trusting one identity provider: a token minted here is completely valid - right issuer, right signature, right user, unexpired - and the SupportPilot API must still refuse it, because it was not minted for the API. Note what is absent: no audience mapper. That absence is the fixture. Declared here rather than created at runtime through the admin API, so the fixture is configuration somebody reviewed rather than a side effect of running a script.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [],
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "address",
+        "phone",
+        "microprofile-jwt",
+        "organization"
+      ]
     }
   ],
   "users": [

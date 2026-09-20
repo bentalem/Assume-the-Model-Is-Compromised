@@ -113,3 +113,15 @@ TAMPERED: dict[str, tuple[str, str, str]] = {
         "organization_id rewritten to the other tenant, then re-signed.",
     ),
 }
+
+# A genuine, correctly signed, unexpired token — minted for a different service in the same realm.
+#
+# Nothing is tampered with here, which is what makes it the interesting case: every check except one
+# passes. The client is declared in the realm file with no audience mapper, so its tokens simply do
+# not name the SupportPilot API.
+WRONG_AUDIENCE = {
+    "alice.token.other_service": (
+        "alice", "another-service",
+        "A valid token for a different service. Nothing about it is forged.",
+    ),
+}

@@ -1,0 +1,57 @@
+id = "1.2-a-token-for-another-service"
+track = 1
+number = "1.2"
+title = "A token for another service"
+points = 30
+
+summary = """
+Right issuer. Right signature. Right user. Not expired. Nothing forged anywhere — and the API \
+refuses it, for a reason most APIs never check."""
+
+objective = """
+Present a genuine token minted for a different service in the same realm, and name the claim that \
+caused the refusal. Read the intent column: the value is in front of you."""
+
+skip_test = """
+what stops a valid token issued for one service from working on another, and what happens across an \
+organisation when that check is missing."""
+
+hints = [
+  "Which of the checks a verifier performs could this token possibly fail, given that nothing about it is forged?",
+  "The intent column prints one claim from the token. What is it, and what is missing from it?",
+  "If forty services trust one identity provider and none of them check this, how many of them can a token from any one of them reach?"
+]
+
+# Read-only. The token is genuine; only its intended recipient is wrong.
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "A token minted for this API"
+detail = "The control group. Same user, same request, same everything except one claim."
+
+[[observation]]
+observation = "token.other_service"
+label = "A token minted for another service in the same realm"
+detail = "Nothing forged. Read the aud value printed in the intent column."
+
+[[observation]]
+observation = "token.resigned"
+label = "For contrast: a token that really is forged"
+detail = "Same refusal, entirely different reason. Two failures can look identical from outside."
+
+[flag]
+kind = "written"
+label = "the claim that caused the refusal"
+rubric = ["aud"]
+
+[[source]]
+path = "infrastructure/local/keycloak/supportpilot-realm.json"
+lines = [1, 12]
+highlight = [1, 4]
+caption = "The realm. Two of its clients mint tokens; only one of them names this API"
+
+[[source]]
+path = "services/api/src/supportpilot_api/dependencies.py"
+lines = [1, 30]
+highlight = [1, 14]
+caption = "Where the token becomes a subject — and what it has to satisfy first"

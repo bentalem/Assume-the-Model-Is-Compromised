@@ -36,7 +36,7 @@ import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 
-from .registry import PROBES, TAMPERED
+from .registry import PROBES, TAMPERED, WRONG_AUDIENCE
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -94,7 +94,7 @@ def startup() -> None:
                 len(PROBES), len(TAMPERED))
 
 
-def _token_for(username: str) -> str:
+def _token_for(username: str, client: str | None = None) -> str:
     """Obtain a user token the way every other tool in this lab does.
 
     The password is the lab's fixed fixture pattern, the same one `scripts/abuse_suite.py` and
@@ -105,7 +105,7 @@ def _token_for(username: str) -> str:
         f"{KEYCLOAK}/realms/{REALM}/protocol/openid-connect/token",
         data={
             "grant_type": "password",
-            "client_id": CLIENT,
+            "client_id": client or CLIENT,
             "username": username,
             "password": f"{username}-local-password",
             "scope": "openid",
@@ -314,6 +314,66 @@ def run_tampered(probe_id: str, request: Request, x_range_token: str = Header(de
             "user": f"{user} (tampered)",
             "request": "GET /v1/orders/ORD-2001",
             "intent": intent,
+            "status": response.status_code,
+            "error_code": error.get("code", "") if isinstance(error, dict) else "",
+            "fields": sorted(body.keys()) if isinstance(body, dict) else [],
+        }
+    )
+
+
+@app.post("/audience/{probe_id}", include_in_schema=False)
+def run_wrong_audience(probe_id: str, x_range_token: str = Header(default="")) -> JSONResponse:
+    """A valid token, minted for somebody else.
+
+    Separate from `/tampered/` on purpose. Nothing here is forged, and a learner should be able to
+    see from the id which kind of case they are running: one where the credential is broken, and one
+    where the credential is perfect and was simply not meant for this service.
+    """
+    if not secrets.compare_digest(x_range_token, _secret):
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+
+    entry = WRONG_AUDIENCE.get(probe_id)
+    if entry is None:
+        return JSONResponse({"error": "unknown_probe", "probe": probe_id}, status_code=404)
+
+    user, client, intent = entry
+    try:
+        token = _token_for(user, client=client)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("could not mint a token from %s", client)
+        return JSONResponse({"probe": probe_id, "error": f"token_failed: {type(exc).__name__}"},
+                            status_code=502)
+
+    try:
+        response = httpx.get(
+            f"{API_URL}/v1/orders/ORD-2001",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"probe": probe_id, "error": f"request_failed: {type(exc).__name__}"},
+                            status_code=502)
+
+    try:
+        body = response.json()
+    except json.JSONDecodeError:
+        body = {}
+    error = body.get("error", {}) if isinstance(body, dict) else {}
+
+    # The audience claim is shown because it is the whole point, and because a learner should be
+    # able to see that the token is otherwise entirely ordinary.
+    try:
+        claims = json.loads(_b64url_decode(token.split(".")[1]))
+        audience = claims.get("aud", "(absent)")
+    except Exception:  # noqa: BLE001
+        audience = "(unreadable)"
+
+    return JSONResponse(
+        {
+            "probe": probe_id,
+            "user": f"{user} via {client}",
+            "request": "GET /v1/orders/ORD-2001",
+            "intent": f"{intent} aud={audience}",
             "status": response.status_code,
             "error_code": error.get("code", "") if isinstance(error, dict) else "",
             "fields": sorted(body.keys()) if isinstance(body, dict) else [],

@@ -620,3 +620,19 @@ register_observation(
         row_cap=16,
     )
 )
+
+
+# ==================================================================================================
+# Track 1 · a token for another service (1.2)
+# ==================================================================================================
+
+register_observation(
+    Observation(
+        id="token.other_service",
+        summary="A valid, unexpired, correctly signed token minted for a different service",
+        run=lambda: probe.run("alice.token.other_service", kind="audience"),
+        columns=_PROBE_COLUMNS,
+        row_cap=1,
+        fields=("error_code", "status"),
+    )
+)
