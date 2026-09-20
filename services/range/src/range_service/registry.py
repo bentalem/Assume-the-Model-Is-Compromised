@@ -743,16 +743,47 @@ register_mutation(
 )
 
 
+register_mutation(
+    Mutation(
+        id="policy.bundle.conflict",
+        summary="Add a rule that collides with the real one, so evaluation errors",
+        apply=lambda: _arm_permissive_policy("conflict"),
+        restore=_restore_real_policy,
+        probe=lambda: policy_bundle.state("conflict"),
+        touches=("supportpilot-opa",),
+        armed_means=(
+            "The bundle loads and cannot answer. Two arms are true with different values, which "
+            "Rego refuses to resolve, so OPA returns 500 for every order.read."
+        ),
+    )
+)
+
+register_mutation(
+    Mutation(
+        id="policy.bundle.undefined",
+        summary="Move the package, so the decision the API asks for does not exist",
+        apply=lambda: _arm_permissive_policy("undefined"),
+        restore=_restore_real_policy,
+        probe=lambda: policy_bundle.state("undefined"),
+        touches=("supportpilot-opa",),
+        armed_means=(
+            "OPA is healthy and answers 200 with no decision in it at all. An undefined policy is "
+            "the quietest of the failure modes and the one most likely to be read as consent."
+        ),
+    )
+)
+
+
 register_observation(
     Observation(
         id="policy.bundle_state",
-        summary="Which authorization policy OPA is loading, per removable check",
+        summary="Which authorization policy OPA is loading, per way of changing it",
         run=lambda: [
-            {"check_removed": name, "state": policy_bundle.state(name)}
-            for name in policy_bundle.VARIANTS
+            {"variant": name, "state": policy_bundle.state(name)}
+            for name in (*policy_bundle.VARIANTS, *policy_bundle.BROKEN)
         ],
-        columns=("check_removed", "state"),
-        row_cap=2,
+        columns=("variant", "state"),
+        row_cap=4,
         fields=("state",),
     )
 )

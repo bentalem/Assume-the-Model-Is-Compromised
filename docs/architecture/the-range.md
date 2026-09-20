@@ -180,6 +180,7 @@ they exercise all three flag kinds and both halves of the console:
 | 3.1 | Deny by default, proved | `reason` | stops the policy engine |
 | 3.2 | Yes, and only these fields | `written` | no — two real API requests |
 | 3.3 | Which layer stops what | `written` | two controls, both on the live policy |
+| 3.4 | The failure that looks like consent | `reason` | three, two of them on the live policy |
 | 4.1 | The worst legal call | `written` | no — the authority is in the schema |
 | 7.1 | Reconstruct it | `written` | no — read-only |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
@@ -220,9 +221,9 @@ and the challenge's own Stage 01 explains why the console must not try to do tha
 
 ### What the remaining challenges need
 
-Eighteen of the thirty-one rows in `.dev/ctf/design.md` are built. Thirteen are not, and they are
-not all the same kind of not-built. Three of them the design marks `Ready`, and the honest position
-on each has changed now that the Range exists to test the assumption against.
+Nineteen of the thirty-one rows in `.dev/ctf/design.md` are built. Twelve are not, and they are not
+all the same kind of not-built. Three of them the design marks `Ready`, and the honest position on
+each has changed now that the Range exists to test the assumption against.
 
 **Blocked on a model in the loop.** 4.3, 5.1, 5.3 and 7.2 need a conversation, not an HTTP request.
 The probe service makes requests; it cannot be steered by text it reads, which is the entire subject
@@ -266,6 +267,28 @@ one exactly two tests fail, named for the control that was removed.
 `range_suite.py` asserts both outcomes, including the containment half: no order crosses a tenant
 boundary while the policy permits it. "A permissive policy is safe here because the database
 refuses" is precisely the kind of sentence that has to be measured rather than believed.
+
+**3.4 is built, and not by adding a fallback mode.** ADR-0004 refused to give the API a
+cached-allow path and deferred the challenge, listing source reading as an acceptable weaker shape.
+What shipped is stronger than that shape and still adds nothing to the API.
+
+The policy client has five branches that return without a decision: timeout, unreachable, bad
+status, unparseable body, and a 200 whose result is undefined. Three of them can be caused from the
+console — stopping the engine, a rule collision that makes evaluation error, and moving the package
+so the decision the API asks for does not exist. All three deny, which is the control working.
+
+The finding is what they look like from outside. Stopping the engine and the evaluation error both
+surface as `503` with `policy_unavailable`. The undefined decision surfaces as **`404` with
+`policy_malformed`, from an engine that is running and healthy** — indistinguishable, to a caller or
+a dashboard, from an order that does not exist. The single line at `pipeline.py:152` decides which
+failures are visible to whoever is watching, and it is not wrong: `404` rather than `403` is
+deliberate elsewhere, so that a refusal never confirms a resource exists in another tenant. The gap
+is between two correct decisions, which is where most real findings are.
+
+So 3.4 teaches the question that actually separates fail-open from fail-closed systems in a review —
+*"show me what the last policy outage looked like in your logs"* — without the repository containing
+a fallback allow. The two new mutations reuse the 3.3 bundle mechanism and store nothing: the broken
+bundles are derived from the real policy by appending one rule or moving the package.
 
 **8.1 is still not Ready.** It turns on the published action document drifting from the registered
 code, which means arming a change to a file in the repository, with the same un-guaranteed inverse

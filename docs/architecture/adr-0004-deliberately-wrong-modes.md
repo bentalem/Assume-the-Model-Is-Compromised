@@ -66,6 +66,14 @@ The asymmetry is worth stating plainly:
 **3.4 will not be built by adding a fallback mode to the API.** The API keeps exactly one behaviour
 when OPA is unreachable, and `V-09` proves it.
 
+**Update: 3.4 has since been built, and the API still has exactly one behaviour.** Not by either of
+the two shapes listed below, and not by adding anything to the API. The Range breaks the engine
+three ways — stopped, erroring, and answering with no decision in it — and all three deny. What the
+challenge turned out to be about is that they are not equally visible: two surface as `503`
+`policy_unavailable`, and the third as `404` `policy_malformed` from an engine that is healthy. The
+deferral was right about not building a fallback and wrong about that being the only way to teach
+the lesson.
+
 3.4 is instead **deferred**, and the honest reason is recorded here rather than dressed up: the lab
 can show that deny-on-outage *is* the behaviour — challenge 3.1 does that, by stopping the engine
 and reading the trail — but it cannot show the alternative without becoming a system that has the

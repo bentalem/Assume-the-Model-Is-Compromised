@@ -1,0 +1,76 @@
+id = "3.4-the-failure-that-looks-like-consent"
+track = 3
+number = "3.4"
+title = "The failure that looks like consent"
+points = 45
+
+summary = """
+Break the policy engine three different ways. Every one of them denies — and one of them denies so \
+quietly that nobody would ever page anyone about it."""
+
+objective = """
+Break the decision point three ways: stop it, make it error, and make the decision it is asked for \
+not exist. Record the HTTP status and the audit reason for each. Then give the reason code that the \
+quietest of the three records — the one an operator watching for outages would never see."""
+
+skip_test = """
+every way a policy engine can fail to answer, and why "it denied" is not the same as "it denied \
+visibly"."""
+
+hints = [
+  "Two of the three produce the same HTTP status and the same reason. Which one does not, and what status does it produce instead?",
+  "If you were alerting on policy outages, which of these three would your alert miss?",
+  "An undefined decision is not an empty decision. What does the client do with a response that has no result in it at all?",
+]
+
+[[control]]
+mutation = "policy.opa.stop"
+label = "Stop the engine entirely"
+detail = "The obvious outage. Challenge 3.1 is built on this one; here it is the control group."
+
+[[control]]
+mutation = "policy.bundle.conflict"
+label = "Make evaluation error"
+detail = "The bundle loads. Two arms are true with different values, which Rego refuses to resolve."
+
+[[control]]
+mutation = "policy.bundle.undefined"
+label = "Make the decision not exist"
+detail = "OPA is healthy and answers 200. The decision the API asked for is simply not in the answer."
+
+[[observation]]
+observation = "policy.bundle_state"
+label = "Which policy OPA is loading"
+detail = "Four ways of changing the bundle. Check here after arming, and after restoring."
+
+[[observation]]
+observation = "policy.opa_state"
+label = "Whether the engine is running at all"
+detail = "For the third control this says 'running', which is the point of the third control."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "An entirely ordinary, permitted read"
+detail = "Not a boundary case. alice reading her own order, which should always work."
+
+[[observation]]
+observation = "audit.ord_2001"
+label = "Every decision recorded about that order"
+detail = "Run it after each of the three. The reason column is what this challenge is about."
+
+[flag]
+kind = "reason"
+label = "the reason code recorded by the quietest failure"
+reason_code = "policy_malformed"
+
+[[source]]
+path = "services/api/src/supportpilot_api/policy/client.py"
+lines = [82, 108]
+highlight = [83, 90]
+caption = "Five ways the engine can fail to answer. Count the return statements, and their reasons"
+
+[[source]]
+path = "services/api/src/supportpilot_api/pipeline.py"
+lines = [146, 156]
+highlight = [152, 152]
+caption = "The one line that decides whether a failure is visible to whoever is watching"

@@ -72,6 +72,21 @@ _DENY_ROLE = (
     "}"
 )
 
+# An arm that is true for every order.read, so it collides with whichever real arm also matches.
+# Rego refuses to produce two different values for a complete rule, so OPA answers 500 at eval time
+# rather than at load time — which is the failure mode that reaches the API as a bad status.
+_CONFLICT_RULE = (
+    "\n\n"
+    'decision := deny("range_conflict_probe") if {\n'
+    '\tinput.action == "order.read"\n'
+    "}\n"
+)
+
+# Moving the package makes `data.supportpilot.authz.decision` undefined. OPA answers 200 with no
+# "result" key at all, which the client treats as malformed rather than as a permissive silence.
+_REAL_PACKAGE = "package supportpilot.authz\n"
+_MOVED_PACKAGE = "package supportpilot.authz_moved\n"
+
 # variant -> (the condition removed from the allow arm, the deny arm that goes with it)
 VARIANTS = {
     "tenant": ("\tin_tenant\n", _DENY_TENANT),
@@ -89,8 +104,23 @@ def _source_text() -> str:
     return SOURCE.read_text(encoding="utf-8")
 
 
+BROKEN = ("conflict", "undefined")
+
+
+def _broken_text(variant: str) -> str:
+    """A bundle that loads but cannot answer, for challenge 3.4."""
+    source = _source_text()
+    if variant == "conflict":
+        return source + _CONFLICT_RULE
+    if _REAL_PACKAGE not in source:
+        raise PolicyBundleError("the package declaration is not where this transform expects it")
+    return source.replace(_REAL_PACKAGE, _MOVED_PACKAGE, 1)
+
+
 def permissive_text(variant: str) -> str:
-    """The real policy with one named condition removed from `order.read`."""
+    """The real policy with one named condition removed, or broken in one named way."""
+    if variant in BROKEN:
+        return _broken_text(variant)
     if variant not in VARIANTS:
         raise PolicyBundleError(f"unknown variant {variant!r}")
     condition, deny_arm = VARIANTS[variant]
@@ -119,9 +149,12 @@ def _write(text: str) -> None:
 
 
 def arm(variant: str) -> None:
-    """Install the permissive policy. The caller restarts OPA."""
+    """Install the altered policy. The caller restarts OPA."""
     _write(permissive_text(variant))
-    logger.warning("armed: the %s check has been removed from order.read in OPA's bundle", variant)
+    if variant in BROKEN:
+        logger.warning("armed: OPA's bundle has been made %s and can no longer answer", variant)
+    else:
+        logger.warning("armed: the %s check has been removed from order.read in OPA's bundle", variant)
 
 
 def restore() -> None:
