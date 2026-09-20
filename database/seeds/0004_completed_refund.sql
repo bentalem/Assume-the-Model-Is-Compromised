@@ -25,6 +25,10 @@
 --     produce a trail that the system could never have written.
 --
 -- Timestamps are fixed and in the past, so the reconstruction reads the same for everyone.
+--
+-- Every insert is ON CONFLICT DO NOTHING against a fixed id. The migrate job runs every seed on
+-- every `compose up`, so a seed that is not idempotent fails the whole job the second time somebody
+-- starts the lab — which is exactly how this one was found.
 
 BEGIN;
 
@@ -42,7 +46,8 @@ VALUES (
   TIMESTAMPTZ '2026-09-01 09:20:00+00',
   TIMESTAMPTZ '2026-09-01 09:05:00+00',
   TIMESTAMPTZ '2026-09-01 09:06:14+00'
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO app.approval_decisions
   (id, action_request_id, approver_id, decision, approved_hash, comment, policy_version, decided_at)
@@ -55,7 +60,8 @@ VALUES (
   'Delivery confirmed undelivered by the carrier. Amount matches the order line.',
   '2026-09-07.1',
   TIMESTAMPTZ '2026-09-01 09:06:02+00'
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO app.action_jobs
   (id, action_request_id, state, attempts, max_attempts, available_at, created_at)
@@ -65,7 +71,8 @@ VALUES (
   'SUCCEEDED', 1, 3,
   TIMESTAMPTZ '2026-09-01 09:06:02+00',
   TIMESTAMPTZ '2026-09-01 09:06:02+00'
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO app.action_executions
   (id, job_id, idempotency_key, provider, provider_reference, outcome, detail, started_at, finished_at)
@@ -76,7 +83,8 @@ VALUES (
   'fake', 're_5f2c9a41b7de08c3a614', 'succeeded', NULL,
   TIMESTAMPTZ '2026-09-01 09:06:12+00',
   TIMESTAMPTZ '2026-09-01 09:06:14+00'
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 -- The trail. Four rows, four request ids, three actors — which is the whole point of 7.1.
 INSERT INTO app.audit_events
@@ -110,6 +118,7 @@ VALUES
    'refund.execute', 'action_request', 'fa110001-0000-0000-0000-000000000001',
    'succeeded', 'succeeded', NULL,
    '6b87102707746120f567e1a21d7cf6342624db5e0f0b8c02c2aa64a0eb808317',
-   're_5f2c9a41b7de08c3a614');
+   're_5f2c9a41b7de08c3a614')
+ON CONFLICT (event_id) DO NOTHING;
 
 COMMIT;

@@ -248,6 +248,62 @@ def main() -> int:
     # while reporting success is the exact failure this file exists to prevent — and it is also the
     # failure that is easiest to write by accident.
     # ---------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------
+    # 3.3 claims an asymmetry: removing the tenant check from the policy changes nothing, because
+    # the resource load already refused and OPA was never asked; removing the role check returns
+    # data, because nothing underneath the policy checks roles.
+    #
+    # Both halves are assertions about a live system, and the first is a containment claim — "a
+    # permissive policy is safe here" is exactly the kind of sentence that has to be measured
+    # rather than believed. If row-level security ever stopped holding, this goes red.
+    # ------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}3.3 · what each layer is actually holding up{RESET}")
+    owner = _owner_of("policy.tenant_check.remove")
+    if owner is None:
+        check("3.3: a challenge declares the policy controls", False, "no page declares them")
+    else:
+        post(f"/c/{owner}/arm", {"mutation": "policy.tenant_check.remove"})
+        check(
+            "the tenant check is removed from the live policy",
+            probe_of(get(f"/c/{owner}"), "policy.tenant_check.remove") == "armed",
+        )
+        foreign = post(f"/c/{owner}/observe", {"observation": "api.alice.foreign_order"})
+        check(
+            "no order crosses a tenant boundary while the policy permits it",
+            "404" in foreign,
+            "row-level security is the layer holding tenant isolation up",
+        )
+        reason = sql(
+            "SELECT reason || ' / version=' || coalesce(policy_version, '(none)') "
+            "FROM app.audit_events WHERE resource_id = 'ORD-3001' AND actor_type = 'user' "
+            "ORDER BY occurred_at DESC LIMIT 1"
+        )
+        check(
+            "the request was refused before the policy was consulted",
+            reason.startswith("resource_not_visible") and reason.endswith("(none)"),
+            reason,
+        )
+        post(f"/c/{owner}/restore", {"mutation": "policy.tenant_check.remove"})
+
+        post(f"/c/{owner}/arm", {"mutation": "policy.role_check.remove"})
+        check(
+            "the role check is removed from the live policy",
+            probe_of(get(f"/c/{owner}"), "policy.role_check.remove") == "armed",
+        )
+        fiona = post(f"/c/{owner}/observe", {"observation": "api.fiona.order"})
+        check(
+            "with no role check, an unauthorised role reads the order",
+            "200" in fiona,
+            "nothing underneath the policy checks roles — this is the half that leaks",
+        )
+        post(f"/c/{owner}/restore", {"mutation": "policy.role_check.remove"})
+        page = get(f"/c/{owner}")
+        check(
+            "both policy controls are correct again",
+            probe_of(page, "policy.role_check.remove") == "correct"
+            and probe_of(page, "policy.tenant_check.remove") == "correct",
+        )
+
     print(f"\n  {GREY}the state this suite leaves behind{RESET}")
     unprotected = sql(
         "SELECT coalesce(string_agg(relname, ', '), 'none') FROM pg_class c "

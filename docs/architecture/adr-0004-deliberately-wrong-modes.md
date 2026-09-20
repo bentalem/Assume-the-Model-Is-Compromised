@@ -1,7 +1,7 @@
 # ADR-0004 — Arming a control, and building a broken one, are different things
 
 **Status:** accepted
-**Decides:** challenge 3.4, and the general question of what the Range may make the lab do.
+**Decides:** challenges 3.4, 2.2 and 3.3, and the general question of what the Range may make the lab do.
 
 ## The conflict
 
@@ -90,6 +90,45 @@ means the API gains a code path that leaks request context between users, which 
 vulnerability the lab exists to warn about, living in the lab's own API.
 
 **Deferred, on the same grounds, with the same two acceptable shapes.**
+
+(3.3 later took a third shape that neither 2.2 nor 3.4 can take: replacing a configuration artefact rather than adding a code path. See below.)
+
+## The same reasoning applied to 3.3, which came out the other way
+
+3.3 installs a permissive authorization policy. It was worth checking against the principle rather
+than assumed to fall with 3.4, and it does not fall with it.
+
+A policy bundle is a configuration artefact, not a code path. Replacing it with the same policy
+minus one condition is a setting at its wrong value — the same shape as disabling row-level
+security, which this ADR already accepts. The API gains nothing: no fallback, no toggle, no branch
+that behaves differently. Every check still screams while it is armed, and the policy's own test
+suite goes from 53/53 to two named failures.
+
+Two properties were added to keep it on the right side of the line, and both are mechanical rather
+than intentional:
+
+**The bundle is a volume, not the working tree.** OPA loads `opa_bundle`, populated from
+`./policy/supportpilot` by an init step on every `compose up`. This is the part that matters for the
+proven-inverse rule. A mutation that wrote to the repository could leave a crashed container's
+permissive authorization policy checked out in somebody's git clone, and an inverse that depends on
+the container still being alive is not a proven inverse. The same objection still blocks 8.1.
+
+**The wrong policy is derived, never stored.** There is no permissive `.rego` file in this
+repository or in any image. Arming reads the real policy and removes one named condition, having
+first asserted the text is present. A stored copy would drift the first time somebody edited the
+real policy, and the challenge would then arm a policy the lab no longer runs while telling the
+learner it is theirs with one control removed.
+
+The grant this creates is real and worth naming as one: the Range can write the bundle the policy
+engine loads. That is the largest single privilege it holds. What bounds it is that the content is
+derived from a read-only copy rather than chosen, and that `range_suite.py` measures the containment
+claim instead of repeating it — no order crosses a tenant boundary while the policy permits it.
+
+Building it also invalidated the challenge's own premise, which is recorded here because it is the
+more useful finding. The API loads the trusted resource before it asks the policy anything, so a
+cross-tenant read is refused at the load and **OPA is never consulted**. The permissive tenant rule
+is unreachable. What 3.3 actually teaches is the asymmetry that fell out of discovering that: one
+property has two layers, the rest have one, and removing a check tells you which kind you have.
 
 ## What this costs, said plainly
 

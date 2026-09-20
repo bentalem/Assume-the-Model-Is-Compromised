@@ -1,0 +1,76 @@
+id = "3.3-which-layer-stops-what"
+track = 3
+number = "3.3"
+title = "Which layer stops what"
+points = 45
+
+summary = """
+Two authorization layers, and a rule that lets the wrong thing through. You are going to remove one \
+check from the live policy, twice, and only one of the two does anything at all."""
+
+objective = """
+Remove the tenant check from order.read and find out what changes. Then remove the role check and \
+find out what changes. Explain why the two results are different, and say which layer was actually \
+enforcing each property."""
+
+skip_test = """
+which of your two authorization layers is enforcing which property, and how to tell from an audit \
+row whether the policy was ever consulted."""
+
+hints = [
+  "With the tenant check removed, does the audit row for the cross-tenant read carry a policy version — and if not, what does its absence tell you about whether the policy was asked?",
+  "Row-level security can say 'this row belongs to another tenant'. Can it say 'this role may not read orders'?",
+  "The API loads the resource before it builds the policy input. What is left to decide if that load already returned nothing?",
+]
+
+[[control]]
+mutation = "policy.tenant_check.remove"
+label = "Remove the tenant check from order.read"
+detail = "The live policy, minus one condition. Derived from the real file, so it is your policy."
+
+[[control]]
+mutation = "policy.role_check.remove"
+label = "Remove the role check from order.read"
+detail = "The same file, the same action, a different condition. Run this one second."
+
+[[observation]]
+observation = "policy.bundle_state"
+label = "Which policy OPA is loading"
+detail = "Check this after arming. 'unknown' means both were armed and one overwrote the other."
+
+[[observation]]
+observation = "api.alice.foreign_order"
+label = "A cross-tenant read"
+detail = "alice, an order in the other tenant. Run it unarmed, then with the tenant check removed."
+
+[[observation]]
+observation = "api.fiona.order"
+label = "A read by someone whose role does not permit it"
+detail = "fiona approves refunds in this tenant. She has no role that reads orders."
+
+[[observation]]
+observation = "audit.ord_3001"
+label = "Every decision recorded about the cross-tenant order"
+detail = "The policy version column is the one that answers this challenge."
+
+[[observation]]
+observation = "audit.ord_2001"
+label = "Every decision recorded about the order in her own tenant"
+detail = "The control group, and where fiona's attempts land."
+
+[flag]
+kind = "written"
+label = "why one removal changed nothing and the other returned data"
+rubric = ["resource_not_visible", "policy_version", "role"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/pipeline.py"
+lines = [112, 124]
+highlight = [116, 120]
+caption = "The resource is loaded before the policy is asked. If it is not visible, nothing is asked"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [78, 101]
+highlight = [85, 95]
+caption = "The three arms of order.read. One of these conditions has a second layer underneath it"

@@ -45,6 +45,12 @@ networks:
 
 volumes:
   postgres_data:
+  # The policy bundle OPA actually loads. It is a volume rather than the repository directory
+  # because challenge 3.3 arms a permissive policy, and a mutation that wrote to the working tree
+  # could leave a crashed container's permissive authorization checked out on disk. The volume is
+  # repopulated from ./policy/supportpilot on every `compose up` by opa-bundle-init, so editing the
+  # policy in the repository still works the way it always did.
+  opa_bundle:
 
 services:
   # --------------------------------------------------------------------------------------------
@@ -113,6 +119,35 @@ services:
   # --------------------------------------------------------------------------------------------
   # Policy decision point. Private network only; no published port.
   # --------------------------------------------------------------------------------------------
+  # --------------------------------------------------------------------------------------------
+  # Populates OPA's bundle volume from the repository, before OPA starts, on every `compose up`.
+  #
+  # This exists so that the bundle OPA loads is a volume rather than a bind mount of the working
+  # tree. Challenge 3.3 arms a permissive policy by replacing the file in that volume; doing the
+  # same thing to the working tree would mean a container that died mid-challenge left a permissive
+  # authorization policy checked out in somebody's git clone.
+  #
+  # It copies on every start, so `compose up` after editing policy/supportpilot/authz.rego behaves
+  # exactly as it did when OPA bind-mounted that directory. It also means a bundle left armed by a
+  # crash is corrected by a restart of the lab, independently of the Range's own restore path.
+  # --------------------------------------------------------------------------------------------
+  opa-bundle-init:
+    image: alpine:3.20
+    container_name: supportpilot-opa-bundle-init
+    restart: "no"
+    # The Range writes this volume when challenge 3.3 is armed, and it runs unprivileged as
+    # uid 10004. Ownership is set here, once, rather than by widening the file mode: 0666 on a
+    # policy bundle would let anything that can reach the volume rewrite authorization.
+    command:
+      - "sh"
+      - "-c"
+      - "cp -f /source/*.rego /source/*.json /bundle/ && chown -R 10004:999 /bundle && chmod 0644 /bundle/* && ls -1 /bundle"
+    volumes:
+      - ./policy/supportpilot:/source:ro
+      - opa_bundle:/bundle
+    networks:
+      - policy
+
   opa:
     image: openpolicyagent/opa:1.4.2-static
     container_name: supportpilot-opa
@@ -124,9 +159,12 @@ services:
       - "--log-level=info"
       - "--set=decision_logs.console=true"
       - "/policy"
+    depends_on:
+      opa-bundle-init:
+        condition: service_completed_successfully
     volumes:
-      # Read-only bundle. OPA never writes policy.
-      - ./policy/supportpilot:/policy:ro
+      # Read-only to OPA: it never writes policy, and it is not the component that arms 3.3.
+      - opa_bundle:/policy:ro
     networks:
       - policy
     healthcheck:
@@ -395,6 +433,13 @@ services:
       # The action document. Track 4 is about reading a tool schema and judging the authority it
       # grants, so the learner needs the real registered surface rather than a description of it.
       - ./openapi:/repo/openapi:ro
+      # OPA's bundle, read-write, for challenge 3.3 alone. This is the largest single grant the
+      # Range holds and it is worth naming as one: with it, this service decides what the policy
+      # engine believes. Two things bound it. The permissive policy is derived from the read-only
+      # copy above rather than stored, so it is always the real policy minus one named condition.
+      # And it is a volume, so a container that dies mid-challenge cannot leave a permissive policy
+      # in the working tree — `compose up` repopulates it from the repository.
+      - opa_bundle:/opa-bundle
     ports:
       - "127.0.0.1:8095:8095"
     networks:

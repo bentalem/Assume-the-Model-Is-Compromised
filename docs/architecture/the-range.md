@@ -179,6 +179,7 @@ they exercise all three flag kinds and both halves of the console:
 | 1.4 | The claim that changes nothing | `value` | no — three tampered tokens |
 | 3.1 | Deny by default, proved | `reason` | stops the policy engine |
 | 3.2 | Yes, and only these fields | `written` | no — two real API requests |
+| 3.3 | Which layer stops what | `written` | two controls, both on the live policy |
 | 4.1 | The worst legal call | `written` | no — the authority is in the schema |
 | 7.1 | Reconstruct it | `written` | no — read-only |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
@@ -219,8 +220,8 @@ and the challenge's own Stage 01 explains why the console must not try to do tha
 
 ### What the remaining challenges need
 
-Seventeen of the thirty-one rows in `.dev/ctf/design.md` are built. Fourteen are not, and they are
-not all the same kind of not-built. Four of them the design marks `Ready`, and the honest position
+Eighteen of the thirty-one rows in `.dev/ctf/design.md` are built. Thirteen are not, and they are
+not all the same kind of not-built. Three of them the design marks `Ready`, and the honest position
 on each has changed now that the Range exists to test the assumption against.
 
 **Blocked on a model in the loop.** 4.3, 5.1, 5.3 and 7.2 need a conversation, not an HTTP request.
@@ -232,27 +233,44 @@ identical refusals"* — an assertion about what the model did. `CLAUDE.md` forb
 for a good reason: two identical runs produce different tool calls. If 5.1 is built, the flag has to
 be about the boundary around the model, never about the model's answer.
 
-**Blocked on the Range being able to write files.** 8.1 turns on the published action document
-drifting from the registered code. The Range mounts `openapi/` read-only and has no file-writing
-capability at all, by design. Arming that drift means either granting the Range write access to the
-repository working tree — where a crashed container leaves the repository holding the broken
-version, so the inverse is no longer guaranteed — or building the drift somewhere that is not the
-repository. The second is the acceptable shape, and it has not been built.
+**3.3 is built, and it is not the challenge the design describes.** The design has it install a
+permissive policy and the learner discover that row-level security refuses anyway. Building it
+turned up something better and more uncomfortable: for a cross-tenant order read, *the policy is
+never consulted at all*. The API loads the trusted resource before it builds the policy input, so a
+read the database will not satisfy is refused at the load with `resource_not_visible` and no policy
+version. Arming a permissive tenant rule changes nothing — not the response, not the audit row.
 
-**3.3 is the interesting one, and it is not Ready.** It installs a permissive policy and has the
-learner discover that row-level security refuses anyway. As a *demonstration* it is exactly what
-ADR-0004 permits: a configuration artefact at its wrong value, reversibly. The obstacle is
-mechanical rather than philosophical. OPA loads its bundle read-only from `./policy/supportpilot`,
-sits on the `policy` network, and the Range cannot reach it (`V-17`) — so arming a different policy
-means writing to the bundle directory, which is the repository working tree, with the same
-un-guaranteed inverse as 8.1. A permissive policy left behind by a crashed container is a worse
-thing to leave behind than a broken schema file.
+So the challenge as shipped removes two different conditions from the same action and asks why the
+results differ. Removing the tenant check does nothing, because a second layer was already holding
+that property up. Removing the role check returns order data to a `finance_approver`, because
+nothing underneath the policy has an opinion about roles. The lesson is sharper than "we have two
+layers": **one property has two layers and the rest have one**, and the severity of a policy bug is
+decided by which of those you are looking at.
 
-The shape that would work: a policy overlay on a named volume rather than on the repository, with
-the wrong bundle shipped inside the Range image, `reset` asserting the volume is empty, and a probe
-proving which behaviour is live. That is a reviewed change of its own, and it is worth doing —
-"the two layers disagreed and the second one held" is the clearest possible demonstration of
-invariant 4, and nothing currently built shows it.
+The mechanism is worth recording because the obvious one does not work. `decision` is a complete
+rule with many definitions, so an overlay file asserting it produces a conflict, OPA errors, and the
+API denies — which reproduces challenge 3.1 and teaches nothing. The bundle has to be replaced
+wholesale. It is therefore a named volume, populated from `./policy/supportpilot` by
+`opa-bundle-init` on every `compose up`, never the working tree: a mutation that wrote to the
+working tree could leave a crashed container's permissive authorization policy checked out in a git
+clone, and "no mutation without a proven inverse" stops being true the moment the inverse depends on
+the container still being alive.
+
+The permissive policy is **derived, never stored**. There is no wrong `.rego` file in this
+repository or in the Range image. Arming reads the real policy from the read-only mount and removes
+one named condition, asserting first that the text it expects is present — so the armed policy is
+always the real one minus one control, and editing the policy makes arming fail loudly rather than
+arm something stale. Against the correct bundle the policy suite is 53/53; against the permissive
+one exactly two tests fail, named for the control that was removed.
+
+`range_suite.py` asserts both outcomes, including the containment half: no order crosses a tenant
+boundary while the policy permits it. "A permissive policy is safe here because the database
+refuses" is precisely the kind of sentence that has to be measured rather than believed.
+
+**8.1 is still not Ready.** It turns on the published action document drifting from the registered
+code, which means arming a change to a file in the repository, with the same un-guaranteed inverse
+that the policy bundle avoided by being a volume. The acceptable shape is the same one: put the
+drifting copy somewhere that is not the working tree. It has not been built.
 
 **Blocked on capability the design already names.** 2.2, 3.4, 4.2, 4.4, 5.4, 8.2, 8.3 and 8.4 each
 need something that does not exist. 2.2 and 3.4 are refused outright by ADR-0004. The rest are

@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import containers, db, probe, source
+from . import containers, db, policy_bundle, probe, source
 
 logger = logging.getLogger("supportpilot.range.registry")
 
@@ -695,6 +695,68 @@ register_mutation(
         armed_means="There is no policy engine. Every authorization question now has no answer.",
     )
 )
+
+def _restart_opa() -> None:
+    """OPA reads its bundle at startup and does not watch the directory."""
+    containers.stop(OPA_CONTAINER)
+    containers.start(OPA_CONTAINER)
+
+
+def _arm_permissive_policy(variant: str) -> None:
+    policy_bundle.arm(variant)
+    _restart_opa()
+
+
+def _restore_real_policy() -> None:
+    policy_bundle.restore()
+    _restart_opa()
+
+
+register_mutation(
+    Mutation(
+        id="policy.tenant_check.remove",
+        summary="Remove the tenant membership check from order.read in the live policy",
+        apply=lambda: _arm_permissive_policy("tenant"),
+        restore=_restore_real_policy,
+        probe=lambda: policy_bundle.state("tenant"),
+        touches=("supportpilot-opa",),
+        armed_means=(
+            "The policy now permits any support role to read an order in any tenant. Nothing "
+            "changes: the API never asks it, because the resource load already refused."
+        ),
+    )
+)
+
+register_mutation(
+    Mutation(
+        id="policy.role_check.remove",
+        summary="Remove the role check from order.read in the live policy",
+        apply=lambda: _arm_permissive_policy("role"),
+        restore=_restore_real_policy,
+        probe=lambda: policy_bundle.state("role"),
+        touches=("supportpilot-opa",),
+        armed_means=(
+            "Any member of a tenant can now read that tenant's orders, whatever their role. This "
+            "one returns data, because nothing underneath the policy checks roles."
+        ),
+    )
+)
+
+
+register_observation(
+    Observation(
+        id="policy.bundle_state",
+        summary="Which authorization policy OPA is loading, per removable check",
+        run=lambda: [
+            {"check_removed": name, "state": policy_bundle.state(name)}
+            for name in policy_bundle.VARIANTS
+        ],
+        columns=("check_removed", "state"),
+        row_cap=2,
+        fields=("state",),
+    )
+)
+
 
 register_observation(
     Observation(
