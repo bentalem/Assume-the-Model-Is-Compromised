@@ -168,6 +168,7 @@ they exercise all three flag kinds and both halves of the console:
 |---|---|---|---|
 | 2.1 | The policy that filters nothing | `value` | two controls |
 | 2.3 | Four questions | `value` | one, unnamed |
+| 5.2 | Indirect, and why it is a finding | `written` | no — the corpus is seed data |
 | 6.1 | Approve one payload, execute another | `reason` | one control |
 | 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
 | 6.3 | Exactly once | `value` | no — attempts a write that rolls back |

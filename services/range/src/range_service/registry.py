@@ -592,3 +592,31 @@ _register_tampered("token.resigned", "alice.token.resigned",
                    "alice's claims re-signed with an attacker's key")
 _register_tampered("token.claimed_org", "alice.token.claimed_org",
                    "a tenant claim rewritten, then re-signed")
+
+
+# ==================================================================================================
+# Track 5 · untrusted content (5.2)
+# ==================================================================================================
+
+_register_probe("api.alice.ticket_1001", "alice.read.tkt_1001",
+                "alice reads the ticket carrying ten planted injections")
+
+register_observation(
+    Observation(
+        id="content.injection_corpus",
+        summary="The ten instruction-shaped messages in TKT-1001",
+        run=lambda: db.select("injection_corpus"),
+        columns=("n", "author", "visibility", "attempt"),
+        row_cap=20,
+    )
+)
+
+register_observation(
+    Observation(
+        id="content.registered_tools",
+        summary="The tool modules the model can actually call",
+        run=lambda: db.select("registered_tool_modules"),
+        columns=("tool_module", "note"),
+        row_cap=16,
+    )
+)

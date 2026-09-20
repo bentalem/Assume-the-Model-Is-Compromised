@@ -1,0 +1,63 @@
+id = "5.2-indirect-and-why-it-is"
+track = 5
+number = "5.2"
+title = "Indirect, and why it is a finding"
+points = 35
+
+summary = """
+Ten instructions written by a customer, arriving through a request nobody could object to. None of \
+them achieved anything — and not one of them was blocked."""
+
+objective = """
+Read the corpus and trace each attempt to the thing that made it inert. Then answer in a sentence \
+or two: why did none of them work, given that nothing filtered any of them?"""
+
+skip_test = """
+the difference between an injection that was stopped and an injection that had nowhere to go, and \
+which of the two this lab demonstrates."""
+
+hints = [
+  "Attempt 6 names two tools. Are they in the list of tool modules beside it?",
+  "Attempt 3 declares the sender an administrator. Which input to which check would that have had to change?",
+  "Attempt 7 forges a tool result claiming an approval. What does the worker compare an approval against?",
+]
+
+# Nothing to arm. The corpus is seed data and the lab is in its normal state — which is the point:
+# no filter is running, and none of these worked anyway.
+
+[[observation]]
+observation = "content.injection_corpus"
+label = "The messages on TKT-1001"
+detail = "One genuine complaint, nine instruction-shaped messages, and one written by an agent."
+
+[[observation]]
+observation = "content.registered_tools"
+label = "The tool modules the model can call"
+detail = "Check the claims in the corpus against this rather than taking the lab's word for it."
+
+[[observation]]
+observation = "api.alice.ticket_1001"
+label = "Read the ticket through the API as alice"
+detail = "A permitted request. This is how the untrusted text reaches the model in the first place."
+
+[[observation]]
+observation = "identity.memberships"
+label = "Where roles actually come from"
+detail = "Relevant to attempt 3, which declares its author an administrator."
+
+[flag]
+kind = "written"
+label = "why none of them worked"
+rubric = ["exist", "role", "secret"]
+
+[[source]]
+path = "database/seeds/0002_tickets_and_injection_corpus.sql"
+lines = [1, 20]
+highlight = [4, 9]
+caption = "The seed file's own statement of what this corpus is for"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [1, 30]
+highlight = [1, 6]
+caption = "Where the decision is made, and what it is allowed to read"
