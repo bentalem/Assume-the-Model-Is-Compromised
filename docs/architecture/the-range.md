@@ -339,10 +339,39 @@ code, which means arming a change to a file in the repository, with the same un-
 that the policy bundle avoided by being a volume. The acceptable shape is the same one: put the
 drifting copy somewhere that is not the working tree. It has not been built.
 
-**Blocked on capability the design already names.** 2.2, 3.4, 4.2, 4.4, 5.4, 8.2, 8.3 and 8.4 each
-need something that does not exist. 2.2 and 3.4 are refused outright by ADR-0004. The rest are
-ordinary unbuilt work: an outbound tool, an unschema'd `object` parameter, a URL-taking tool, an
-MCP-style tool source, a prompt store.
+**Blocked on capability the design already names — and not all the same kind of blocked.** An
+earlier version of this section called all of these "ordinary unbuilt work", which was wrong for
+three of them and needs saying plainly, because "not built yet" and "the rules forbid this" are
+different answers to give a reviewer.
+
+*Refused by a non-negotiable rule, not merely unbuilt.* Rule 7 of `CLAUDE.md` reads: **the model
+never gets a generic tool — no SQL, shell, file, or unrestricted HTTP tool.**
+
+  * **4.2** wants a tool whose parameter is an unschema'd `object`. Challenge 4.1's own material
+    says what that is: *"a generic tool wearing a business name, which is worse than one that looks
+    generic, because nobody in the room becomes suspicious."* Building 4.2 by adding one to the API
+    means shipping the exact thing the lab teaches people to find.
+  * **8.2** wants a URL-taking tool pointed at an internal address. That is the unrestricted HTTP
+    tool, named in the rule.
+
+Both fall the way 3.4 fell, by a stronger route: not a judgement call in an ADR, a rule. And both
+have the same escape that 3.3 and 3.4 turned out to have — the lesson does not require the API to
+hold the capability. 4.1 already teaches half of 4.2 by having the learner audit the real surface
+and find that no such parameter exists; a full 4.2 needs the bad schema somewhere that is not the
+registered surface.
+
+*In tension with rule 10.* **8.3** connects a tool server that alters its tool list at runtime.
+Rule 10 says external text cannot register tools. A demonstration needs the lab to contain a
+component that does exactly that, and where it is allowed to sit is the whole design question. Not
+refused, not ordinary either — it needs its own ADR before anyone writes code.
+
+*Genuinely ordinary unbuilt work.* **4.4** (an outbound tool), **5.4** (a rendering surface) and
+**8.4** (a prompt store with and without review). Each is a privilege grant and should be reviewed
+as one, but none of them collides with a rule.
+
+*Refused, and recorded above.* **2.2**, for two independent reasons. **3.4 is built** — it appeared
+in this list as refused long after it had shipped, which is the kind of staleness this section is
+supposed to prevent.
 
 **Resolved.** 7.1 was blocked on seeded evidence — the trail on a fresh lab is empty, and a flag
 that depends on whether somebody happened to run the verification suite is a flag that fails for the
