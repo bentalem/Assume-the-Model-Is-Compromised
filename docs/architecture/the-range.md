@@ -285,6 +285,22 @@ working tree could leave a crashed container's permissive authorization policy c
 clone, and "no mutation without a proven inverse" stops being true the moment the inverse depends on
 the container still being alive.
 
+Recovering the bundle, if it is ever left wrong. `restore` and `reset` both rewrite it from the
+read-only repository mount, and the Range refuses to start quietly about it — startup reports any
+control that is not at its designed setting. If the Range itself is the thing that is broken, the
+volume can be thrown away instead:
+
+```
+docker compose --profile range down
+docker volume rm supportpilot_opa_bundle
+docker compose --profile range up -d
+```
+
+`opa-bundle-init` repopulates it from `./policy/supportpilot` before OPA starts, so the policy comes
+back from the repository rather than from anything the Range wrote. This path is tested rather than
+assumed: the volume was removed and the lab cold-started from it, with the suites run afterwards.
+Note the absence of `-v` on that `down` — it takes the containers, not `postgres_data`.
+
 The permissive policy is **derived, never stored**. There is no wrong `.rego` file in this
 repository or in the Range image. Arming reads the real policy from the read-only mount and removes
 one named condition, asserting first that the text it expects is present — so the armed policy is
