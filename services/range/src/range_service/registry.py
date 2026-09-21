@@ -253,17 +253,27 @@ def reset(request_id: str) -> list[str]:
     re-probes afterwards and raises if anything is still armed.
     """
     changed: list[str] = []
+    failed: list[str] = []
     for mutation_id, mutation in MUTATIONS.items():
+        # One mutation must never end the sweep. The retry below used to sit outside any handler, so
+        # a restore that raised twice — a stopped docker-proxy does exactly that — aborted the loop
+        # partway through, and every mutation after it was neither probed nor restored, with no
+        # report and no audit row. Whatever happens here, the remaining mutations still get their
+        # turn and the post-check below still runs.
         try:
             if mutation.probe() != CORRECT:
                 mutation.restore()
                 changed.append(mutation_id)
         except Exception:  # noqa: BLE001
             logger.exception("reset failed for %s", mutation_id)
-            mutation.restore()
-            changed.append(mutation_id)
+            try:
+                mutation.restore()
+                changed.append(mutation_id)
+            except Exception:  # noqa: BLE001
+                logger.exception("reset could not restore %s", mutation_id)
+                failed.append(mutation_id)
 
-    still_armed = [mid for mid, value in state().items() if value != CORRECT]
+    still_armed = sorted({mid for mid, value in state().items() if value != CORRECT} | set(failed))
     db.record_event(
         request_id, "range.reset", ",".join(changed) or "none",
         "succeeded" if not still_armed else "failed",

@@ -23,11 +23,13 @@ Everything below follows from that one sentence.
 
 ## The shape of the system
 
-Seven components on four networks. The networks are the first control: most of the isolation here is
+Eight components on six networks. The networks are the first control: most of the isolation here is
 enforced by the fact that two containers simply cannot reach each other.
 
-The Range adds an eighth, profile-gated and deliberately fenced off; it has its own document above
-because it is the service most worth reviewing.
+The Range adds a ninth, profile-gated and deliberately fenced off; it has its own document above
+because it is the service most worth reviewing. Two more come up under the same profile and exist
+only to bound it: the `probe`, which makes the API requests the Range cannot, and the `docker-proxy`,
+which is the only way it can restart a container.
 
 ```mermaid
 flowchart LR
@@ -207,7 +209,7 @@ When the two layers disagree, that is an event. If policy allows a read and RLS 
 API writes `order.read.rls_empty` to the audit trail before returning `404`. A disagreement between
 your two controls should be loud.
 
-### The four database roles
+### The five database roles
 
 | Role | Holds | Never holds |
 |---|---|---|
@@ -215,6 +217,10 @@ your two controls should be loud.
 | `sp_api_role` | `SELECT` on named tables, `INSERT` on notes, actions, audit | ownership, `BYPASSRLS`, `SUPERUSER`, DDL |
 | `sp_worker_role` | job claim, execution state, audit `INSERT` | any grant on customers, orders, tickets, notes |
 | `sp_auditor_role` | `SELECT` on `audit_events` | any write, anywhere |
+| `sp_range_role` | `USAGE` on schema `range`, `EXECUTE` on the reviewed `range.*` functions | ownership, `BYPASSRLS`, `SUPERUSER`, any privilege on an `app` table |
+
+`sp_range_role` exists in every database — migration `0010` is not conditional — but nothing connects
+as it unless the `range` compose profile is up.
 
 The worker **refuses to start** if it can read a customer. Not a warning — a failed boot.
 
@@ -339,7 +345,7 @@ when it stops working.
 
 | Suite | What it proves | How to run |
 |---|---|---|
-| `verify_local.py` | 16 environment checks, `V-01` to `V-16` | `python scripts/verify_local.py` |
+| `verify_local.py` | 21 environment checks, `V-01` to `V-21` | `python scripts/verify_local.py` |
 | `abuse_suite.py` | injection and abuse cases, `TS7-nn` | `python scripts/abuse_suite.py` |
 | `action_suite.py` | approval and execution cases, `TS8-nn` | `python scripts/action_suite.py` |
 | `contract_suite.py` | every call built from the published tool document | `python scripts/contract_suite.py` |

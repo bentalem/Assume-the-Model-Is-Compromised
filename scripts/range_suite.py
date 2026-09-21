@@ -117,7 +117,10 @@ def _flag_values(body: str, field: str) -> list[str]:
     a, b = spans[names.index(field)]
     found = []
     for line in lines[2:]:
-        if "row(s)" in line and line.strip().endswith("row(s)"):
+        # Skip only the count trailer render._result_table appends. Testing for "ends with row(s)"
+        # would also drop a data row whose cell happens to read like one, e.g. "affects 3 row(s)".
+        stripped = line.strip()
+        if stripped.endswith("row(s)") and stripped[: -len("row(s)")].strip().isdigit():
             continue
         value = line[a:b].strip()
         if value:
@@ -477,5 +480,29 @@ def main() -> int:
     return 0
 
 
+def _reset_whatever_is_armed() -> None:
+    """Best-effort: put the lab back however the suite exits.
+
+    Every arm in this file is followed by a restore, which is fine until something between the two
+    raises. `get()` catches nothing and `post()` catches only HTTPError, so a socket timeout while
+    the Range re-probes twelve controls used to abort the run with row security still disabled — in
+    the suite whose purpose is to prove that cannot be left behind.
+
+    The Range's reset endpoint asserts every registered mutation, not just this challenge's, so one
+    call is enough whichever challenge it is addressed to.
+    """
+    try:
+        page = get("/")
+        challenge_id = page.split('href="/c/', 1)[1].split('"', 1)[0]
+        post(f"/c/{challenge_id}/reset", {})
+        print(f"  {GREY}reset on exit: the environment was asserted before leaving{RESET}")
+    except Exception as exc:  # noqa: BLE001 — a failed cleanup must not mask the real error
+        print(f"  {RED}reset on exit failed: {type(exc).__name__}{RESET}")
+        print(f"  {YELLOW}The lab may still be armed. Press Reset in the console.{RESET}")
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    finally:
+        _reset_whatever_is_armed()

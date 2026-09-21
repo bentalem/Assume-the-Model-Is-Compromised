@@ -22,5 +22,5 @@ So the Range gets a proxy instead. It is a normal HAProxy image with a configura
 The result is that the worst thing a compromised Range can do through this path is restart three
 containers in a local lab, which is also the best thing it can do, which is the point.
 
-`V-02` asserts the Range cannot reach the API, and the proxy's allowlist is asserted by its own
+`V-17` asserts the Range cannot reach the API, and the proxy's allowlist is asserted by its own
 smoke test rather than by reading this file.

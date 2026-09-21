@@ -86,7 +86,7 @@ It finishes by printing the URLs. Then prove the environment is actually correct
 python scripts/verify_local.py
 ```
 
-Sixteen checks, `V-01` through `V-16`, one line each. **Every one must pass.** A bootstrap that
+Twenty-one checks, `V-01` through `V-21`, one line each. **Every one must pass.** A bootstrap that
 succeeded is not the same as an environment that is correct — this is what tells you which.
 
 ## A3 · What you now have
@@ -135,7 +135,7 @@ Learning your way around the system, rather than installing it, is
 
 | Command | What it proves |
 |---|---|
-| `python scripts/verify_local.py` | 16 environment checks, `V-01` to `V-16` |
+| `python scripts/verify_local.py` | 21 environment checks, `V-01` to `V-21` |
 | `python scripts/abuse_suite.py` | injection and abuse cases — two need Part B and skip without it |
 | `python scripts/action_suite.py` | approval and execution: no self-approval, no double execution |
 | `python scripts/contract_suite.py` | every call built from the published tool document |
@@ -488,7 +488,7 @@ When something surprising happens and you want to know what actually occurred:
 README.md                 the article
 LAB.md                    this file
 CLAUDE.md                 the invariants — what must never be weakened
-compose.yaml              four networks, seven services
+compose.yaml              six networks, eleven services — three gated on the `range` profile
 services/
   api/                    auth · policy · tools · repositories · audit
   worker/                 jobs · adapters · idempotency

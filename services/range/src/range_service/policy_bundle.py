@@ -41,12 +41,16 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from . import containers
+
 logger = logging.getLogger("supportpilot.range.policy_bundle")
 
 # The policy as the repository holds it: read-only, and the restore path's source of truth.
 SOURCE = Path("/repo/policy/supportpilot/authz.rego")
 # The bundle OPA loads.
 DEPLOYED = Path("/opa-bundle/authz.rego")
+# The container that loads it. Must match registry.OPA_CONTAINER.
+OPA_CONTAINER = "supportpilot-opa"
 
 # The three arms of order.read, written out in full rather than matched by regex: a regex that
 # silently matched nothing would arm a policy identical to the real one and report success.
@@ -131,11 +135,20 @@ def permissive_text(variant: str) -> str:
             "the order.read allow arm is not where this transform expects it; the policy has been "
             "edited and this mutation must be updated rather than arming something else"
         )
-    if deny_arm not in source:
-        raise PolicyBundleError(f"the {variant} deny arm for order.read is not where it is expected")
+    # Checked against the arm itself, but removed together with the blank line that follows it.
+    # Those are different strings: if the arm is ever followed by one newline instead of two, the
+    # check passes and the removal silently does nothing, leaving a policy with the allow condition
+    # gone and the deny arm intact — armed according to the probe, and refusing exactly as before.
+    removable = deny_arm + "\n\n"
+    if removable not in source:
+        raise PolicyBundleError(
+            f"the {variant} deny arm for order.read is not where this transform expects it, or is "
+            "no longer followed by a blank line; the policy has been edited and this mutation must "
+            "be updated rather than arming half of itself"
+        )
 
     out = source.replace(_ALLOW_ARM, _ALLOW_ARM.replace(condition, ""), 1)
-    out = out.replace(deny_arm + "\n\n", "", 1)
+    out = out.replace(removable, "", 1)
 
     if out == source:
         raise PolicyBundleError("the transform changed nothing")
@@ -163,19 +176,49 @@ def restore() -> None:
     logger.info("restored: OPA's bundle is the repository's policy again")
 
 
-def state(variant: str) -> str:
-    """Whether OPA is loading the real policy, this variant of it, or something unrecognised.
+def _opa_has_loaded_the_bundle() -> bool:
+    """Whether OPA started after the bundle was last written.
 
-    Byte comparison against both known texts. Anything else is reported as unknown rather than
-    guessed at — a probe that answered `correct` for a bundle nobody recognises would be the one
-    thing in this service that must never happen. Both variants write the same file, so arming one
-    while the other is armed leaves the first reading `unknown`, which is the intended answer.
+    This is the difference between reading the file and reading the system. OPA loads its bundle
+    once, at startup, and does not watch the directory — so the file on disk and the policy being
+    enforced are two things that have to agree, not one thing.
+
+    They come apart in two ordinary ways. `restore()` writes the file and then restarts OPA; if the
+    restart fails, the file is correct and the engine is still armed. And `docker compose up -d`
+    re-runs `opa-bundle-init`, which copies the repository policy over the volume while a running
+    OPA is left alone, because compose sees no reason to recreate it.
+
+    Without this check `state()` reported `correct` in both cases — the one thing the probe must
+    never do. Found by a review, then reproduced: armed the role check, wrote the real policy back
+    without restarting, and watched the probe say `correct` while fiona still read the order.
+
+    An unreachable runtime answers `False`. Not knowing is not the same as being correct.
+    """
+    try:
+        started = containers.started_at(OPA_CONTAINER)
+    except containers.ContainerError:
+        logger.warning("cannot tell whether OPA has loaded the bundle; reporting unknown")
+        return False
+    return started >= DEPLOYED.stat().st_mtime
+
+
+def state(variant: str) -> str:
+    """Whether OPA is enforcing the real policy, this variant of it, or something unrecognised.
+
+    Byte comparison against both known texts, and then the question of whether OPA has actually
+    read what it is being compared against. Anything else is reported as unknown rather than
+    guessed at — a probe that answered `correct` for a policy nobody recognises, or for a file the
+    engine never loaded, would be the one thing in this service that must never happen. Both
+    variants write the same file, so arming one while the other is armed leaves the first reading
+    `unknown`, which is the intended answer.
     """
     if not DEPLOYED.is_file():
         return "unknown"
     deployed = DEPLOYED.read_text(encoding="utf-8")
     if deployed == _source_text():
-        return "correct"
-    if deployed == permissive_text(variant):
-        return "armed"
-    return "unknown"
+        answer = "correct"
+    elif deployed == permissive_text(variant):
+        answer = "armed"
+    else:
+        return "unknown"
+    return answer if _opa_has_loaded_the_bundle() else "unknown"

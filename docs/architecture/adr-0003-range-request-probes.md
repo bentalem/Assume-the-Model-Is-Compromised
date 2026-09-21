@@ -1,11 +1,11 @@
 # ADR-0003 — How the Range makes an API request without being able to reach the API
 
-**Status:** accepted, not yet built
+**Status:** accepted, built
 **Supersedes nothing. Constrains:** every remaining challenge in tracks 1, 3, 5 and 8.
 
 ## The problem
 
-Twelve of the thirty challenges need the learner to make a request *through the API* — present a
+Twelve of the thirty-one challenges need the learner to make a request *through the API* — present a
 token for the wrong audience, read an order after a role was revoked, watch a request fail closed
 while the policy engine is down. All of them are blocked on the same thing.
 
@@ -88,12 +88,13 @@ Three constraints, and the third is the one that matters:
 
 ## What this unblocks
 
-1.1, 1.2, 1.3, 1.4, 3.1, 3.4, 5.1, 5.2, 8.1 — and it is the foundation for the "Range-driven agent
+1.1, 1.2, 1.3, 1.4, 3.1, 3.4, 5.2, 8.1 — and it is the foundation for the "Range-driven agent
 turns" capability in `.dev/ctf/design.md` §5, which is the same idea pointed at Onyx instead of the
 API.
 
 ## What it does not unblock
 
-Anything needing a model in the loop (4.3, 5.3, 7.2). A probe makes an HTTP request; it does not
-have a conversation. Those need Onyx, and Onyx is a separate compose project — a later decision,
+Anything needing a model in the loop (4.3, 5.1, 5.3, 7.2) — 5.1 included, because its stated outcome
+is an assertion about what the model did. A probe makes an HTTP request; it does not have a
+conversation. Those need Onyx, and Onyx is a separate compose project — a later decision,
 and a larger one.

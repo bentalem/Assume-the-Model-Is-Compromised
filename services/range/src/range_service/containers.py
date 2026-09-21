@@ -21,6 +21,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime
 
 logger = logging.getLogger("supportpilot.range.containers")
 
@@ -81,3 +82,34 @@ def start(name: str) -> None:
     if status not in (204, 304):
         raise ContainerError(f"start {name}: HTTP {status} {body[:120]!r}")
     _wait_for(name, "running")
+
+
+def started_at(name: str) -> float:
+    """When this container last started, as epoch seconds, read from the runtime.
+
+    Used to answer a question a file cannot: has this process read the file that is on disk now?
+    A bundle that OPA has not loaded says nothing about what OPA is enforcing.
+    """
+    status, body = _request("GET", f"/containers/{name}/json")
+    if status != 200:
+        raise ContainerError(f"inspect {name}: HTTP {status}")
+    try:
+        raw = json.loads(body)["State"]["StartedAt"]
+    except (json.JSONDecodeError, KeyError) as exc:
+        raise ContainerError(f"inspect {name}: unreadable response") from exc
+    return _epoch(raw)
+
+
+def _epoch(value: str) -> float:
+    """Docker reports RFC 3339 with nanoseconds; datetime accepts at most six fractional digits."""
+    text = value.replace("Z", "+00:00")
+    if "." in text:
+        head, _, rest = text.partition(".")
+        digits = ""
+        while rest and rest[0].isdigit():
+            digits, rest = digits + rest[0], rest[1:]
+        text = head + "." + digits[:6] + rest
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError as exc:
+        raise ContainerError(f"unreadable container timestamp {value!r}") from exc
