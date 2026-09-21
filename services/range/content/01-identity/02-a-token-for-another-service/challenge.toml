@@ -46,12 +46,12 @@ rubric = ["aud"]
 
 [[source]]
 path = "infrastructure/local/keycloak/supportpilot-realm.json"
-lines = [1, 12]
-highlight = [1, 4]
-caption = "The realm. Two of its clients mint tokens; only one of them names this API"
+lines = [159, 177]
+highlight = [160, 168]
+caption = "The realm declares four clients and three of them mint tokens, but only two attach this API's audience. This one attaches nothing"
 
 [[source]]
 path = "services/api/src/supportpilot_api/dependencies.py"
-lines = [1, 30]
-highlight = [1, 14]
+lines = [44, 66]
+highlight = [61, 64]
 caption = "Where the token becomes a subject — and what it has to satisfy first"

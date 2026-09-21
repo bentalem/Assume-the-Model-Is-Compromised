@@ -47,9 +47,9 @@ reason_code = "resource_not_visible"
 
 [[source]]
 path = "services/api/src/supportpilot_api/main.py"
-lines = [142, 150]
-highlight = [146, 149]
-caption = "Where a malformed request is refused — note what it logs, and what it does not write"
+lines = [149, 173]
+highlight = [165, 173]
+caption = "Where a malformed request is refused — it names the offending fields in the log and the response, and writes no audit row"
 
 [[source]]
 path = "database/migrations/0004_audit_events.sql"

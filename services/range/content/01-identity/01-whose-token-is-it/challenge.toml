@@ -60,8 +60,8 @@ field = "status"
 
 [[source]]
 path = "services/api/src/supportpilot_api/dependencies.py"
-lines = [1, 30]
-highlight = [1, 14]
+lines = [44, 66]
+highlight = [61, 64]
 caption = "The trust boundary. Whatever is in the header becomes the subject"
 
 [[source]]

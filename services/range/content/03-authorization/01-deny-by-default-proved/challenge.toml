@@ -55,6 +55,6 @@ caption = "Default deny, written as a rule rather than assumed"
 
 [[source]]
 path = "services/api/src/supportpilot_api/main.py"
-lines = [136, 155]
-highlight = [151, 154]
+lines = [165, 178]
+highlight = [175, 178]
 caption = "What the API does with an unexpected failure — and note the status it chooses"
