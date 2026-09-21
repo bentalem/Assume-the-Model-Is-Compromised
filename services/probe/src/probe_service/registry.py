@@ -139,3 +139,41 @@ WRONG_AUDIENCE = {
         "A valid token for a different service. Nothing about it is forged.",
     ),
 }
+
+
+# ------------------------------------------------------------------------------------------------
+# Enumerations — a sequence of legal requests, for challenge 4.3.
+#
+# Every other probe is one request. This is a handful of them, following the cursor the API returns,
+# because the thing 4.3 demonstrates cannot be shown in a single call: each call is inside the page
+# cap, correctly authorised and correctly logged, and the extraction is the product of repeating it.
+#
+# What comes back is counts, never records. Same rule as every other probe and it matters more here:
+# a probe that returned the pages would be exactly the bulk-read channel this challenge is about.
+# ------------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Enumeration:
+    id: str
+    summary: str
+    user: str
+    path: str
+    query: str
+    # A ceiling on this service, not on the API. The API has no per-session limit, which is the
+    # finding; without a ceiling here the probe would page until the directory ran out.
+    max_pages: int
+    intent: str = ""
+
+
+ENUMERATIONS: dict[str, Enumeration] = {
+    "alice.enumerate.customers": Enumeration(
+        id="alice.enumerate.customers",
+        summary="Page the customer directory with one two-character query",
+        user="alice",
+        path="/v1/customers",
+        query="ar",
+        max_pages=12,
+        intent="Every call is within the page cap, permitted, and logged as allowed.",
+    ),
+}

@@ -36,7 +36,7 @@ import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 
-from .registry import PROBES, TAMPERED, WRONG_AUDIENCE
+from .registry import ENUMERATIONS, PROBES, TAMPERED, WRONG_AUDIENCE
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -273,6 +273,94 @@ _TRANSFORMS = {
     "resign_with_attacker_key": resign_with_attacker_key,
     "claim_other_organization": claim_other_organization,
 }
+
+
+@app.post("/enumerate/{enumeration_id}", include_in_schema=False)
+def run_enumeration(
+    enumeration_id: str, request: Request, x_range_token: str = Header(default="")
+) -> JSONResponse:
+    """Make the same permitted search repeatedly, following the cursor, and report counts.
+
+    For challenge 4.3. Each call is inside the policy's page cap, made by a real user with a real
+    role, and recorded as allowed. Nothing here is an exploit; the finding is what the calls add up
+    to, and that nothing counts them.
+
+    Counts only, never records. A probe that returned the pages would be exactly the bulk-read
+    channel this challenge exists to describe.
+    """
+    if not secrets.compare_digest(x_range_token, _secret):
+        logger.warning("rejected enumeration request with a bad token from %s", request.client)
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+
+    plan = ENUMERATIONS.get(enumeration_id)
+    if plan is None:
+        return JSONResponse(
+            {"error": "unknown_enumeration", "enumeration": enumeration_id}, status_code=404
+        )
+
+    try:
+        token = _token_for(plan.user)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("token acquisition failed for %s", plan.user)
+        return JSONResponse(
+            {"enumeration": plan.id, "error": f"token_failed: {type(exc).__name__}"},
+            status_code=502,
+        )
+
+    seen: set[str] = set()
+    cursor: str | None = None
+    calls = 0
+    statuses: set[int] = set()
+
+    for _page in range(plan.max_pages):
+        params = {"q": plan.query, "limit": "25"}
+        if cursor:
+            params["cursor"] = cursor
+        try:
+            response = httpx.get(
+                f"{API_URL}{plan.path}",
+                params=params,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=30,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("enumeration request failed: %s", plan.id)
+            return JSONResponse(
+                {"enumeration": plan.id, "error": f"request_failed: {type(exc).__name__}"},
+                status_code=502,
+            )
+
+        calls += 1
+        statuses.add(response.status_code)
+        if response.status_code != 200:
+            break
+
+        try:
+            body = response.json()
+        except json.JSONDecodeError:
+            break
+
+        for row in body.get("results", []):
+            reference = row.get("customer_ref")
+            if reference:
+                seen.add(reference)
+
+        cursor = body.get("next_cursor")
+        if not cursor:
+            break
+
+    return JSONResponse(
+        {
+            "enumeration": plan.id,
+            "user": plan.user,
+            "query": plan.query,
+            "intent": plan.intent,
+            "calls": calls,
+            "distinct_records": len(seen),
+            "every_call_allowed": statuses == {200},
+            "more_pages_remaining": bool(cursor),
+        }
+    )
 
 
 @app.post("/tampered/{probe_id}", include_in_schema=False)

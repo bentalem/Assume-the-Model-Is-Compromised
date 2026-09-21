@@ -62,3 +62,37 @@ def run(probe_id: str, kind: str = "probe") -> list[dict[str, Any]]:
             "intent": payload.get("intent", ""),
         }
     ]
+
+
+def enumerate_directory(enumeration_id: str) -> list[dict[str, Any]]:
+    """Run a registered enumeration and report what the sequence of calls added up to.
+
+    For challenge 4.3. The probe service returns counts, never records — which is the same rule
+    every other probe follows and matters more here, because records are the thing the challenge is
+    about reaching.
+    """
+    request = urllib.request.Request(
+        f"{PROBE_URL}/enumerate/{enumeration_id}",
+        method="POST",
+        headers={"X-Range-Token": _secret()},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        return [{"calls": "-", "distinct_records": "-", "every_call_allowed": "-",
+                 "more_pages_remaining": "-", "intent": f"the probe service refused: {exc.code}"}]
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("enumeration call failed: %s", enumeration_id)
+        return [{"calls": "-", "distinct_records": "-", "every_call_allowed": "-",
+                 "more_pages_remaining": "-", "intent": f"unreachable: {type(exc).__name__}"}]
+
+    return [
+        {
+            "calls": str(payload.get("calls", "-")),
+            "distinct_records": str(payload.get("distinct_records", "-")),
+            "every_call_allowed": "yes" if payload.get("every_call_allowed") else "no",
+            "more_pages_remaining": "yes" if payload.get("more_pages_remaining") else "no",
+            "intent": payload.get("intent", ""),
+        }
+    ]

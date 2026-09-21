@@ -974,6 +974,18 @@ register_observation(
 
 register_observation(
     Observation(
+        id="search.enumeration",
+        summary="One two-character query, paged to exhaustion, counted",
+        run=lambda: probe.enumerate_directory("alice.enumerate.customers"),
+        columns=("calls", "distinct_records", "every_call_allowed", "more_pages_remaining", "intent"),
+        row_cap=1,
+        fields=("distinct_records",),
+    )
+)
+
+
+register_observation(
+    Observation(
         id="tools.surface",
         summary="Every registered operation, read from the published action document",
         run=_tool_surface,

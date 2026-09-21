@@ -1,0 +1,65 @@
+id = "4.3-inside-every-limit"
+track = 4
+number = "4.3"
+title = "Inside every limit"
+points = 45
+
+summary = """
+No injection, no bug, no tampering. A permitted user makes a permitted search, then makes it again \
+with the cursor the API handed back. Count what that reaches."""
+
+objective = """
+Run the enumeration and read the three numbers it returns: how many calls were made, how many \
+distinct customer records they reached, and whether every one of them was allowed. Then give the \
+number of distinct records one session obtained."""
+
+skip_test = """
+why a per-call page cap is a control and a per-session total is not, and where in a review you \
+would find out which one a team has."""
+
+hints = [
+  "The policy returns a page size and the API clamps to it. Does anything clamp the number of pages?",
+  "Look at the `every_call_allowed` column. If every call was authorised, what exactly would you write up as the finding?",
+  "How many customers does this tenant have, and how many did two calls reach?",
+]
+
+# Read-only, and nothing is armed. Every request this challenge makes is one the system is supposed
+# to permit — that is the entire point, and arming a control would answer a different question.
+
+[[observation]]
+observation = "search.enumeration"
+label = "One two-character query, paged to exhaustion"
+detail = "Counts only. The probe never returns the records, which is the rule that makes it a probe."
+
+[[observation]]
+observation = "api.alice.restricted_customer"
+label = "A single, ordinary search call"
+detail = "For scale: one permitted request, the kind nobody would look at twice."
+
+[[observation]]
+observation = "tools.surface"
+label = "The operation being used, as registered"
+detail = "Note which parameters exist, and which of them bounds anything across calls."
+
+[[observation]]
+observation = "audit.recent"
+label = "What the trail recorded while you did it"
+detail = "Run this afterwards. Look at the decision column for the calls you just made."
+
+[flag]
+kind = "value"
+label = "the number of distinct customer records one session reached"
+observation = "search.enumeration"
+field = "distinct_records"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [104, 116]
+highlight = [108, 111]
+caption = "The page size is decided by policy, not by the caller. It is a real control, and it is per call"
+
+[[source]]
+path = "services/api/src/supportpilot_api/repositories/pagination.py"
+lines = [30, 41]
+highlight = [36, 40]
+caption = "Where the cap is applied. Count the things bounded here, and note that none of them is a session"
