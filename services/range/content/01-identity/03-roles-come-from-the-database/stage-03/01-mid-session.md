@@ -3,8 +3,8 @@
 `email` stopped coming back.
 
 ```
-before   customer_ref, full_name, assigned_team, open_ticket_count, email
-after    customer_ref, full_name, assigned_team, open_ticket_count
+before   assigned_team, customer_ref, email, full_name, open_ticket_count
+after    assigned_team, customer_ref, full_name, open_ticket_count
 ```
 
 Same person. Same endpoint. Same customer. **Same token** — nothing reissued it, nothing invalidated

@@ -228,10 +228,30 @@ def armed_count() -> int:
 
 
 def apply(mutation_id: str, request_id: str) -> str:
+    """Arm one control, with evidence written before and after.
+
+    The lab's rule is that a sensitive change and its audit row share a transaction, so that a
+    failed write fails the change. This service cannot honour that literally: a mutation may stop a
+    container or write a file, and no database transaction spans those. What it can do is never
+    arm anything that is not already written down. The intent goes in first; if that write fails,
+    nothing is armed. The outcome goes in after, so the pair is a record of what was attempted as
+    well as what happened.
+
+    Previously only the second write existed, and an arm followed by a failed record left a control
+    armed with no evidence at all — in the service that teaches rule 9.
+    """
     mutation = MUTATIONS.get(mutation_id)
     if mutation is None:
         raise KeyError(mutation_id)
-    mutation.apply()
+    # 'allowed' rather than anything more descriptive: app.audit_events constrains decision to a
+    # fixed vocabulary, and the intent row is exactly "this arm was permitted to proceed". Inventing
+    # a value here would have failed the CHECK the first time a learner pressed Arm.
+    db.record_event(request_id, "range.arm", mutation_id, "allowed", "arming_requested")
+    try:
+        mutation.apply()
+    except Exception as exc:
+        db.record_event(request_id, "range.arm", mutation_id, "failed", type(exc).__name__)
+        raise
     db.record_event(request_id, "range.arm", mutation_id, "succeeded", "armed_by_learner")
     return mutation.probe()
 
@@ -252,6 +272,19 @@ def reset(request_id: str) -> list[str]:
     reports success without restoring is the failure this function exists to make impossible, so it
     re-probes afterwards and raises if anything is still armed.
     """
+    # Probe everything before restoring anything. Four of these mutations write the same policy
+    # bundle, so restoring the first also corrects the other three — and probing as we went credited
+    # whichever was probed first. A learner who armed policy.bundle.conflict was told, in the console
+    # and in the audit row, that policy.tenant_check.remove had been the thing restored.
+    wrong: set[str] = set()
+    for mutation_id, mutation in MUTATIONS.items():
+        try:
+            if mutation.probe() != CORRECT:
+                wrong.add(mutation_id)
+        except Exception:  # noqa: BLE001
+            logger.exception("reset could not probe %s", mutation_id)
+            wrong.add(mutation_id)
+
     changed: list[str] = []
     failed: list[str] = []
     for mutation_id, mutation in MUTATIONS.items():
@@ -260,18 +293,14 @@ def reset(request_id: str) -> list[str]:
         # partway through, and every mutation after it was neither probed nor restored, with no
         # report and no audit row. Whatever happens here, the remaining mutations still get their
         # turn and the post-check below still runs.
+        if mutation_id not in wrong:
+            continue
+        changed.append(mutation_id)
         try:
-            if mutation.probe() != CORRECT:
-                mutation.restore()
-                changed.append(mutation_id)
+            mutation.restore()
         except Exception:  # noqa: BLE001
-            logger.exception("reset failed for %s", mutation_id)
-            try:
-                mutation.restore()
-                changed.append(mutation_id)
-            except Exception:  # noqa: BLE001
-                logger.exception("reset could not restore %s", mutation_id)
-                failed.append(mutation_id)
+            logger.exception("reset could not restore %s", mutation_id)
+            failed.append(mutation_id)
 
     still_armed = sorted({mid for mid, value in state().items() if value != CORRECT} | set(failed))
     db.record_event(

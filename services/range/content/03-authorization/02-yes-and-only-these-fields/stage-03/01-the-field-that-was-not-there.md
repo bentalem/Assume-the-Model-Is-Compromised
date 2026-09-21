@@ -3,8 +3,8 @@
 `email`.
 
 ```
-alice   200   customer_ref, full_name, assigned_team, open_ticket_count
-bob     200   customer_ref, full_name, assigned_team, open_ticket_count, email
+alice   200   assigned_team, customer_ref, full_name, open_ticket_count
+bob     200   assigned_team, customer_ref, email, full_name, open_ticket_count
 ```
 
 Same endpoint. Same customer. Same code path. **Neither request was refused**, and nothing in the

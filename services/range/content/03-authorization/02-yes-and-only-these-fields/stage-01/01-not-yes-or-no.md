@@ -67,9 +67,10 @@ This matters, because there are three places it could happen and two of them are
 The lab does the third. The decision lives in policy, where it can change under review; the
 enforcement lives in trusted code, where it cannot be argued with.
 
-And note what that means for the agent in front of it: **the address never reaches the model's
-context at all.** Not hidden, not filtered in the answer — never loaded into the conversation. That
-distinction is the whole of "post-filtering is not access control".
+And note what that means for the agent in front of it. Here the withheld field is the customer's
+`email`, and **it never reaches the model's context at all.** Not hidden, not filtered in the
+answer — never loaded into the conversation. That distinction is the whole of "post-filtering is not
+access control".
 
 ## What you are about to do
 

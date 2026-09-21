@@ -17,8 +17,8 @@ the second one names the data.
 ```
 app.order_items has row-level security enabled but not forced. PostgreSQL exempts a
 table's owner from its own policies unless FORCE is set, so the policy on this table
-is not consulted for any query made by the owning role. Every other table in the
-schema is configured correctly, which is why this was not noticed.
+is not consulted for any query made by the owning role. Every other table carrying
+tenant data is configured correctly, which is why this was not noticed.
 
 Impact: line-item detail — quantity, unit price, product — for every tenant, with no
 tenant filter applied at the data layer.
@@ -36,9 +36,9 @@ Three things that make it act on itself rather than sit in a backlog:
 
 ## The question that generalises
 
-You were not looking for a bug. You were looking for **one row that disagrees with fifteen others**,
-in a list that a team would describe as correct — and they would be describing it honestly, because
-fifteen of sixteen is what "we do this" feels like from inside.
+You were not looking for a bug. You were looking for **one row that disagrees with the rest**, in a
+list that a team would describe as correct — and they would be describing it honestly, because
+fourteen identical rows and one documented exception is what "we do this" feels like from inside.
 
 > An audit is not "does this system have the control". It is "does this system have the control
 > **everywhere**, and how would anyone know".

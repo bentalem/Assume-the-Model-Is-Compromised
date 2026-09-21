@@ -70,9 +70,9 @@ Fix: evaluate expires_at in the worker, immediately before the provider call,
 against the database clock rather than the worker's.
 ```
 
-The last clause is worth keeping. **Ask whose clock.** A deadline evaluated on the machine that
-wants to proceed is a deadline that machine can be wrong about, and clock skew in a container fleet
-is not exotic.
+The last clause is a recommendation, not a description of what you just watched: this worker compares
+against its own clock. **Ask whose clock.** A deadline evaluated on the machine that wants to proceed
+is a deadline that machine can be wrong about, and clock skew in a container fleet is not exotic.
 
 **Reset before you leave** — the window is currently in the past, and a lab left in that state will
 make the next thing you measure confusing.

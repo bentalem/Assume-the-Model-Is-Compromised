@@ -47,18 +47,22 @@ looks: **it does not require anyone to detect anything.**
 
 Two places in this lab, and the difference matters:
 
-- **When an approver acts.** The query that decides what an approver may act on filters on the
-  window, so a stale request is not offered.
+- **When an approver acts.** Not in the query — the lookup fetches the request by id and selects
+  `expires_at` without filtering on it. The refusal comes from the policy, which compares
+  `input.context.occurred_at` against `input.resource.expires_at`. That is **the API's clock**, at
+  the moment it built the policy input.
 - **When the worker executes.** Immediately before the provider call, in the same block as
   separation of duty and payload integrity.
 
 The second is the one that actually holds. The first prevents a *new* approval on a stale request;
 only the second stops an *old* approval from being executed late.
 
-And the clock is the **database's**, not the worker's. That is deliberate — several workers, one
-clock, and no possibility of a container with a skewed time deciding that a window is still open.
-When you review this pattern elsewhere, ask whose clock: a deadline evaluated on the machine that
-wants to proceed is a deadline that machine can be wrong about.
+And the clock is the **worker's own** — `job.expires_at < datetime.now(UTC)`, evaluated in the
+process that is about to call the provider. Nothing earlier filters on the window either: the claim
+query looks only at the lease and the retry count. So that one comparison is the whole of the
+execution-time check, and a container with a skewed clock is a container that can decide a window is
+still open. When you review this pattern elsewhere, ask whose clock: a deadline evaluated on the
+machine that wants to proceed is a deadline that machine can be wrong about — including this one.
 
 ## The question to ask a client
 

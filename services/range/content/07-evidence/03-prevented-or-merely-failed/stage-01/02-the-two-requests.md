@@ -16,7 +16,8 @@ GET /v1/orders/ORD-3001                                 404
 ```
 POST /v1/actions/refunds                                400
 {"level":"INFO","logger":"supportpilot","event":"request_rejected",
- "path":"/v1/actions/refunds"}
+ "path":"/v1/actions/refunds",
+ "rejected":[{"field":"body.reason","error":"enum"}]}
 ```
 
 A refund proposal on an order alice is fully entitled to propose a refund for. The body carried a
@@ -26,12 +27,13 @@ A refund proposal on an order alice is fully entitled to propose a refund for. T
 
 ## What each one looks like from outside
 
-Neither response says anything useful. That is deliberate — a `404` that distinguished "belongs to
-someone else" from "does not exist" would answer the question an attacker is asking, and a `400`
-that named the offending field would let one probe the schema.
+Neither response says which part of the system refused. The `404` says nothing at all, deliberately —
+one that distinguished "belongs to someone else" from "does not exist" would answer the question an
+attacker is asking. The `400` is more forthcoming: it names the offending field and the kind of
+failure, in the body as well as in the log, because a caller that cannot see which field it got wrong
+cannot correct it. What neither of them tells you is whether a control was consulted.
 
-So both are opaque, both are refusals, and a report written from the responses alone would call both
-of them blocked.
+So both are refusals, and a report written from the responses alone would call both of them blocked.
 
 ## What to do instead
 

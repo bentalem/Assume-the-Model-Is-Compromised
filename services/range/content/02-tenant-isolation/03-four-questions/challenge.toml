@@ -18,7 +18,7 @@ second query about roles."""
 
 hints = [
   "You are looking for a disagreement between two columns, not for a missing row. Which two?",
-  "Fifteen of sixteen rows look identical. What is the fastest way to make the odd one obvious?",
+  "Fourteen of the sixteen rows look identical once you have armed it. What is the fastest way to make the odd one obvious?",
   "Once you have the table — would this one have been caught by a review of the tenant logic? Why not?",
 ]
 

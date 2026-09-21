@@ -23,23 +23,25 @@ did not read the ticket.** The control does not care how the request was produce
 indifference to how convincing the request was — is exactly what you want against an attacker whose
 whole technique is being convincing.
 
-## The three places it is enforced here
+## The two places it is enforced here, and the screen in front of them
 
 | Where | Refuses because | Removable by |
 |---|---|---|
 | **Policy** | `input.subject.id == input.resource.requester_id` | editing a policy file |
-| **Approval portal** | the UI will not offer your own request | a change to one service |
 | **Database trigger** | the row cannot be written at all | a migration |
+| Approval portal | it does not refuse on its own: it posts to the API and shows you the answer it gets back | a change to one service |
 
-Three implementations of one rule. That looks like duplication, and it is the opposite.
+Two independent implementations of one rule, and a screen that inherits their answer. That looks like
+duplication, and it is the opposite.
 
-## Why three is not redundant
+## Why two is not redundant
 
 Ask the question that separates a defence in depth from a decorative one:
 
 > **Which of these would still hold if someone removed the others this afternoon?**
 
-- Remove the policy rule, and the portal and the trigger still refuse.
+- Remove the policy rule, and the trigger still refuses — the portal does not, because it has no
+  answer of its own to fall back on.
 - Replace the portal with a script that posts directly to the API, and policy and the trigger still
   refuse.
 - Bypass the API entirely — a migration, a maintenance script, a support engineer with a psql

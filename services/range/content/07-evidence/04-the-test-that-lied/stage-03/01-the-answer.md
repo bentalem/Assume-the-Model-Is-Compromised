@@ -46,7 +46,7 @@ Longer, duller, and true. Then the gap becomes visible instead of being covered 
 somebody writes the test that is actually missing:
 
 ```
-TS7-11  "A session cannot retrieve more than N customer records in total"
+TS7-15  "A session cannot retrieve more than N customer records in total"
 ```
 
 That test does not exist, and it cannot be written yet, because **the control it would cover does

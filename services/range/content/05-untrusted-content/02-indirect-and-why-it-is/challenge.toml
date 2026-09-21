@@ -5,8 +5,8 @@ title = "Indirect, and why it is a finding"
 points = 35
 
 summary = """
-Ten instructions written by a customer, arriving through a request nobody could object to. None of \
-them achieved anything — and not one of them was blocked."""
+Nine instructions — eight written by a customer, one by an agent — arriving through a request nobody \
+could object to. None of them achieved anything, and not one of them was blocked."""
 
 objective = """
 Read the corpus and trace each attempt to the thing that made it inert. Then answer in a sentence \
