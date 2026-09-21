@@ -17,6 +17,21 @@ skip_test = """
 why a system's own summary is a delivery channel, and which field has to survive the trip for a \
 later reader to tell."""
 
+purpose = """
+Practise tracing a loop through the system's own storage. Count the corpus by author before you \
+read any bodies, find the row the system wrote about itself, then follow both halves: which \
+registered operation could write a row like it, and which one reads that table back. Establishing \
+that the read half does not exist here — rather than accepting the narration — is the skill. Then \
+find the provenance column the query loads and the response model drops."""
+
+agent_link = """
+The shape is an old one: data laundered into a store the organization owns and read back as a \
+record, the same idea as second-order SQL injection. What an agent adds is that the system writes \
+to itself with nobody reading the summary in between, and that provenance thins on the way — a \
+later reader is told an agent wrote the text, which is true, and is not told that a customer \
+supplied the words. That is an attribution problem as much as an injection one, and it is what an \
+incident reconstructed a month later runs into."""
+
 hints = [
   "Group content.injection_corpus by its author column. How many distinct values are there, and which one appears once?",
   "The row query selects five columns and the response model declares three. Which one is loaded and then dropped?",

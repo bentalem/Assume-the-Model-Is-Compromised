@@ -18,6 +18,23 @@ skip_test = """
 why bounding a delivery tool's recipient does not bound what it delivers, and where in a review you \
 would find out which of the two a team has thought about."""
 
+purpose = """
+You are practising the proof of an absence, and the precision that makes one worth anything. Read \
+all seven operations for an argument that names a destination, establish that none carries one, \
+and then write the narrow claim — no registered operation takes a destination or delivers content \
+outside this system — rather than the satisfying wider one, because the API makes outbound calls \
+to the policy engine and to the identity provider's key endpoint on ordinary requests. The second \
+half is the transferable part: for a delivery tool, which existing controls already cover the \
+recipient, and what would have to be built for the content."""
+
+agent_link = """
+The recipient half is classical access control and this lab already has layers for it; the content \
+half is agent-specific and structural. The policy input has four keys — subject, action, resource, \
+context — and the request body is not one of them, so no rule can relate what a call sends to what \
+the session read a moment earlier. That is why a tool that reads a ticket written outside the \
+organisation and a tool that sends are each defensible alone: composition happens across calls, \
+and a per-call decision is never given the thing that differs."""
+
 hints = [
   "Read the parameters column for all seven operations. Which of them names a place that is not this database?",
   "OPA is told four things about a call. Is the body of the request one of them?",

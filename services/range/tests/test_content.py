@@ -107,6 +107,48 @@ def main() -> int:
     # cannot drift, and these checks prove the generation actually happened rather than that a
     # hand-written copy happens to look right.
     # ------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------
+    # Orientation. A learner opening a challenge has to be able to tell what they are practising
+    # and what it has to do with agents before they do anything — including on the challenges whose
+    # honest answer is "this is ordinary application security, and here is what an agent changes".
+    # Optional in the loader so the panel can render nothing; required here so none is forgotten.
+    # ------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}orientation on every challenge{RESET}")
+    missing_purpose = [c.number for c in challenges if not c.purpose.strip()]
+    missing_link = [c.number for c in challenges if not c.agent_link.strip()]
+    check(
+        "every challenge says what you are practising",
+        not missing_purpose,
+        ", ".join(missing_purpose) if missing_purpose else f"{len(challenges)} challenges",
+    )
+    check(
+        "every challenge says how it relates to agents",
+        not missing_link,
+        ", ".join(missing_link) if missing_link else f"{len(challenges)} challenges",
+    )
+    # A placeholder would pass the checks above. These two are the shape of a real answer: long
+    # enough to say something, and not a copy of a field that is already on the page.
+    thin = [c.number for c in challenges if len(c.purpose.strip()) < 120
+            or len(c.agent_link.strip()) < 120]
+    check("none of them is a placeholder", not thin, ", ".join(thin) if thin else "all substantial")
+    duplicated = [
+        c.number for c in challenges
+        if c.purpose.strip() in (c.summary.strip(), c.objective.strip())
+        or c.agent_link.strip() in (c.summary.strip(), c.objective.strip())
+    ]
+    check(
+        "orientation is not a restatement of the summary or objective",
+        not duplicated,
+        ", ".join(duplicated) if duplicated else "distinct on all",
+    )
+    for challenge in challenges:
+        rendered = render.challenge_page(challenge)
+        if not check(
+            f"{challenge.number}: orientation reaches the page",
+            "What you are practising" in rendered and "Why it matters for an agent" in rendered,
+        ):
+            break
+
     print(f"\n  {GREY}the guide{RESET}")
     page = render.guide(challenges)
 

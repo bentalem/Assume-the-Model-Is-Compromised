@@ -16,14 +16,16 @@ skip_test = """
 what is in the Authorization header when an agent calls a tool, and how the blast radius of a \
 successful injection differs between the answers."""
 
-purpose = """You run the same two reads twice — once carrying a user's own token, once carrying a credential
+purpose = """
+You run the same two reads twice — once carrying a user's own token, once carrying a credential
 that holds membership in every tenant — and compare the two sets of results line by line. The skill
 is reading an identity architecture off a single header value, and being able to explain why a
 service account has to hold the union of everyone's access rather than calling that breadth sloppy
 configuration. You also practise recording the unarmed results first, because the finding here is
 which rows did not move."""
 
-agent_link = """This one is squarely about agents. A tool call has to carry some credential, and the choice between
+agent_link = """
+This one is squarely about agents. A tool call has to carry some credential, and the choice between
 the signed-in user's token and the agent's own account decides whether a successful injection
 reaches one user's records or every tenant's — nothing else you build afterwards changes that
 number by as much. The same choice decides attribution: the audit row names the subject loaded from

@@ -16,6 +16,20 @@ have chosen, and what is the widest string it could have put there?"""
 skip_test = """
 why 'does it escape' is the second question about a rendering surface, and what the first one is."""
 
+purpose = """
+Practise reviewing a rendering surface in the right order. First get the schema of what a caller \
+may put in each displayed value — a closed enum, a validated decimal, an order number read back \
+from the loaded row — and only then read the interpolation and name the line that escapes it. \
+Finish by asking whether that escaping is tested anywhere, because an untested control is one \
+that works until somebody refactors."""
+
+agent_link = """
+This one is classical application security. It is HTML escaping, and a browser does not care that \
+the string came from a model. What an agent changes is the source and the stakes: the value is \
+chosen by a component that reads customer-authored text, which makes the field schema the control \
+you can actually keep true, and the page is the approval screen for an irreversible transfer, so \
+a wrong value costs a human signature on the wrong number rather than a stolen session."""
+
 hints = [
   "The review page builds one f-string. How many values go into it, and what does each of them pass through first?",
   "The portal writes values inside single-quoted HTML attributes. What does html.escape do to a single quote by default?",

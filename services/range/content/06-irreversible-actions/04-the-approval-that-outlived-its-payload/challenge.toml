@@ -16,6 +16,21 @@ skip_test = """
 why an approval needs a deadline at all when the thing it approves has not changed, and which clock \
 that deadline is measured against."""
 
+purpose = """
+Practise reasoning about the one input that changes with nobody acting: time. Move the window \
+into the past, find the reason code, then establish where the deadline is evaluated and against \
+whose clock — a comparison inside the worker, immediately before the provider call, against that \
+process's own clock. Note what was not wrong: payload, hash, approver and state were all fine, \
+which is why this is the control that gets left out."""
+
+agent_link = """
+Classical: a time-bounded authorisation is standard in banking and payments, and the ordinary \
+reasons an approved action is still queued — an outage, a backlog, a lease that was lost — have \
+nothing to do with models. What an agent changes is how many approved and unexecuted actions \
+exist at one time, and that nothing re-reads the situation between the approval and the effect. \
+The approver's judgement was a statement about a moment, so the deadline belongs at the moment of \
+the act."""
+
 hints = [
   "The request is unchanged. The approver is unchanged. The payload hash still matches. What is different?",
   "Which component compares the deadline to a clock, and whose clock is it?",

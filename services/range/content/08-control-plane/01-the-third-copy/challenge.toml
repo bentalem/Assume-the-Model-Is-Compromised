@@ -17,6 +17,21 @@ skip_test = """
 why a generated document and a registered tool list are different artifacts, and which of the two \
 your agent is actually holding."""
 
+purpose = """
+You count the copies of one control artifact and, for each, name the mechanism that keeps it in \
+step with the others. Two of the three here are compared on every commit; the third is made by a \
+person pasting a document into an admin panel, and nothing in this repository can even read it. \
+The skill is reading a green check for its exact scope — what `OK: action document matches the \
+code` entitles you to conclude, and what people assume it covers instead."""
+
+agent_link = """
+The general shape is classical: configuration living in a system your pipeline cannot reach, the \
+same category as a DNS record, a console-made IAM role or a webhook URL. What is agent-specific is \
+what this particular copy decides — the set of operations an automated caller may attempt against \
+production — and that the drift is not symmetric. A removed tool or a narrowed schema fails closed \
+at the boundary, because authority is enforced there and not from the document. A stale \
+description fails silently: nothing validates prose, so nothing refuses."""
+
 hints = [
   "The check prints 'action document matches the code'. Which two of the three copies is that comparing?",
   "How does the tool list get from the document into the agent — what runs, and who runs it?",

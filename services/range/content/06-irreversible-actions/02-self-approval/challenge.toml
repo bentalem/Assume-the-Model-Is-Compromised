@@ -16,6 +16,21 @@ skip_test = """
 why a control enforced in three places is not redundant, and which of the three would still hold if \
 someone deleted the other two this afternoon."""
 
+purpose = """
+Practise proving which layer actually enforced something. Attempt the self-approval straight at \
+the table, then run the same insert with a different approver, and only then name what refused it \
+— here a database trigger, because the attempt never reached the policy engine or the portal. The \
+second attempt is the part worth keeping: without it, a refusal could equally mean the table \
+takes no approvals at all."""
+
+agent_link = """
+Classical, and the oldest control in the course: separation of duty predates computers by \
+centuries and is unchanged by anything a model does. What an agent changes is that proposing and \
+justifying collapse into one component, and that component can be steered by text it read, so the \
+second party has to be somebody the text cannot reach. Notice the property that makes it worth \
+the cost — the rule does not care how convincing the request was, which is the right answer to an \
+attacker whose whole technique is being convincing."""
+
 hints = [
   "Before you decide what refused it, run the same approval with a different approver. What does that tell you about the refusal?",
   "The error text is quoted from the thing that raised it. What kind of component raises an exception with a message like that?",

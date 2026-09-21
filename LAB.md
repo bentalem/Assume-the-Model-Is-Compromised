@@ -529,7 +529,8 @@ The lab proves its controls to a machine. The Range proves them to you.
 docker compose --profile range up -d
 ```
 
-Then open **http://127.0.0.1:8095**.
+Then open **http://127.0.0.1:8095**, and read **/guide** first — it explains how a challenge is
+laid out, what the console does, and where to start. Nothing in The Range needs a terminal.
 
 It arms the lab's own controls into broken states, lets you watch what changes, shows the source for
 why, and puts everything back. Challenge 2.1 is the one to start with: a tenant policy that is

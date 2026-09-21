@@ -17,6 +17,20 @@ skip_test = """
 what an approval is actually binding to when somebody says "the refund was approved", and at which \
 moment that binding is checked."""
 
+purpose = """
+Practise the difference between approving a record and approving content. Edit the pending \
+payload, leave the hash alone, and find where that is caught — a hash recomputed from the payload \
+the worker is about to send, in the last component before the provider call. Work out why there \
+are two reason codes and which failure each describes, because a system carrying only the second \
+one would have paid your altered amount."""
+
+agent_link = """
+Classical: time-of-check to time-of-use, and binding an authorisation to a hash of its content is \
+a payments control decades older than this course. What an agent changes is who proposes. \
+Payloads are produced automatically and in volume, and the approver's screen is the only place a \
+human reads one — so the approval has to bind to exact content, and the binding has to be \
+recomputed at the moment of the irreversible act rather than at the moment of the request."""
+
 hints = [
   "The approval recorded a hash. When is that hash next compared to anything, and by which component?",
   "The observation can tell you the payload changed. Can it tell you the hash no longer matches? Why not?",

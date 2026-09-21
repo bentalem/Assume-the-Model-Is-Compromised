@@ -17,6 +17,22 @@ skip_test = """
 what a passing test proves about the control it covers, and what it proves about the claim in its \
 name."""
 
+purpose = """
+You read a passing suite the way a reviewer has to: names first with the bodies covered, then what \
+each assertion would take to fail, then whether the property named on the tin is on that list. The \
+case here is the hardest shape — three careful assertions, two of which verify that paging works, \
+under a name claiming bulk extraction is impossible. The rule that transfers is that a per-request \
+test cannot establish a per-session property, and a name claiming one stops the next person from \
+writing the test that would."""
+
+agent_link = """
+There is no agent-specific mechanism in this challenge at all. Reading a test for what it actually \
+asserts is the same work on a payments API, and the case you examine is a pagination test. The \
+connection is only in what the missing control would have bounded: nothing in this repository \
+counts a session's calls — `AGENT_MAX_TOOL_CALLS` is set in `.env` and no service source reads it, \
+and `rate_limited()` is defined and raised nowhere — so a per-request cap is exactly the control \
+that a caller willing to make many requests walks straight past."""
+
 hints = [
   "Read the names first, with the bodies covered. Which one is a statement about the world rather than about a request?",
   "For that case: write down, line by line, what it would take for it to fail. Is the claim in the name on that list?",

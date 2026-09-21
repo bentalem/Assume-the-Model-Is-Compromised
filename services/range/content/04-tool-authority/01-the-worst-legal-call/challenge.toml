@@ -16,6 +16,22 @@ repetition matters."""
 skip_test = """
 the question you ask of every tool in a review, and why each clause of it is there."""
 
+purpose = """
+You are practising the review question this track is built on: what is the worst thing one legal \
+call can do, for your most privileged user, when an attacker chooses every argument. You rate the \
+seven registered operations on reach, effect and rate, and find the one whose parameters let the \
+caller compose the set rather than name a single record. The output is a concrete sentence naming \
+the tool and what one call returns — not a severity rating — plus the discipline of saying which \
+of the surface's decisions are right and should be kept."""
+
+agent_link = """
+This is the closest thing in the lab to a genuinely agent-specific subject. The same endpoints are \
+unremarkable behind a web form, where a person decides to call one, once, with the arguments the \
+form allows; registering them as tools turns each into a standing grant to a caller that picks its \
+own arguments and can be steered by the text it just read. The challenge also shows where a bound \
+stops being one: AGENT_MAX_TOOL_CALLS is 8 in the environment and no service in this repository \
+reads it, so the per-call cap is enforced and the per-session cap is only requested."""
+
 hints = [
   "Six of the seven take an identifier. What does the seventh take, and who chooses the set it returns?",
   "Look at the parameters column for that tool. Which of them decides how much comes back, and who supplies it?",

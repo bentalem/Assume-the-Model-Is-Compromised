@@ -18,6 +18,23 @@ skip_test = """
 what changes when the list of tools a model may call is supplied by a party outside your review, \
 and what would have to be pinned before connecting one is safe."""
 
+purpose = """
+You establish at what moment a tool list is fixed and which artefact would have to change to \
+change it — here three files, with an export that writes nothing at all while any two of them \
+disagree. Then you separate two failures people collapse into one: a set that changed with no \
+diff, and third-party prose landing in the same context as your own instructions. The closing \
+exercise is stating preconditions mechanically rather than as intentions — a digest covering names \
+and text, a mismatch that fails the connection loudly, and a pin that only moves by pull request."""
+
+agent_link = """
+This one is genuinely agent-specific rather than classical work made sharper. A tool list is a \
+control surface older systems do not have: a library does not renegotiate its exported functions \
+on every import, and a tool server computes its answer on every connection. What keeps it \
+tractable is that the authorization input here has four members — subject, action, resource, \
+context — and prose is not one of them, so a description can change what is attempted and not what \
+is permitted. Attempts still cost: they reach the third party, they fill your logs, and people \
+read descriptions too."""
+
 hints = [
   "The tool modules are named in a migration and the routers are named in create_app. At what moment is that list decided, and by whom?",
   "If the list arrived over the network at the start of every conversation, which control in this lab would notice that it had changed?",

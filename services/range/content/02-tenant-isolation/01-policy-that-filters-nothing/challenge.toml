@@ -19,14 +19,16 @@ skip_test = """
 which *three* things all have to be true before a PostgreSQL row policy filters a query, and which \
 one of them a code review cannot see."""
 
-purpose = """You take a row policy that is correct, leave it exactly as written, and make it stop filtering by
+purpose = """
+You take a row policy that is correct, leave it exactly as written, and make it stop filtering by
 changing something that is not in the policy at all. The skill is holding the whole precondition
 set rather than the policy alone: row security enabled, FORCE set, and a connecting role that
 neither owns the table nor holds BYPASSRLS or SUPERUSER. Three of those four inputs live in the
 catalogue and the connection string rather than in anything a data-layer review reads, which is why
 the exercise ends in two queries you can ask a DBA for rather than in a code reading."""
 
-agent_link = """Row-level security is ordinary multi-tenancy engineering. A system with no model anywhere near it
+agent_link = """
+Row-level security is ordinary multi-tenancy engineering. A system with no model anywhere near it
 needs this just as much, and if you find the gap in a client's system the honest label on the
 finding is tenant isolation, not AI risk. What an agent changes is the value of the layer rather
 than the layer itself: the set of queries is composed at run time instead of being a finite list

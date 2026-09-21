@@ -17,6 +17,22 @@ skip_test = """
 what an object parameter with no schema turns a tool into, and which of your own schema checks \
 would report one."""
 
+purpose = """
+You are practising a whole-surface audit rather than a spot check: count every parameter and every \
+request-body property across the seven operations, and record for each whether it declares what it \
+accepts. Part of the skill is telling a gap in your listing from a gap in the document — limit and \
+cursor print without a type because they are declared as an anyOf, which is a fact about where the \
+listing looked. The rest is reading the check that guards the document and working out which of \
+its rules would reject an object with no properties and which would let one through."""
+
+agent_link = """
+The reading technique is ordinary interface review and needs no agent experience. What changes is \
+the standing of the document: it is the whole of what constrains the caller, with no form, no \
+client code and no person between the schema and the call, so a parameter typed object with no \
+declared properties is not an under-documented interface but an undocumented API reachable through \
+a reviewed one. Note where the gate here actually bites — it bounds parameter names and string \
+parameter shapes, and a body property never enters that loop."""
+
 hints = [
   "The surface prints a type beside each parameter, and two names print `?`. Is a type the listing could not find the same finding as a parameter that has no schema?",
   "Both POST operations carry a body typed `object`. What does each of those bodies declare that a generic parameter would not?",

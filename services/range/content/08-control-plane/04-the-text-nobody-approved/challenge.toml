@@ -18,6 +18,22 @@ skip_test = """
 that the words describing a tool are part of its control surface, and which of your controls \
 currently cover them."""
 
+purpose = """
+You take a control inventory the system already has — a recorded proposer, a second approver \
+enforced by a database trigger, a payload hash, one execution, an audit row in the same \
+transaction — and work out which of the five apply to changing an operation's summary. The answer \
+is none, and the value is in reaching it by checking each one rather than assuming. You then read \
+the check that does run and separate what it guarantees, that the document matches the code, from \
+what a passing line is taken to mean, that somebody agreed to the text."""
+
+agent_link = """
+Unreviewed, unversioned configuration text is an ordinary governance gap, and the controls here \
+were not weakened to create it. What makes it a security question is that the reader now acts on \
+what it reads: the same sentence was documentation while a person read it and became configuration \
+when a model did, and no process noticed, because nothing visibly happened. Keep the limit in \
+view — a description grants nothing, and the reason this lab survives an unguarded one is that \
+authority is enforced somewhere the text cannot reach."""
+
 hints = [
   "A refund needs a proposal, a second person, and an audit row. How many of those does changing an operation's summary need?",
   "There is a check that runs on this document. Does it verify that the text is correct, or that it matches something else?",

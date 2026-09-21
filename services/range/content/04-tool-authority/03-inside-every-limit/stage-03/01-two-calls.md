@@ -60,8 +60,10 @@ That is the whole of track 4's third dimension, arriving as a number rather than
 
 Two changes, both configuration rather than architecture, and it is worth naming which does what:
 
-- **A minimum query length.** Raises the cost of a blind sweep. It does not stop a determined
-  caller, who can enumerate the alphabet — it is a speed bump, and it should be described as one.
+- **A longer minimum query length.** There is already one — the schema declares `minLength: 2` —
+  and two characters reached 30 of 33 records, so it is currently a control in name only. Raising
+  it raises the cost of a blind sweep and no more: a determined caller enumerates the alphabet.
+  Describe it as the speed bump it is.
 - **A per-session or per-token record ceiling.** This is the control. It bounds the total, which is
   the quantity the finding is about, and it is the one that does not exist here.
 

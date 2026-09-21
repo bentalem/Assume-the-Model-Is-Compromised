@@ -16,15 +16,17 @@ skip_test = """
 which checks a token verifier has to perform beyond "is the signature valid", and why a claim in a \
 token is not a fact about a person."""
 
-purpose = """You send three tokens that are each wrong in one way — unsigned, re-signed with an attacker's key,
-and re-signed with the tenant claim rewritten — and account for why all three are refused at the
+purpose = """
+You send three tokens that are each wrong in one way — unsigned, re-signed with an attacker's
+key, and re-signed with the tenant claim rewritten — and account for why all three are refused at the
 same point. The skill is ordering a verifier's checks well enough to see that the rewritten claim
 was never read at all, because nothing downstream of verification runs on a token that did not
 verify. The second half is the more durable one: knowing which inputs to an authorization decision
 are claims and which are lookups, so you can say what an attacker holding the signing key would
 actually gain."""
 
-agent_link = """JWT verification is classical application security and none of it is new. What carries over to
+agent_link = """
+JWT verification is classical application security and none of it is new. What carries over to
 agents is the claim-versus-lookup habit underneath it. A tool call is a bag of arguments assembled
 upstream of every check, and the caller assembling them can be influenced by the text it just read,
 so "the caller asserted this value" versus "the server read this value from its own records" is the

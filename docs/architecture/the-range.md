@@ -12,6 +12,11 @@ docker compose --profile range up -d        # http://127.0.0.1:8095
 
 Profile-gated, because a lab being used as a lab does not need it running.
 
+`/guide` is the landing page and the thing to read first: the three stages and why they are in
+that order, what the console sends, the three flag kinds, the eight tracks, and where to start.
+Its track table and challenge count are generated at render time rather than written down, so
+they cannot drift from what is loaded — and a test asserts the generation happened.
+
 ---
 
 ## Why this service is the interesting one to review

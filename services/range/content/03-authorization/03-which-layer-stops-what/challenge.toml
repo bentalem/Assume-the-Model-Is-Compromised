@@ -17,6 +17,22 @@ skip_test = """
 which of your two authorization layers is enforcing which property, and how to tell from an audit \
 row whether the policy was ever consulted."""
 
+purpose = """
+You are practising the experiment that sits behind "we have defence in depth": remove one \
+condition from the live policy, run the request again, and find out whether anything changes at \
+all. You do it twice on the same action, and you learn to read the audit trail's policy version \
+column as the witness of whether the policy was ever consulted — empty means something upstream \
+refused first. The skill is naming, property by property, which layer enforces what, and which \
+controls are load-bearing on their own."""
+
+agent_link = """
+This is classical application security: two authorization layers, and the question of which layer \
+covers which property, apply to any application. What an agent changes is who composes the calls. \
+A tool surface accepts any argument combination its schema permits, with no form or client code \
+narrowing it first, so rules that have nothing underneath them get exercised more often and by a \
+caller that can be steered by text it read. The severity of a policy bug is set by what is beneath \
+it, and that is worth knowing before the calls start arriving unattended."""
+
 hints = [
   "With the tenant check removed, does the audit row for the cross-tenant read carry a policy version — and if not, what does its absence tell you about whether the policy was asked?",
   "Row-level security can say 'this row belongs to another tenant'. Can it say 'this role may not read orders'?",

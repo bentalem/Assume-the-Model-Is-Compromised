@@ -16,6 +16,20 @@ skip_test = """
 what a worker should do when a payment call times out, and which of the three "once" constraints in \
 this schema is the only one that helps."""
 
+purpose = """
+Practise deciding what to do with no information: a provider call timed out and nothing tells you \
+whether the money moved. Record the same effect twice under one key, name the constraint that \
+refuses it, and run the fresh-key attempt so that you have shown the refusal is about the key \
+rather than about the row, the grant or the role. Keep retry and reconciliation apart — \
+idempotency makes a second attempt harmless, it does not tell you what the first one did."""
+
+agent_link = """
+Nothing in this challenge is agent-specific. Idempotency keys and a unique index are payments \
+engineering, and the exercise would read the same in a system with no model anywhere in it. What \
+an agent changes is rate and the absence of a reader: attempts arrive automatically and nobody \
+looks at each one, so once has to be held by the database rather than by a component that checks \
+before it acts — which is a race with itself the moment there are two workers."""
+
 hints = [
   "Before you attempt anything: what are the three possible states of a payment call that timed out?",
   "Two of the three unique constraints in this schema stop a duplicate being created. Which one stops a duplicate being recorded?",

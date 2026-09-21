@@ -70,14 +70,24 @@ is discarded. Nothing is exposed by that. It is a field that promises a record a
 
 ## What is missing
 
-`services/approval-portal/tests/` exists and is empty.
+`services/approval-portal/tests/` held nothing at all until this challenge was written.
 
-The escaping above is correct today and nothing in the repository would notice if it stopped being.
+That is worth keeping in front of you, because it is how the gap is normally found: the escaping was
+correct, had always been correct, and nothing in the repository would have noticed if it stopped
+being. There is a test file there now — `test_rendering.py`, written because this challenge said
+there was not one — and it is worth reading for what it asserts beyond the obvious.
 Compare that with how the rest of the lab treats a control: the `CLAUDE.md` working conventions say
 every capability ships with a positive, a negative and a cross-tenant test, and the Range's own
 Markdown renderer carries a comment at `markdown.py:21`–`23` explaining a bug its content test
-caught. The
-one service that renders values into a human's browser has no test file at all.
+caught. The one service that renders values into a human's browser had none of that, in a repository
+that argues for exactly that, and nobody noticed until somebody went looking for a rendering surface.
+
+Read what the new file asserts, because the obvious test is the less useful one. Checking that
+`<script>` comes back escaped would pass even if somebody changed `html.escape(value)` to
+`html.escape(value, quote=False)` — and several values on that page sit inside single-quoted HTML
+attributes, which that change would make injectable. So the quotes are asserted separately, and the
+library's default is asserted too, because the page depends on it and nothing else would fail if it
+moved.
 
 That is the finding to write up from this challenge, and it is a better one than an escaping bug
 would have been, because it is about the thing that keeps being true rather than the thing that is

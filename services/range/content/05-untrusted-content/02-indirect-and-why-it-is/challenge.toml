@@ -16,6 +16,22 @@ skip_test = """
 the difference between an injection that was stopped and an injection that had nowhere to go, and \
 which of the two this lab demonstrates."""
 
+purpose = """
+Practise the move the rest of this track is built on: assume the text arrived intact and was \
+acted on, then ask what it could reach. Take the seeded attempts one at a time and name the \
+structural reason each had nowhere to go — a tool that is not registered, a role that is loaded \
+from a table, a secret that was never in the context, an approval that is a row with a hash. Keep \
+apart the two outcomes that look identical from outside: an attempt that was stopped, and an \
+attempt that had no target."""
+
+agent_link = """
+This is the most agent-specific subject in the course, because it exists only where one channel \
+carries instructions and data with no separator; there is no prepared statement for English. That \
+is why the exercise is about tools, credentials and boundaries rather than about filtering the \
+text. Note the attempt with no structural answer — permitted reads, repeated — because permission \
+is evaluated per call while damage accumulates across calls, and nothing in this lab counts \
+calls."""
+
 hints = [
   "Attempt 6 names two tools. Are they in the list of tool modules beside it?",
   "Attempt 3 declares the sender an administrator. Which input to which check would that have had to change?",

@@ -41,7 +41,7 @@ authorised. Each is logged as `allowed`, correctly, because each one *is* allowe
 | fields per record | yes | the policy obligation, applied before the response is built |
 | calls per session | **no** | nothing |
 | depth of paging | **no** | the cursor advances until the data runs out |
-| minimum query length | **no** | `ar` is a valid search |
+| minimum query length | **yes, and it does not help** | the schema says `minLength: 2`, and `ar` is two |
 
 ## Why this is the hardest kind of finding to report
 

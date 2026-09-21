@@ -17,6 +17,23 @@ skip_test = """
 every way a policy engine can fail to answer, and why "it denied" is not the same as "it denied \
 visibly"."""
 
+purpose = """
+You are practising the enumeration of failure modes in a dependency that makes security decisions. \
+Break the decision point three ways — stopped, erroring, and answering with the decision simply \
+absent — and record the HTTP status, the audit reason and whether the engine was running for each. \
+The skill is the gap between "it denied" and "it denied visibly": two of the three reach the \
+caller as a dependency outage, and the third is recorded as an ordinary not-found while the engine \
+stays healthy. It also teaches you to go and read the one line in an authorization client that \
+decides what an undefined answer means."""
+
+agent_link = """
+This is classical application security; a policy engine's failure modes and the monitoring blind \
+spot around them exist wherever a decision is externalised. What an agent changes is that nobody \
+is watching the individual request. A person who gets a not-found for an order they know exists \
+raises a ticket, and that complaint is often the only detection a quiet failure mode has; an \
+unattended session produces no such complaint, so the reason code in the trail is the only place \
+the failure is stated at all."""
+
 hints = [
   "Two of the three produce the same HTTP status and the same reason. Which one does not, and what status does it produce instead?",
   "If you were alerting on policy outages, which of these three would your alert miss?",

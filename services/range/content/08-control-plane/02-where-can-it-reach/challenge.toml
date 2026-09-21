@@ -18,6 +18,22 @@ skip_test = """
 which processes in your own system can open a socket to your internal services, and why an egress \
 allowlist in application code is the weaker half of that answer."""
 
+purpose = """
+You derive a reachability map from network membership — two containers can open a socket to each \
+other only if they share a network — and then use it to rank a hypothetical URL-taking tool. The \
+point is the order of work: draw the map before reviewing the parser, because a host allowlist \
+holds only while the calling code is right, and network placement holds when it is wrong. You also \
+practise asking what on an internal network answers with no credential, and reading a check that \
+opens a socket rather than a diagram that asserts a topology."""
+
+agent_link = """
+This is textbook network segmentation and egress control, and none of it is new. What an agent \
+adds is a reason for a URL-taking tool to exist — fetch the carrier's tracking page, read the PDF \
+a customer linked — and a caller whose URL can be influenced by the ticket text it just read. Rule \
+7 of `CLAUDE.md` is why no such tool exists here. Blast radius is the agent-relevant half: that \
+tool would have run inside the API container, which sits on `app`, `policy` and `data` at once, so \
+the same parser bug is a defect in one service and reads your authorization policy in this one."""
+
 hints = [
   "Two containers can talk only if they share a network. Which networks is the API attached to, and who else is on each one?",
   "If a request from inside the API container arrived at opa:8181, what credential would it have to present?",

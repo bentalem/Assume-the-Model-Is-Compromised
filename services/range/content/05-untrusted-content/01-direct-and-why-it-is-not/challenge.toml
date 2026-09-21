@@ -17,6 +17,21 @@ skip_test = """
 why a direct injection is bounded by the caller's own authority, and which single change to a \
 deployment makes that stop being true."""
 
+purpose = """
+Practise establishing a ceiling before arguing about text. Read alice's memberships from the \
+server, read the registered operation list in full, and write down the worst legal call the two \
+together allow. Then find the single assumption that argument rests on — that the agent calls \
+tools with the caller's own token — so that you know which question to ask first on a system that \
+is not this one."""
+
+agent_link = """
+Direct injection does not cross a boundary: the author of the text and the credential it runs \
+under are the same person, so succeeding gains them nothing they did not hold. It is in an agent \
+course as the calibration exercise — severity comes from reachable authority, not from wording. \
+One deployment change breaks that argument, the agent holding a service account instead of the \
+caller's token, and then a single credential holds more than any one caller does and the same \
+sentence becomes an escalation."""
+
 hints = [
   "If alice typed the override herself, which row in identity.memberships would have to change for it to gain her anything?",
   "The policy input has four fields about the subject. Which of them could a sentence in a chat window reach?",

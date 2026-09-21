@@ -17,6 +17,22 @@ skip_test = """
 why a per-call page cap is a control and a per-session total is not, and where in a review you \
 would find out which one a team has."""
 
+purpose = """
+You are practising the count that turns a sequence of permitted requests into a finding: make one \
+allowed search, follow the cursor the API hands back, and total what the session reached. Nothing \
+is armed and nothing is bypassed — the policy returns a page size of 25 and the API clamps to it, \
+and the point is that nothing clamps the number of pages. The skill is writing that up so it \
+concedes the per-call control, names the mechanism, and states what monitoring will not show, \
+because every call in the sequence is authorised and recorded as allowed."""
+
+agent_link = """
+This is classical application security with a rate multiplier: paging an authorised endpoint to \
+exhaustion is scraping, and it long predates agents. What an agent changes is the arithmetic — a \
+person paging an interface repeatedly is slow and visibly odd, while the same requests from a \
+tool-calling session follow from one typed sentence and leave a trail of individually ordinary \
+allowed calls. Permission is evaluated per call and extraction accumulates across calls; a caller \
+for which calls are cheap is what moves that gap from an argument to a number."""
+
 hints = [
   "The policy returns a page size and the API clamps to it. Does anything clamp the number of pages?",
   "Look at the `every_call_allowed` column. If every call was authorised, what exactly would you write up as the finding?",

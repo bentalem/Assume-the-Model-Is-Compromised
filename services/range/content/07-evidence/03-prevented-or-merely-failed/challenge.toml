@@ -16,6 +16,21 @@ skip_test = """
 what an audit trail looks like for a request that never reached the authorization pipeline, and why \
 that is the most important row in an investigation."""
 
+purpose = """
+You practise the distinction a security finding lives or dies on: whether an attempt was refused by \
+a control, or fell over before any control was consulted. The method is the trail, not the \
+response — a decision row means something decided, and no row usually means the request never \
+reached the thing that writes rows. You also read the reason code to tell which layer acted, since \
+a denial carrying no policy version was refused by the resource lookup before policy was asked. \
+Then you write the paragraph that says what you did not establish."""
+
+agent_link = """
+Nothing in this is agent-specific; the same mistake is made with curl, and it is the most common \
+error in the field. What an agent changes is rate and review. Calls are made without a person \
+reading each one, so refusals accumulate unattended and get counted in bulk — and a count of \
+refusals is not a count of controls working. This challenge is the habit that keeps those two \
+numbers apart, which matters more the less anyone is watching each call."""
+
 hints = [
   "One of the two produced a decision. What would the other one have produced, and where would it be?",
   "If a request is rejected before identity is established, which layer could possibly have written a row about it?",
