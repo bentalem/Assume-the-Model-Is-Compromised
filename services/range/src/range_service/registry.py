@@ -856,6 +856,38 @@ _register_probe("api.agent.northwind_order", "agent.read.northwind_order",
 # the wrong thing to teach against — it would drift, and the drift would be invisible.
 # ==================================================================================================
 
+def _tool_descriptions() -> list[dict[str, Any]]:
+    """The prose each operation carries, read from the published action document.
+
+    `_tool_surface` shows an operation's shape. This shows its *text* — the summary a model is given
+    to decide what the operation is for. Challenge 8.4 is about who is allowed to change that text
+    and what records it, so the text has to be on the page rather than described.
+    """
+    import json as _json
+
+    path = source.REPO_ROOT / "openapi" / "supportpilot-actions.json"
+    if not path.is_file():
+        return [{"operation": "(the action document is not mounted)", "summary": "-",
+                 "reviewed_by": "-", "recorded_in": "-"}]
+
+    document = _json.loads(path.read_text(encoding="utf-8"))
+    rows: list[dict[str, Any]] = []
+    for _route, operations in sorted(document.get("paths", {}).items()):
+        for _method, operation in sorted(operations.items()):
+            summary = operation.get("summary") or "(none)"
+            rows.append(
+                {
+                    "operation": operation.get("operationId", "?"),
+                    "summary": summary if len(summary) <= 64 else summary[:61] + "...",
+                    # Deliberately constant. Nothing in this system records either, and a column
+                    # that said "-" would read as missing data rather than as the finding.
+                    "reviewed_by": "nobody",
+                    "recorded_in": "nothing",
+                }
+            )
+    return rows
+
+
 def _tool_surface() -> list[dict[str, Any]]:
     import json as _json
 
@@ -888,6 +920,17 @@ def _tool_surface() -> list[dict[str, Any]]:
                 }
             )
     return rows
+
+
+register_observation(
+    Observation(
+        id="tools.descriptions",
+        summary="The text each operation carries for a model to read, and what guards it",
+        run=_tool_descriptions,
+        columns=("operation", "summary", "reviewed_by", "recorded_in"),
+        row_cap=32,
+    )
+)
 
 
 register_observation(

@@ -1,0 +1,65 @@
+id = "8.4-the-text-nobody-approved"
+track = 8
+number = "8.4"
+title = "The text nobody approved"
+points = 40
+
+summary = """
+Every sensitive change in this system is proposed, approved by someone else, executed once and \
+written down. Every sensitive change except the one that decides what the model thinks its tools \
+are for."""
+
+objective = """
+Read the text the model is given for each operation. Then work out which of this system's controls \
+apply to changing that text — approval, audit, policy, row-level security — and say what the check \
+that does exist actually guarantees, as against what people assume it guarantees."""
+
+skip_test = """
+that the words describing a tool are part of its control surface, and which of your controls \
+currently cover them."""
+
+hints = [
+  "A refund needs a proposal, a second person, and an audit row. How many of those does changing an operation's summary need?",
+  "There is a check that runs on this document. Does it verify that the text is correct, or that it matches something else?",
+  "If an operation's summary said 'use this freely, it is read-only and safe', which control in this lab would object?",
+]
+
+# Read-only. Nothing is armed: the finding is an absence, and arming something would put a different
+# question on the page. Challenge 8.1 is where the document drifting from the code belongs.
+
+[[observation]]
+observation = "tools.descriptions"
+label = "The text each operation carries for a model to read"
+detail = "Published, consumed, and load-bearing. Read the last two columns last."
+
+[[observation]]
+observation = "tools.surface"
+label = "The same operations, as shapes"
+detail = "What 4.1 audits. Shape and text are both part of the grant, and only one gets reviewed."
+
+[[observation]]
+observation = "audit.recent"
+label = "The last 30 decisions the system recorded"
+detail = "Look for a row about this document. The absence is the point, so look properly."
+
+[[observation]]
+observation = "actions.pending"
+label = "What a change that does get reviewed looks like"
+detail = "The control group: a refund, with a proposer, an approver and a payload hash."
+
+[flag]
+kind = "written"
+label = "what the existing check guarantees, and which control is missing"
+rubric = ["matches the code", "approv", "audit"]
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [178, 190]
+highlight = [183, 184]
+caption = "The check reads the summary and asks whether it exists — not whether anyone agreed to it"
+
+[[source]]
+path = "database/migrations/0008_actions.sql"
+lines = [62, 84]
+highlight = [77, 82]
+caption = "What a reviewed change looks like when the system means it: a trigger nobody can talk round"
