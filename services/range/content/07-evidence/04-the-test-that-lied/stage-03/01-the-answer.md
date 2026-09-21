@@ -53,11 +53,12 @@ That test does not exist, and it cannot be written yet, because **the control it
 not exist either.** Which is the real finding — the missing control was hidden behind a test name
 that said it was handled.
 
-## This is not hypothetical
+## What the missing test would have covered
 
-This lab's own agent was later asked to search for fifteen two-letter strings in one message. It made
-fifteen authorised calls and returned the customer directory. No injection, no bug, every call
-correctly logged as `allowed`.
+Nothing counts a session's calls. `AGENT_MAX_TOOL_CALLS` is `8` in the environment, no service in
+this repository reads it, and `rate_limited()` is defined in the API and raised nowhere. So the
+ceiling on how much of the directory one conversation can reach is a line of instruction text the
+model is asked to respect — no injection, no bug, and every call correctly logged as `allowed`.
 
 `TS7-09` was passing the whole time.
 

@@ -65,7 +65,7 @@ reason_code = "policy_malformed"
 
 [[source]]
 path = "services/api/src/supportpilot_api/policy/client.py"
-lines = [82, 108]
+lines = [82, 110]
 highlight = [83, 90]
 caption = "Five ways the engine can fail to answer. Count the return statements, and their reasons"
 

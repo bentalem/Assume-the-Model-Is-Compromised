@@ -42,8 +42,15 @@ dismissed.
 So the leak is not a page. **It is the product of pages**, and every single call in it is correctly
 authorised, correctly scoped, and correctly logged as `allowed`.
 
-This is not hypothetical. This lab's agent, asked in one plain sentence to search for fifteen
-two-letter strings, made fifteen authorised calls and returned the customer directory.
+And there is a budget. `AGENT_MAX_TOOL_CALLS` is set to `8` in the environment — see
+`.env.example`. Go and find what reads it.
+
+Nothing does. No service in this repository consults that value; it is a line in the agent's own
+instructions, asking the model to stop at eight. `rate_limited()` is defined in the API's
+`errors.py` and is raised nowhere.
+
+> **The per-call cap is a control. The per-session cap is a request.** Only one of those survives an
+> attacker who chooses the arguments.
 
 ## Narrowing it — name which one you mean
 

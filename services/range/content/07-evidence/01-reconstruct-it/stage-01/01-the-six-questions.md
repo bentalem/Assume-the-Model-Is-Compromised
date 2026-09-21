@@ -23,7 +23,7 @@ Almost everyone starts an investigation by grouping rows by request id, because 
 request id is for, and because in a web application it usually works.
 
 > **One action is not one request.** A refund in this system is four requests, made by three
-> different actors, over about nine seconds.
+> different actors, over sixteen seconds.
 
 The person who asks cannot be the person who approves — that is the control. The thing that executes
 is a separate worker, because the API is not allowed to move money. Each of those is its own request

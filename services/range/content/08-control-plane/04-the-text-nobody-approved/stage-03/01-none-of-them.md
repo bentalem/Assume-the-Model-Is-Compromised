@@ -33,7 +33,8 @@ OK: action document matches the code. Operations: add_internal_note, get_action_
 
 **"Matches the code."** That is a consistency property. It guarantees the document is not stale —
 that the operations it lists exist, that the schemas are bounded, that every operation has a summary
-at all. Challenge 8.1 is about what happens when that check is missing.
+at all. Challenge 8.1 — designed, not yet built — is about what happens when that check is
+missing.
 
 What it does not guarantee, and does not claim to:
 

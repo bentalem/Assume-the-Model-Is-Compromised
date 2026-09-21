@@ -42,9 +42,9 @@ boundary to cross because it never leaves the caller's own authority. Every call
 authorised, and every call would be logged as `allowed`.
 
 It fails here only because nothing acts on it. If a model did follow it, nothing in this system
-would stop it — and that is not a hypothetical. This lab's own agent, asked in one plain sentence to
-search for fifteen two-letter strings, made fifteen authorised calls and returned the customer
-directory.
+would stop it. The only thing between one search and the whole directory is a line in the agent's
+instructions asking it to make at most eight tool calls — no service reads that number, and
+`rate_limited()` is defined in the API and raised nowhere.
 
 > **Permission is evaluated per call. Damage accumulates across calls.** The corpus's most
 > sophisticated attempts are the dead ones; its most boring attempt is the live one.

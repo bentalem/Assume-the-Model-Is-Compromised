@@ -52,8 +52,8 @@ is the reason the fallback branch looks the way it does.
 So this is not a bug with an obvious fix. It is a **gap between two correct decisions**, which is
 where most real findings live. The finding is not "the code is wrong". It is:
 
-> **Your policy engine has failure modes your alerting cannot see.** Two of the five report as a
-> dependency outage. Three of them do not.
+> **Your policy engine has failure modes your alerting cannot see.** Three of the five report as a
+> dependency outage. Two of them do not.
 
 ## The trap this is really about
 
