@@ -1,0 +1,59 @@
+id = "8.1-the-third-copy"
+track = 8
+number = "8.1"
+title = "The third copy"
+points = 40
+
+summary = """
+The tool list exists in three places. Two of them are checked against each other on every commit. \
+The third is a human pasting a file into a web form."""
+
+objective = """
+Find every place this system stores what tools the agent has. For each one, say what keeps it in \
+step with the others, and name the copy that nothing checks. Then say what a reader of the passing \
+CI check is entitled to conclude, and what they are not."""
+
+skip_test = """
+why a generated document and a registered tool list are different artifacts, and which of the two \
+your agent is actually holding."""
+
+hints = [
+  "The check prints 'action document matches the code'. Which two of the three copies is that comparing?",
+  "How does the tool list get from the document into the agent — what runs, and who runs it?",
+  "If a tool were removed from the code today and every check passed, what would the agent still believe it could call?",
+]
+
+# Read-only. Nothing is armed, and the reason is the finding: the copy this challenge is about lives
+# in a service the Range cannot see, which is precisely why nothing checks it.
+
+[[observation]]
+observation = "tools.surface"
+label = "Copy two: the exported document"
+detail = "Read from openapi/supportpilot-actions.json, the file that gets registered."
+
+[[observation]]
+observation = "content.registered_tools"
+label = "Copy one: the modules the code actually registers"
+detail = "The source of truth. Everything else is derived from this, or has drifted from it."
+
+[[observation]]
+observation = "tools.descriptions"
+label = "The prose that travels with copy two"
+detail = "Whatever is pasted carries this text, and the agent reads it as the tool's purpose."
+
+[flag]
+kind = "written"
+label = "the third copy, and what the passing check does not cover"
+rubric = ["matches the code", "onyx", "paste"]
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [305, 316]
+highlight = [309, 314]
+caption = "The check. Note which two artifacts it compares, and that it is a comparison, not a deployment"
+
+[[source]]
+path = "scripts/connect_onyx.py"
+lines = [8, 18]
+highlight = [11, 13]
+caption = "How the third copy is made. 'Left to you' is the entire challenge"

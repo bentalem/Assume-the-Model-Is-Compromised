@@ -1,0 +1,80 @@
+id = "8.2-where-can-it-reach"
+track = 8
+number = "8.2"
+title = "Where can it reach"
+points = 40
+
+summary = """
+Give an agent a tool that takes a URL and the interesting question is not whether the URL was \
+validated. It is what answers when the request leaves the container."""
+
+objective = """
+Work out, from the network definitions quoted in Stage 01, which services in this lab can open a \
+socket to which. Then say what a URL-taking tool running inside the API container would have \
+reached, name the one internal service that would have answered without a credential, and say \
+which control decides that — the allowlist in the code, or something else."""
+
+skip_test = """
+which processes in your own system can open a socket to your internal services, and why an egress \
+allowlist in application code is the weaker half of that answer."""
+
+hints = [
+  "Two containers can talk only if they share a network. Which networks is the API attached to, and who else is on each one?",
+  "If a request from inside the API container arrived at opa:8181, what credential would it have to present?",
+  "The Range stops and starts containers, which is as dangerous as it sounds. Why is its allowlist a separate process rather than a check in its own code?",
+]
+
+# Read-only, and nothing is armed. The capability this challenge is about — a tool that takes a URL
+# — is the unrestricted HTTP tool prohibited by rule 7 of CLAUDE.md. It is not built here, it is not
+# built anywhere in this repository, and the absence is the teaching material. The dangerous shape
+# appears as illustrative code in Stage 01, which is the shape ADR-0004 sanctions.
+
+[[observation]]
+observation = "tools.surface"
+label = "Every parameter the model is allowed to supply"
+detail = "Read the parameters and body columns. Look for a host, a port, a URL or a path. 4.1 is the challenge about auditing this surface; here you only need to establish that the thing 8.2 is about is absent."
+
+[[observation]]
+observation = "policy.opa_state"
+label = "Container state, fetched through the one dangerous path the Range has"
+detail = "This one row came back from the Docker API. Not from the socket — through a proxy that permits three verbs on three container names and refuses everything else. It is the worked example for Stage 03."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "A request the Range could not have made itself"
+detail = "The Range has no route to the API. A second service does, and it answers only to request ids it already holds. Compare that with a tool that composes a URL."
+
+[flag]
+kind = "written"
+label = "what a URL-taking tool in the API container would have reached, and what decides that"
+rubric = ["network", "opa", "postgres"]
+
+[[source]]
+path = "scripts/verify_local.py"
+lines = [431, 445]
+highlight = [442, 445]
+caption = "V-17 does not read the compose file. It opens a socket from inside the Range and fails if either host answers"
+
+[[source]]
+path = "scripts/verify_local.py"
+lines = [186, 200]
+highlight = [197, 199]
+caption = "V-02 asks the same question from the edge network, where the browser-facing service lives"
+
+[[source]]
+path = "services/api/src/supportpilot_api/policy/client.py"
+lines = [54, 60]
+highlight = [55, 57]
+caption = "The one outbound destination the API has is fixed when the client is constructed. No caller supplies it, so there is no URL to validate"
+
+[[source]]
+path = "services/range/src/range_service/containers.py"
+lines = [1, 14]
+highlight = [8, 13]
+caption = "Why the Range does not hold the Docker socket. The narrowing lives in a separate process with its own configuration"
+
+[[source]]
+path = "services/range/src/range_service/containers.py"
+lines = [35, 43]
+highlight = [36, 36]
+caption = "Every request this module makes is the proxy address plus a path built from a literal — and the proxy would refuse anything else regardless, which is the point of having both"
