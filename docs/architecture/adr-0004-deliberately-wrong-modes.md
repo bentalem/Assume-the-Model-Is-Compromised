@@ -52,7 +52,7 @@ A fallback-allow path in the API is not a setting at its wrong value. It is **a 
 not otherwise exist**, added to the service the lab is modelling, which would then be shipped in
 every image, present in every review, and one environment variable away from being live.
 
-That failure has a name and the lab teaches it: a debug mode nobody meant to enable. Track 9 is
+That failure has a name and the lab teaches it: a debug mode nobody meant to enable. Track 8 is
 about what the runtime may change about itself, and a repository arguing that case cannot also
 contain a switch that turns its own authorization off.
 
@@ -74,19 +74,24 @@ challenge turned out to be about is that they are not equally visible: two surfa
 deferral was right about not building a fallback and wrong about that being the only way to teach
 the lesson.
 
-3.4 is instead **deferred**, and the honest reason is recorded here rather than dressed up: the lab
-can show that deny-on-outage *is* the behaviour — challenge 3.1 does that, by stopping the engine
-and reading the trail — but it cannot show the alternative without becoming a system that has the
-alternative.
+*What follows is the original decision, kept as written. The update above supersedes its outcome,
+not its reasoning.*
 
-If 3.4 is built later, the two acceptable shapes are:
+3.4 was instead **deferred**, and the honest reason was recorded here rather than dressed up: the
+lab can show that deny-on-outage *is* the behaviour — challenge 3.1 does that, by stopping the
+engine and reading the trail — but it cannot show the alternative without becoming a system that has
+the alternative.
+
+Two acceptable shapes were listed for building it later:
 
 1. **A separate, disposable service** that demonstrates the wrong behaviour, never on the `app`
    network, never the real API. The learner sees a fallback-allow, and the API never contains one.
 2. **Source reading.** Stage 01 shows what the code would look like, from a file that is not
    installed anywhere, with the test that would catch it.
 
-Both are weaker than arming a switch, and both are the right kind of weaker.
+Both are weaker than arming a switch, and both are the right kind of weaker. In the event it took a
+third shape neither of these anticipated: break the engine in three ways that all deny, and make the
+finding the fact that they are not equally visible.
 
 ## The same reasoning applied to 2.2
 
@@ -153,7 +158,10 @@ property has two layers, the rest have one, and removing a check tells you which
 
 ## What this costs, said plainly
 
-Two challenges out of thirty, and they are good ones. The cost is real.
+One challenge out of thirty-one — 2.2 — and it is a good one. The cost is real.
+
+(It was two when this was written. 3.4 was later built without the refused capability, as the
+update above records.)
 
 The alternative cost is a repository that teaches people to ask *"what can your runtime turn off
 about itself?"* while carrying two switches that turn off its own authorization and its own tenant

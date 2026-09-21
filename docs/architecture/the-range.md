@@ -161,8 +161,8 @@ that actually proved it was asking the database afterwards.
 
 ## State
 
-**Phases 0 and 1 are done, and Phase 2 is under way.** Four challenges are live, and between them
-they exercise all three flag kinds and both halves of the console:
+**Phases 0 and 1 are done, and Phase 2 is under way.** Twenty challenges are live, and between
+them they exercise all three flag kinds and both halves of the console:
 
 | | | Flag | Arms anything |
 |---|---|---|---|
@@ -185,11 +185,12 @@ they exercise all three flag kinds and both halves of the console:
 | 7.1 | Reconstruct it | `written` | no — read-only |
 | 7.3 | Prevented, or merely failed | `reason` | no — read-only |
 | 7.4 | The test that lied in its own name | `written` | no — read-only |
+| 8.4 | The text nobody approved | `written` | no — the finding is an absence |
 
 `range_suite.py` also runs **every observation every challenge declares**, on every challenge. The
 content tests prove a challenge renders and that its control ids resolve; they never call an
 observation, so a renamed SQL function or a dropped column would pass every test and fail the first
-learner who pressed Run. Sixty observations, checked against the console's own `ran` line rather
+learner who pressed Run. Sixty-four observations, checked against the console's own `ran` line rather
 than against the word "failed" — 7.4 renders a source panel containing that string, and the first
 version of this check reported it as a broken observation.
 
@@ -249,7 +250,7 @@ and the challenge's own Stage 01 explains why the console must not try to do tha
 
 ### What the remaining challenges need
 
-Nineteen of the thirty-one rows in `.dev/ctf/design.md` are built. Twelve are not, and they are not
+Twenty of the thirty-one rows in `.dev/ctf/design.md` are built. Eleven are not, and they are not
 all the same kind of not-built. Three of them the design marks `Ready`, and the honest position on
 each has changed now that the Range exists to test the assumption against.
 
@@ -365,9 +366,31 @@ Rule 10 says external text cannot register tools. A demonstration needs the lab 
 component that does exactly that, and where it is allowed to sit is the whole design question. Not
 refused, not ordinary either — it needs its own ADR before anyone writes code.
 
-*Genuinely ordinary unbuilt work.* **4.4** (an outbound tool), **5.4** (a rendering surface) and
-**8.4** (a prompt store with and without review). Each is a privilege grant and should be reviewed
-as one, but none of them collides with a rule.
+*Genuinely ordinary unbuilt work.* **4.4** (an outbound tool) and **5.4** (a rendering surface).
+Both are privilege grants and should be reviewed as such, but neither collides with a rule.
+
+**8.4 is built, and not by adding the capability it asks for.** The design wants a prompt store
+with and without review. Building one here would be a table nothing reads — Onyx is a separate
+deployment and is not running in this compose project, so the challenge would describe an outcome
+nobody can run. The lesson did not need it. The summaries in the published action document are
+prose a model reads to decide what an operation is for, and `export_openapi.py` calls them exactly
+that. So the text is already a control surface, and the challenge asks which of this system's
+controls cover changing it. None of them do, which the audit trail confirms rather than implies: it
+holds fourteen distinct actions and not one concerns the document, its tools, or any prompt.
+
+**A warning about reading `.dev/ctf/design.md` on its own.** That file is the original
+specification and it has not been amended as things were built, deliberately — it is a record of
+what was asked for. Two of its entries are now actively misleading and it is worth naming them
+here, because following either would breach a rule this repository treats as non-negotiable:
+
+  * §5 lists *"a deliberately wrong policy-fallback mode"* as a capability to grow, unlocking 3.4.
+    ADR-0004 **refused** that capability. Adding a cached or fallback allow path for when OPA is
+    unavailable is prohibited by `CLAUDE.md`, and 3.4 was built without it.
+  * §5 lists *"a reviewable prompt store"* as unlocking 8.4. 8.4 was built without one, because a
+    prompt store nothing reads would be a table and a narration.
+
+The design document is the question. This section is the answer, and where they disagree, this one
+is later.
 
 *Refused, and recorded above.* **2.2**, for two independent reasons. **3.4 is built** — it appeared
 in this list as refused long after it had shipped, which is the kind of staleness this section is
