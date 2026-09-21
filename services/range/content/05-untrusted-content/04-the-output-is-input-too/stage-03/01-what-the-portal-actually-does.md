@@ -70,17 +70,13 @@ is discarded. Nothing is exposed by that. It is a field that promises a record a
 
 ## What is missing
 
-`services/approval-portal/tests/` held nothing at all until this challenge was written.
+The escaping here is correct and has always been correct. For a long time nothing in this
+repository would have noticed if it stopped being — `services/approval-portal/tests/` was empty.
 
-That is worth keeping in front of you, because it is how the gap is normally found: the escaping was
-correct, had always been correct, and nothing in the repository would have noticed if it stopped
-being. There is a test file there now — `test_rendering.py`, written because this challenge said
-there was not one — and it is worth reading for what it asserts beyond the obvious.
-Compare that with how the rest of the lab treats a control: the `CLAUDE.md` working conventions say
-every capability ships with a positive, a negative and a cross-tenant test, and the Range's own
-Markdown renderer carries a comment at `markdown.py:21`–`23` explaining a bug its content test
-caught. The one service that renders values into a human's browser had none of that, in a repository
-that argues for exactly that, and nobody noticed until somebody went looking for a rendering surface.
+That is how this gap is normally found. Every other capability in the lab ships with a positive, a
+negative and a cross-tenant test; the one service that renders values into a human's browser had
+none, in a repository that argues loudly for exactly that. A control with no test is a control
+somebody is trusting.
 
 Read what the new file asserts, because the obvious test is the less useful one. Checking that
 `<script>` comes back escaped would pass even if somebody changed `html.escape(value)` to

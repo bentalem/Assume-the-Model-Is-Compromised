@@ -9,9 +9,9 @@ One word, in one statement, decides whether a connection handed back to the pool
 the last request was. Get it wrong and tenant isolation leaks between strangers."""
 
 objective = """
-Work out what `SET LOCAL` does that `SET` does not, and why that difference matters only on a \
-pooled connection. Then find the check in this repository that would fail if the word were \
-removed, and say what it actually proves."""
+Work out what transaction-scoped context does that session-scoped context does not, and why the \
+difference matters only on a pooled connection. Then read `V-12`, the environment check that covers \
+this, and say what it actually proves — and what it cannot see."""
 
 skip_test = """
 why request context must be transaction-scoped rather than session-scoped, and what a test for \
@@ -39,9 +39,9 @@ hints = [
   "The check makes twelve requests and then asks a question with no context set at all. Why twelve, and why no context?",
 ]
 
-# Read-only. ADR-0004 refused to make this armable: `SET` rather than `SET LOCAL` is not a control
-# at its wrong setting, it is a code path that leaks request context between users, and adding one
-# to the API would be shipping the vulnerability this lab exists to warn about.
+# Read-only, deliberately. Session-scoped context rather than transaction-scoped is not a control at
+# its wrong setting — it is a code path that leaks request context between users, and adding one to
+# the API would be shipping the vulnerability this lab exists to warn about.
 
 [[observation]]
 observation = "orders.as_owner"
@@ -78,4 +78,4 @@ caption = "The whole control. `is_local => true` is SET LOCAL, and it is inside 
 path = "scripts/verify_local.py"
 lines = [364, 373]
 highlight = [366, 372]
-caption = "The check that would fail if the word were removed — note that it asks with no context at all"
+caption = "V-12 — note that it asks its final question with no context at all"

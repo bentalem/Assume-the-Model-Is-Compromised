@@ -29,6 +29,10 @@ A correctly working cursor is not a defence against bulk extraction. **It is the
 Follow it to exhaustion and you have every row, twenty-five at a time, with every request inside
 every limit and every one of them logged as `allowed`.
 
+That sentence is the button in the console. It prints how many calls it made, how many distinct
+customer records those calls reached, and whether every one of them was allowed. Nothing refused it,
+nothing counted it, and `TS7-09` was green the whole time it ran.
+
 > The test proves the page cap holds. The name claims the *total* is bounded. Nothing in the file
 > bounds a total, because nothing in the system does.
 

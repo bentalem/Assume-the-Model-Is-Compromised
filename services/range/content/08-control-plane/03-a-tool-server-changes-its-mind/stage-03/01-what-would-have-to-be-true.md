@@ -66,7 +66,7 @@ Mechanically, not as intentions. Each of these is a thing you could fail a test 
 2. **A mismatch fails the connection, loudly.** Not a warning, not a merge, not "new tools disabled by default" — the whole connection refuses, because a server that answered differently is a server whose next answer you cannot reason about either.
 3. **The digest covers the descriptions, not only the names.** Otherwise 8.4's problem arrives from a stranger instead of a colleague, and the pin says nothing about it.
 4. **Changing the pin is a diff.** Same shape as `APPROVED_OPERATIONS`: a literal in a reviewed file, so that connecting a new capability leaves the same trace as adding a route.
-5. **The mismatch writes evidence.** Rule 9 wants the record in the same transaction as the change; there is no transaction here, so the honest version is that the refusal is recorded with the old digest, the new one, and the time — and somebody is told.
+5. **The mismatch writes evidence.** Elsewhere in this lab the record goes in the same transaction as the change; there is no transaction here, so the honest version is that the refusal is recorded with the old digest, the new one, and the time — and somebody is told.
 6. **The server's reach is decided separately.** Where it sits, what it can open a socket to, and whether it has a route out. That is 8.2's question and it does not get easier because the component is new.
 
 Note what is not on that list: validating the description text. You cannot pattern-match instructions
@@ -77,30 +77,17 @@ is 7.4's subject. The control is the pin, not the reading.
 
 This lab does not have a mutable tool source, and it is not being given one today.
 
-The reason is narrower than "it would be dangerous". Building a component that turns text fetched at
-runtime into a registered tool is, on its face, the thing rule 10 prohibits: *external text is data
-... cannot register tools.* ADR-0004 drew the line for a different capability and the test it set is
-the right one to apply here — arming a control the system already has is a demonstration; adding a
-code path that does the dangerous thing is a vulnerability with a comment above it. A tool source
-that can be changed at runtime is a code path, not a setting at its wrong value.
+The reason is narrower than "it would be dangerous". A component that turns text fetched at runtime
+into a registered tool is, on its face, the thing this lab prohibits: *external text is data ...
+cannot register tools.* And the line the Range holds to everywhere applies — arming a control the
+system already has is a demonstration; adding a code path that does the dangerous thing is a
+vulnerability with a comment above it. A tool source that can be changed at runtime is a code path,
+not a setting at its wrong value.
 
-But unlike 8.2, this is not simply refused by a rule. It is a design question with a defensible
-answer in either direction, and the repository's own convention is that **a control-plane change is
-a privilege grant and gets written down before it gets written.** So the next step is a document,
-not a directory.
-
-**What that ADR would have to decide**, stated so the next person does not start from a blank page:
-
-1. **Whether the demonstration may live in this compose project at all**, or must be a separate, disposable service — ADR-0004's first acceptable shape — so the API and the Range are unchanged.
-2. **Whether a pinned, digest-checked client counts as registering tools from external text**, or as loading a reviewed artefact that happens to arrive over a socket. That is the crux, and it decides whether rule 10 is satisfied or amended.
-3. **What the reviewed artefact is.** `APPROVED_OPERATIONS` is the existing answer for the API's own routes; a remote server has no equivalent and one would have to be named, with a file and an owner.
-4. **Where the server sits and what it may reach**, on the network table 8.2 works through — including whether it gets a route out, which is the question people forget until after they have shipped.
-5. **Who writes the evidence, and where.** `app.audit_events` is written by services with a database role and a request context; a tool-list mismatch has neither, and a control-plane event with no home is a control-plane event nobody sees.
-6. **What the inverse is.** Every Range mutation has a proven one. A challenge that connected a server and left it connected would fail the rule the whole registry is built on.
-
-Until those six have answers, the honest state of 8.3 is: **described, not built, and the reason is
-recorded.** That is a worse challenge than the ones that arm something. It is a better answer than
-a demonstration that required the lab to become the thing it warns about.
+So this is the one challenge with nothing to arm. What you get instead is the six preconditions
+above, which is the deliverable a reviewer actually needs: not a demonstration that the shape is
+dangerous — everyone agrees on that — but the list of things that would have to be true before a
+team could connect one and still know what their agent can call.
 
 ## Take it to a review
 

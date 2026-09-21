@@ -41,8 +41,9 @@ layer.
 ```
 
 In this lab those two are deliberately different: `sp_migrator_role` owns every table, and
-`sp_api_role` — the role in the connection string — owns nothing. Build rule 5 exists for exactly
-this reason, and it is checked on every migration run rather than remembered.
+`sp_api_role` — the role in the connection string — owns nothing. That separation is not left to
+memory: a smoke test runs on every migration and fails the job if any runtime role owns anything in
+the schema.
 
 But it is very common for them to be the same, and not through carelessness. Watch how a real system
 arrives there:

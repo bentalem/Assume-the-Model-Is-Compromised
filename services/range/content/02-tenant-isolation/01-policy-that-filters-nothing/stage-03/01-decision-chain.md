@@ -45,8 +45,9 @@ and the answer is still wrong.
 | owns it? | **the connection string, and the migration history** | **nobody** |
 | the policy | the migration | everyone — and it is fine |
 
-Three of the four inputs to a tenant isolation decision are invisible to the review that everyone
-actually performs.
+Two of the four inputs are invisible to the review everyone actually performs — and they are the
+two that decide whether the other two do anything. The policy gets read by everybody; ownership gets
+read by nobody.
 
 ## The reason code, if this had gone through the API
 

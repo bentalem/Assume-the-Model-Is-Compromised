@@ -52,13 +52,11 @@ runtime.
 - `V-17` runs inside the Range and fails if `api:8000` or `opa:8181` answers.
 - `V-02` runs inside the approval portal — a service reachable from a browser — and fails if `postgres:5432` or `opa:8181` answers.
 
-The architecture notes record that `V-17` earned its place immediately. The Range needed PostgreSQL,
-the first draft joined it to `data`, and the check failed — because the API is on `data` too, so
-sharing the database network had quietly handed the Range a route to the API. The fix was a
-dedicated `range_data` network rather than a weaker check.
-
-That is the argument for writing a reachability check before the service has any authority worth
-abusing. It cost nothing while the worst consequence was a red line in a test run.
+Both are worth copying, and the shape is the point: **a reachability check names the service doing
+the reaching, not the service being reached.** "Nothing can get to the database" is unfalsifiable.
+"From inside this container, this address does not answer" runs in seconds and fails loudly the
+first time somebody attaches a service to one network too many — which is the usual way a route
+appears, long before anyone would call it a finding.
 
 ## The worked example: a narrow path to something dangerous
 
@@ -90,8 +88,8 @@ surface.
 
 Read the two `containers.py` panels together and the property is plain. The module sends the proxy
 address plus a path built from a literal in `registry.py`, so nothing derived from a request reaches
-it. And the proxy would refuse anything else regardless. Neither control is trusted alone, which is
-rule 4 of `CLAUDE.md` arriving in a place that has nothing to do with databases.
+it. And the proxy would refuse anything else regardless. Neither control is trusted alone — the same
+two-layer rule the database work rests on, arriving somewhere with no database in sight.
 
 **One honest detail, because a topology you have not read carefully is worse than none.** `control`
 has three members, not two: the Range, the proxy, and the probe service. The probe is there so the

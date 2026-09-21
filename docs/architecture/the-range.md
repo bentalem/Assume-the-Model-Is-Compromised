@@ -12,10 +12,15 @@ docker compose --profile range up -d        # http://127.0.0.1:8095
 
 Profile-gated, because a lab being used as a lab does not need it running.
 
-`/guide` is the landing page and the thing to read first: the three stages and why they are in
-that order, what the console sends, the three flag kinds, the eight tracks, and where to start.
-Its track table and challenge count are generated at render time rather than written down, so
-they cannot drift from what is loaded — and a test asserts the generation happened.
+Three pages, one vocabulary. `/` is the landing page: what this is, the eight tracks and what
+each one establishes, and three named ways in — with the challenge count, this browser's solved
+count and a live probe of the environment on it, because a landing page that reads "correct"
+while the lab is armed would be the first lie the course tells. `/catalogue` is the index, a
+table per track. `/guide` is the long version: the three stages and why they are in that order,
+what the console sends, the three flag kinds, and where to start.
+
+Every count and every track name on all three is generated at render time rather than written
+down, so they cannot drift from what is loaded — and a test asserts the generation happened.
 
 ---
 
@@ -206,9 +211,10 @@ and both halves of the console:
 `range_suite.py` also runs **every observation every challenge declares**, on every challenge. The
 content tests prove a challenge renders and that its control ids resolve; they never call an
 observation, so a renamed SQL function or a dropped column would pass every test and fail the first
-learner who pressed Run. A hundred and one observations, checked against the console's own `ran` line rather
+learner who pressed Run. Every one of them, checked against the console's own `ran` line rather
 than against the word "failed" — 7.4 renders a source panel containing that string, and the first
-version of this check reported it as a broken observation.
+version of this check reported it as a broken observation. There is no count in this sentence on
+purpose: the one that used to be here was wrong within two challenges of being written.
 
 The same suite now proves the **flag integrity rule** — *a flag must be unobtainable while every
 mutation probes correct* — for every challenge that owes it, rather than for one challenge against a
@@ -249,6 +255,13 @@ This is not being fixed by adding a hash chain today. It is written down because
 declared column and a written one is exactly what 7.1 teaches learners to look for, and a repository
 making that argument should state where it has one of its own. `range.audit_column_use()` reports
 the counts, so the claim is a query rather than a paragraph that was true when it was typed.
+
+The append-only half is now a query as well. `range.audit_write_access()` reads the table's ACL and
+its policies out of the catalogue and returns one row per command: who holds the grant, which
+policy would match, and what a statement therefore does. It reports `TRUNCATE` alongside the other
+four, because row-level security does not filter a table-level command — the owner holds it and no
+policy stands between it and the record, which is the concrete form of "append-only is made of
+grants".
 
 6.2 is the one exception to observations being read-only: it *attempts* an approval, because the
 subject of the challenge is what refuses the write. Both attempts undo themselves, neither takes an

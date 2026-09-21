@@ -62,12 +62,17 @@ def post(path: str, fields: dict[str, str]) -> str:
 
 
 def probe_of(page: str, mutation_id: str) -> str:
-    """Read one control's state out of the rendered page — what the learner actually sees."""
-    marker = f"{mutation_id} · "
+    """Read one control's state out of the rendered page — what the learner actually sees.
+
+    The console publishes it as `data-state` on the control's own form, beside `data-mutation`.
+    That pairing is the contract; reading the visible label instead made this function a hostage
+    to typography, and it was.
+    """
+    marker = f'data-mutation="{mutation_id}" data-state="'
     index = page.find(marker)
     if index < 0:
         return "absent"
-    return page[index + len(marker):].split("<")[0].strip()
+    return page[index + len(marker):].split(chr(34))[0].strip()
 
 
 def _owner_of(mutation_id: str) -> str | None:
@@ -76,7 +81,7 @@ def _owner_of(mutation_id: str) -> str | None:
     The console deliberately refuses a mutation a challenge does not declare, so a sweep over
     the whole registry has to arm each one through a page that owns it.
     """
-    for fragment in get("/").split('href="/c/')[1:]:
+    for fragment in get("/catalogue").split('href="/c/')[1:]:
         challenge_id = fragment.split('"')[0]
         # The same marker probe_of uses, so "declared on this page" means exactly what it means
         # there — and an id that is a prefix of another cannot match the wrong one.
@@ -97,10 +102,10 @@ def _flag_values(body: str, field: str) -> list[str]:
     the flag accepted it afterwards and the check called the challenge broken. What makes a flag
     earned is that it is in the armed result set and not in the correct one.
     """
-    key = chr(60) + 'div class="result"' + chr(62)
+    key = "data-result" + chr(62)
     if key not in body:
         return []
-    block = html.unescape(body.split(key, 1)[1].split(chr(60) + "/div" + chr(62), 1)[0])
+    block = html.unescape(body.split(key, 1)[1].split(chr(60) + "/", 1)[0])
     lines = [line for line in block.splitlines() if line.strip()]
     if len(lines) < 3:
         return []
@@ -360,7 +365,7 @@ def main() -> int:
     # reported it as a broken observation.
     # ------------------------------------------------------------------------------------------
     print(f"\n  {GREY}every declared observation, on every challenge{RESET}")
-    marker = chr(60) + 'p class="detail" style="margin:0 0 8px"' + chr(62) + chr(60) + "code" + chr(62)
+    marker = "data-ran" + chr(62)
     ran_ok = 0
     empty = []
     broken = []
@@ -378,7 +383,7 @@ def main() -> int:
                 broken.append(f"{number} {observation}: no result at all")
                 continue
             tail = body.split(marker, 1)[1]
-            ran = tail.split(chr(60) + "/code" + chr(62), 1)[0].strip()
+            ran = tail.split(chr(60), 1)[0].strip()
             if ran != f"observation {observation}":
                 broken.append(f"{number} {observation}: {ran}")
                 continue
@@ -492,7 +497,7 @@ def _reset_whatever_is_armed() -> None:
     call is enough whichever challenge it is addressed to.
     """
     try:
-        page = get("/")
+        page = get("/catalogue")
         challenge_id = page.split('href="/c/', 1)[1].split('"', 1)[0]
         post(f"/c/{challenge_id}/reset", {})
         print(f"  {GREY}reset on exit: the environment was asserted before leaving{RESET}")

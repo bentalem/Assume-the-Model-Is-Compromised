@@ -3,7 +3,7 @@
 `approval_expired`.
 
 ```python
-if requester == decision["approver_id"]:
+if decision["approver_id"] == job.requester_id:
     raise RefusedToExecute("self_approval_detected")
 if job.expires_at < datetime.now(UTC):
     raise RefusedToExecute("approval_expired")
@@ -70,9 +70,14 @@ Fix: evaluate expires_at in the worker, immediately before the provider call,
 against the database clock rather than the worker's.
 ```
 
-The last clause is a recommendation, not a description of what you just watched: this worker compares
-against its own clock. **Ask whose clock.** A deadline evaluated on the machine that wants to proceed
-is a deadline that machine can be wrong about, and clock skew in a container fleet is not exotic.
+The last clause is a recommendation, not a description of what you just watched: `datetime.now(UTC)`
+is **the worker's own clock**. Note that the earlier checks are not — the row policy that guards an
+approval write compares against `now()` inside the database. So this lab evaluates the same deadline
+against two different clocks at two different moments, and the one guarding execution is the weaker
+of the two.
+
+**Ask whose clock.** A deadline evaluated on the machine that wants to proceed is a deadline that
+machine can be wrong about, and clock skew in a container fleet is not exotic.
 
 **Reset before you leave** — the window is currently in the past, and a lab left in that state will
 make the next thing you measure confusing.

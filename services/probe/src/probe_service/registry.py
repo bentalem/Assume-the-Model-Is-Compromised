@@ -25,6 +25,13 @@ class Probe:
     # Why this request exists, shown in the Range's result panel so a learner can see what was asked
     # without being able to ask for anything else.
     intent: str = ""
+    # The request body, as the exact bytes to send, for the one probe that is not a GET.
+    #
+    # A string rather than a dict, and not by accident. A structure assembled at call time is a
+    # structure somebody can be tempted to assemble from an argument; a literal here is the same
+    # thing the reviewer of this file read. Nothing composes it and no caller can supply one — the
+    # rule that makes this registry worth having applies to bodies exactly as it does to paths.
+    body: str | None = None
 
 
 def _p(*args, **kwargs) -> tuple[str, Probe]:
@@ -95,6 +102,34 @@ PROBES: dict[str, Probe] = dict(
             "fiona, who approves refunds, tries to read an order",
             "fiona", "GET", "/v1/orders/ORD-2001",
             intent="Same tenant, wrong role. A refusal that is about the role, not the record.",
+        ),
+        # ------------------------------------------------------------------------------------
+        # Track 7 · the request that never reached a control (7.3)
+        #
+        # The only probe here that is not a GET, and the only one whose point is that it fails
+        # before anything decides. alice is a support agent in cedar, ORD-2001 is cedar's, and
+        # every other field is one she is entitled to send — the `reason` is a string where the
+        # schema declares an enumeration, and nothing else is wrong with it.
+        #
+        # So the API refuses it in the validation handler, returns 400 with the offending field
+        # named, and writes no audit row, because at that moment there is no subject, no resource
+        # and no decision to record. 7.3 asks a learner to find that absence, and a challenge that
+        # printed a log line for a request the lab had never made was asking them to take it on
+        # trust.
+        #
+        # The body is fixed and it is invalid on purpose. That is what makes this safe to leave in
+        # a registry: it cannot create a refund proposal, because it cannot get past the schema.
+        # Anyone editing it into a well-formed body is adding a probe that moves the lab's state,
+        # which is a different thing and belongs in a mutation with a restore.
+        _p(
+            "alice.propose.invalid_reason",
+            "alice proposes a refund with a reason outside the enumeration",
+            "alice", "POST", "/v1/actions/refunds",
+            intent="Refused by schema validation, before any control was consulted. Creates nothing.",
+            body=(
+                '{"order_number":"ORD-2001","amount":"12.00",'
+                '"currency":"USD","reason":"damaged item"}'
+            ),
         ),
     ]
 )

@@ -60,3 +60,7 @@ about four seconds.
 
 Now open Stage 03's source panels. One case from a real, passing suite. Read the name, then read
 what it checks.
+
+Then press the one button in the console. It makes the same permitted search over and over,
+following the cursor the way the test proves the cursor can be followed, and counts what came back.
+Hold that number next to the name while you read.

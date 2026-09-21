@@ -82,9 +82,7 @@ measuring that.
 
 ---
 
-*A note on how this challenge was built. The first version revoked bob's membership outright. It is
-his only one, so revoking it removed him from the tenant and the next request came back `404` —
-refused by the resource lookup before policy was consulted. True, interesting, and not this lesson:
-a 404 shows that something changed, while a narrowed field list shows exactly what. The content had
-been written before the mutation was run end to end, and described an outcome nobody had observed —
-which is the same error as a test named for a claim it does not check.*
+*Why a demotion and not a removal. Bob has one membership, so removing it would take him out of the
+tenant entirely and the next request would come back `404` — refused by the resource lookup before
+policy was ever consulted. True, and a different lesson: a `404` shows that something changed, while
+a narrowed field list shows exactly what changed and where the narrowing happened.*

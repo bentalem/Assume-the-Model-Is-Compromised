@@ -11,20 +11,29 @@ tenant claim rewritten 401  unauthenticated
 
 ## Why all three are identical
 
-Because all three died at the same place: **signature verification**, the first thing that happens
-after the string is pulled off the header.
+Because all three died at the same place, and it is earlier than most people guess: **the algorithm
+allowlist**.
 
-The third case had *two* things wrong with it — a rewritten tenant claim and an invalid signature —
+The API reads the `alg` header and checks it against a fixed set — `RS256`, `RS384`, `RS512`,
+`ES256`, `ES384` — *before* it looks up a key and before it verifies anything. Stripping the
+signature sets `alg` to `none`. Re-signing with an attacker key sets it to `HS256`. Neither is on
+the list, so neither token ever reaches a key lookup, let alone a signature check.
+
+The third case had *two* things wrong with it — a rewritten tenant claim and a symmetric algorithm —
 and the API never got far enough to have an opinion about the first one. The claim was never read,
-because nothing after verification runs on a token that did not verify.
+because nothing downstream runs on a token that was refused at the door.
 
 That is the correct order, and it is worth noticing that it is an order at all:
 
 ```
-raw string  →  verify  →  identify  →  load subject  →  authorize  →  query
-                 ↑
-            all three died here
+raw string  →  algorithm  →  key + signature  →  claims  →  load subject  →  authorize  →  query
+                   ↑
+             all three died here
 ```
+
+**This is the control that earned its keep.** Pinning the algorithm is the cheapest line in token
+verification and the one most often left to the library's default — and the default, historically,
+has been to trust whatever the token asked for.
 
 ## The claim would have changed nothing anyway
 

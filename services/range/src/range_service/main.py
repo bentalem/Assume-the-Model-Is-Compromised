@@ -167,15 +167,40 @@ def robots() -> PlainTextResponse:
     return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
 
+def _lab_state() -> dict[str, str] | None:
+    """The probe reading for the whole lab, or None if it cannot be read at all.
+
+    Every page that shows the environment reads it here, on every render. Nothing is cached and
+    nothing is remembered: a page that says "correct" because that is what it was told last time
+    is the exact failure this course spends eight tracks teaching people to find.
+    """
+    try:
+        return registry.state()
+    except Exception:  # noqa: BLE001 — unreadable is shown as unknown, never as correct
+        logger.exception("could not probe environment state")
+        return {mid: registry.UNKNOWN for mid in registry.MUTATIONS} or None
+
+
 @app.get("/guide", response_class=HTMLResponse, include_in_schema=False)
 def guide() -> HTMLResponse:
-    """How to use the range. Linked from the catalogue, and the first thing to read."""
+    """How to use the range: the long version, linked from the landing page and the catalogue."""
     return HTMLResponse(render.page("How to use The Range", render.guide(_challenges)))
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def index() -> HTMLResponse:
-    return HTMLResponse(render.page("Catalogue", render.catalogue(_challenges)))
+    """The landing page. The first thing a learner sees, so it opens in a working state: the
+    counts are counted and the environment line is a live probe, not a decoration."""
+    return HTMLResponse(
+        render.page("Start", render.landing(_challenges, state=_lab_state()))
+    )
+
+
+@app.get("/catalogue", response_class=HTMLResponse, include_in_schema=False)
+def catalogue() -> HTMLResponse:
+    return HTMLResponse(
+        render.page("Catalogue", render.catalogue(_challenges, state=_lab_state()))
+    )
 
 
 def _tabs(request: Request) -> tuple[int, int]:
@@ -189,11 +214,7 @@ def _tabs(request: Request) -> tuple[int, int]:
 def _render(challenge, request: Request, **kwargs) -> HTMLResponse:
     """Render a challenge with the live environment state, always read from the system."""
     tab_01, tab_03 = _tabs(request)
-    try:
-        state = registry.state()
-    except Exception:  # noqa: BLE001 — an unreadable state is shown as unknown, never as correct
-        logger.exception("could not probe environment state")
-        state = {mid: registry.UNKNOWN for mid in registry.MUTATIONS}
+    state = _lab_state() or {mid: registry.UNKNOWN for mid in registry.MUTATIONS}
     return HTMLResponse(render.challenge_page(challenge, tab_01, tab_03, state=state, **kwargs))
 
 

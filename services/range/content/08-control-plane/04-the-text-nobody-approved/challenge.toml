@@ -41,7 +41,7 @@ hints = [
 ]
 
 # Read-only. Nothing is armed: the finding is an absence, and arming something would put a different
-# question on the page. The document drifting from the code belongs to 8.1, which is not built.
+# question on the page. The document drifting from the copy the agent holds is 8.1's subject.
 
 [[observation]]
 observation = "tools.descriptions"
@@ -51,12 +51,12 @@ detail = "Published, consumed, and load-bearing. Read the last two columns last.
 [[observation]]
 observation = "tools.surface"
 label = "The same operations, as shapes"
-detail = "What 4.1 audits. Shape and text are both part of the grant, and only one gets reviewed."
+detail = "The same seven operations 4.1 audits, listed as shapes. Read what is in this table and what is not."
 
 [[observation]]
 observation = "audit.recent"
 label = "The last 30 decisions the system recorded"
-detail = "Look for a row about this document. The absence is the point, so look properly."
+detail = "Every decision the system thought worth recording. Search it for anything about this document."
 
 [[observation]]
 observation = "actions.pending"

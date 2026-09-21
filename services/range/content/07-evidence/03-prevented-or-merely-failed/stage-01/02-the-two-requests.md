@@ -1,7 +1,11 @@
 # The two requests
 
-Both of these were made by alice, a support agent in the cedar tenant. Both were refused. These are
-the API's own access log lines, unedited.
+Both of these are made by alice, a support agent in the cedar tenant, and both are refused. The
+first two buttons in the console issue them — the real requests, through the real API, as her — and
+what is printed below is what they produce.
+
+**Make them both before you go near the trail.** Until you do, the trail has nothing to say about
+either of them, and that is not the absence this challenge is about.
 
 ## Request A
 
@@ -45,7 +49,7 @@ Then, for whichever one has a row, ask the second question:
 
 > **Does it carry a policy version?**
 
-The three observations in the console are enough. One shows every decision recorded about
+The three audit observations in the console are enough. One shows every decision recorded about
 `ORD-3001`; one shows the same for `ORD-2001`, which alice may read, so you can see what an ordinary
 row looks like; and one shows the last thirty decisions from the whole system, which is where you go
 to confirm that something is **not** there.

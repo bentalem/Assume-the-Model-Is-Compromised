@@ -47,7 +47,7 @@ detail = "Shared with 3.4, which is about the failure itself. Here it is only a 
 [[observation]]
 observation = "policy.bundle_state"
 label = "Which policy the engine is loading"
-detail = "Check before and after. `unknown` for this variant means it is armed."
+detail = "Check before and after. The armed variant reads `armed`; the others read `unknown`, because the deployed bundle matches none of them."
 
 [[observation]]
 observation = "api.alice.own_order"

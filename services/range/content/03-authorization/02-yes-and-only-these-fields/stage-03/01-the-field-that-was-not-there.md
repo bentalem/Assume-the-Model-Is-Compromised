@@ -56,9 +56,9 @@ applying them is boring.
 The reason this matters more with a model in front of it:
 
 An agent that receives a full customer record has that record in its context for the rest of the
-conversation. Everything it says afterwards is generated from a context containing a home address —
-and a later instruction, in a ticket, in a document, asking it to summarise what it knows is now
-asking it to summarise an address it should never have had.
+conversation. Everything it says afterwards is generated from a context containing a contact detail
+it was not entitled to — and a later instruction, in a ticket, in a document, asking it to summarise
+what it knows is now asking it to summarise a field it should never have had.
 
 Filtering the *answer* does not help. The data is already in.
 

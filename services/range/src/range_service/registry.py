@@ -550,6 +550,124 @@ register_observation(
 
 
 # ==================================================================================================
+# Track 6 · what the worker refuses, and why (6.1, 6.4)
+#
+# Every other observation in this track reports the lab's *state*: what the payload says now, when
+# the window closes, what has executed. None of them can say what the worker would do about it,
+# because the worker is a separate process with its own database role and the Range has no route to
+# it — and 0018 explains at length why the Range does not reimplement the worker's canonicalisation
+# in SQL to find out. That still holds. Nothing below recomputes a hash or evaluates a condition.
+#
+# What it does is read the worker's own pre-execution checks out of the worker's own source, in the
+# order they run, and put the vocabulary on the page. Read rather than listed here, for the reason
+# `tools.surface` reads the action document rather than a copy: a hand-maintained list in this file
+# would drift from the code it claims to describe, and the drift would be invisible — which is the
+# failure track 7 spends a whole challenge on.
+#
+# It reports the checks in `verify()` and nothing else. `claim()` and the worker's main loop can
+# also refuse, but those are not pre-execution checks on an approved payload, and a list that mixed
+# them in would answer a question the challenge did not ask.
+# ==================================================================================================
+
+_WORKER_PROCESSOR = "services/worker/src/supportpilot_worker/jobs/processor.py"
+
+
+def _worker_refusals() -> list[dict[str, Any]]:
+    """Every reason `JobProcessor.verify()` can refuse, in the order it checks them."""
+    import re as _re
+
+    path = source.REPO_ROOT / _WORKER_PROCESSOR
+    if not path.is_file():
+        return [{"order": "-", "refuses_when": "(the worker's source is not mounted)",
+                 "reason_code": "-", "line": "-"}]
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+
+    # The bounds of verify(), found by its definition and the next method at the same indentation.
+    # Scanning the whole file would pick up claim()'s refusal as well, which is about a missing
+    # row rather than about a payload somebody changed.
+    start = end = None
+    for number, line in enumerate(lines):
+        if start is None:
+            if _re.match(r"^    def verify\(", line):
+                start = number
+        elif _re.match(r"^    def \w", line):
+            end = number
+            break
+    if start is None:
+        return [{"order": "-", "refuses_when": "(verify() is not in this build of the worker)",
+                 "reason_code": "-", "line": "-"}]
+    if end is None:
+        end = len(lines)
+
+    raised = _re.compile(r'RefusedToExecute\(\s*f?"(.*?)"\s*\)')
+    interpolation = _re.compile(r"\{[^}]*\}")
+
+    def _named(expression: str) -> str:
+        """`{job.state}` as `<state>`. The code is a template; the column should say so."""
+        words = _re.sub(r"[^A-Za-z_]+", " ", expression).split()
+        return f"<{words[-1] if words else '...'}>"
+
+    rows: list[dict[str, Any]] = []
+    condition = "-"
+    for number in range(start, end):
+        stripped = lines[number].strip()
+        if stripped.startswith(("if ", "elif ")):
+            condition = stripped.split(" ", 1)[1].rstrip(":")
+        found = raised.search(stripped)
+        if found:
+            rows.append(
+                {
+                    "order": str(len(rows) + 1),
+                    "refuses_when": condition,
+                    "reason_code": interpolation.sub(
+                        lambda match: _named(match.group(0)[1:-1]), found.group(1)
+                    ),
+                    "line": str(number + 1),
+                }
+            )
+            condition = "-"
+
+    if not rows:
+        return [{"order": "-", "refuses_when": "(verify() raises nothing in this build)",
+                 "reason_code": "-", "line": "-"}]
+    return rows
+
+
+register_observation(
+    Observation(
+        id="worker.refusals",
+        summary="Every reason the worker can refuse to execute, in the order it checks them",
+        run=_worker_refusals,
+        columns=("order", "refuses_when", "reason_code", "line"),
+        row_cap=12,
+        fields=("reason_code",),
+    )
+)
+
+
+# ==================================================================================================
+# Track 7 · is the trail actually append-only (7.1)
+#
+# 7.1's Stage 03 makes a claim with two halves: no runtime role can amend a written row, and the
+# owner can but changes nothing because FORCE row security applies the table's policies to it and
+# there is no UPDATE policy for anyone. Both halves are statements about the catalogue, and the
+# challenge that teaches "a schema is a promise, a query is evidence" should not be asking anyone
+# to take them on the prose's word.
+# ==================================================================================================
+
+register_observation(
+    Observation(
+        id="audit.write_access",
+        summary="Who may write to app.audit_events, per command, and which policy would match",
+        run=lambda: db.select("audit_write_access"),
+        columns=("command", "granted_to", "policies", "effect"),
+        row_cap=8,
+    )
+)
+
+
+# ==================================================================================================
 # Requests made through the API, via the probe service
 #
 # The Range cannot reach the API. These ask `probe` for one of its registered requests, by id, over
@@ -589,6 +707,12 @@ _register_probe("api.bob.restricted_customer", "bob.read.restricted_customer",
                 "a manager reads the same restricted customer")
 _register_probe("api.fiona.order", "fiona.read.order",
                 "an approver, who does not read orders, tries to")
+
+# The one probe that carries a body, and the one whose result is meant to be boring: a refusal that
+# happened before anything decided. 7.3 needs the learner to make this request themselves, because
+# the finding is what it does *not* leave behind in the audit trail.
+_register_probe("api.alice.invalid_refund", "alice.propose.invalid_reason",
+                "alice proposes a refund with a reason outside the enumeration")
 
 
 # ==================================================================================================

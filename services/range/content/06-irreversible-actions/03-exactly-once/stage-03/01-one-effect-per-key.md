@@ -27,24 +27,19 @@ refused it"**.
 The same discipline as 6.2, and it is the habit worth taking out of this track more than any
 individual control.
 
-## What building this challenge actually caught
+## Why the permitted attempt is on this page at all
 
-Both attempt-functions ended with a cleanup that could not run: `DELETE ... WHERE detail = '…'`,
-where `detail` was also the name of an output column. PL/pgSQL could not tell which was meant.
+It would be tidier to show you only the refusal. It would also be worthless.
 
-In the replay path the insert raises first, so the cleanup is never reached and the function looks
-perfect. **The bug only appears on the path where the insert succeeds** — which is exactly the path
-where the cleanup is the thing keeping the promise *"ACCEPTED — and rolled back by the Range"*.
+A measurement that only ever runs against a healthy system has never exercised the path that
+matters. The refusal path and the success path are different code, and the one you never run is the
+one that runs on the day something is actually wrong — when the constraint has been dropped, when
+the key derivation changed, when the row was written by an older version of the worker.
 
-So the shipped version would have been correct in every case except the one where a control had
-failed, and in that case it would have left a duplicate execution row behind while reporting that it
-had removed it.
+> **A tool that is only correct when the system is correct is not an instrument.**
 
-It was found because the control group is *supposed* to succeed, and it failed for the wrong reason.
-Without a control group, this challenge ships.
-
-> **A tool that is only correct when the system is correct is not an instrument.** The paths you
-> never exercise are the ones that run on the day something is actually wrong.
+That is why every challenge here gives you the unarmed run first, and why "it refused" is not a
+result until you have seen the same instrument report a success.
 
 ## What to ask a client
 

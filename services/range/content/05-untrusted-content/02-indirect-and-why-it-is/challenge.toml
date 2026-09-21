@@ -44,7 +44,7 @@ hints = [
 [[observation]]
 observation = "content.injection_corpus"
 label = "The messages on TKT-1001"
-detail = "One genuine complaint, nine instruction-shaped messages, and one written by an agent."
+detail = "Eleven rows: one genuine complaint, nine instruction-shaped (one written by an agent), one restricted internal note. Bodies are truncated in this panel."
 
 [[observation]]
 observation = "content.registered_tools"

@@ -9,9 +9,10 @@ Get forty-five dollars approved, then change it to four thousand five hundred be
 claims it. The approval is still valid. The refund is not."""
 
 objective = """
-Alter the pending payload without touching the hash, then find the reason code the worker records \
-when it refuses to execute it. The answer is in the worker's source, not in the database — and \
-knowing why is the challenge."""
+Alter the pending payload without touching the hash, then give the reason code the worker records \
+when it refuses to execute it. No observation can compute that answer from the database, and the \
+third button says why: it reads the worker's refusal list out of the worker's own source. Seven \
+entries, in the order the worker checks them. Choosing the right one is the challenge."""
 
 skip_test = """
 what an approval is actually binding to when somebody says "the refund was approved", and at which \
@@ -34,7 +35,7 @@ recomputed at the moment of the irreversible act rather than at the moment of th
 hints = [
   "The approval recorded a hash. When is that hash next compared to anything, and by which component?",
   "The observation can tell you the payload changed. Can it tell you the hash no longer matches? Why not?",
-  "The worker refuses in two different ways here, with two different reason codes. Which one fires first, and what is the other one for?",
+  "Two of the seven entries in the refusal list are about the hash. Which of those two fires first, and what is the other one for?",
 ]
 
 [[control]]
@@ -51,6 +52,11 @@ detail = "The amount, the hash the approval binds to, and whether the amount is 
 observation = "actions.pending"
 label = "Action requests and their state"
 detail = "Nothing changes state here. The request is still PENDING_APPROVAL either way."
+
+[[observation]]
+observation = "worker.refusals"
+label = "Every reason the worker can refuse, in the order it checks them"
+detail = "Read from the worker's source, not computed. It does not know what you armed — it knows what the worker looks at."
 
 [flag]
 kind = "reason"

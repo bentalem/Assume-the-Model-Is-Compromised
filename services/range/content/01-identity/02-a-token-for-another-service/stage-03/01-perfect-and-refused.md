@@ -28,8 +28,8 @@ Same status, same code, nothing to tell them apart from outside. **One is a forg
 perfectly good credential handed to the wrong door**, and the API is right to make them look the
 same — an error distinguishing them would tell an attacker whether they hold a real key.
 
-The distinction lives in the logs, where an operator can see it. Same shape as the 404 in 7.3 and
-the opaque validation error in 6.1: **specific inward, opaque outward.**
+The distinction lives in the logs, where an operator can see it. Same shape as every refusal in
+this lab: **specific inward, opaque outward.**
 
 ## What the fixture actually is
 

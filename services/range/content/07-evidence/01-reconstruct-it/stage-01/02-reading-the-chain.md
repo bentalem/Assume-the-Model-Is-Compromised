@@ -36,7 +36,8 @@ you go to watch it happen deliberately.
 
 **The trail gives you ids, not names.** `actor_id` is a uuid. Resolving it to a person is the
 directory's job, not the log's — a log that copies display names is a log that is wrong the day
-someone gets married. Use the baseline in `LAB.md` to map them.
+someone gets married. Resolving one to a person is a lookup this trail does not do for you — which
+is itself worth noticing, because it is the step an investigator always has to take and rarely has.
 
 **One actor is not a person at all.** The executing row's actor is a workload, and its `actor_type`
 says so. That distinction is load-bearing in an agent system: some of your actors are software, and

@@ -10,7 +10,9 @@ Two write attempts. Both blocked. One was stopped by a control and one was malfo
 
 objective = """
 Two requests below were both refused. Exactly one of them was refused by an authorization control. \
-Use the audit trail to decide which, and give the reason code that control recorded."""
+Make both of them from the console first — on a fresh lab the trail has nothing to say about either \
+until somebody does — then use the trail to decide which, and give the reason code that control \
+recorded."""
 
 skip_test = """
 what an audit trail looks like for a request that never reached the authorization pipeline, and why \
@@ -39,6 +41,16 @@ hints = [
 
 # Read-only, like the rest of track 7. The trail already holds what this challenge is about; arming
 # something would be answering a different question.
+
+[[observation]]
+observation = "api.alice.foreign_order"
+label = "Request A — alice reads ORD-3001"
+detail = "The cross-tenant read, made through the real API as alice. Run this before you open the trail."
+
+[[observation]]
+observation = "api.alice.invalid_refund"
+label = "Request B — alice proposes a refund with an invalid reason"
+detail = "The same body as the log line below, sent for real. 400, the offending field named, and nothing created."
 
 [[observation]]
 observation = "audit.ord_3001"

@@ -92,6 +92,6 @@ caption = "The policy's own statement of what it is allowed to read"
 
 [[source]]
 path = "services/probe/src/probe_service/registry.py"
-lines = [73, 80]
-highlight = [73, 74]
+lines = [80, 87]
+highlight = [80, 81]
 caption = "The one change that raises the ceiling: the agent holding an account of its own rather than the caller's"

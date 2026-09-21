@@ -29,8 +29,8 @@ opens a socket rather than a diagram that asserts a topology."""
 agent_link = """
 This is textbook network segmentation and egress control, and none of it is new. What an agent \
 adds is a reason for a URL-taking tool to exist — fetch the carrier's tracking page, read the PDF \
-a customer linked — and a caller whose URL can be influenced by the ticket text it just read. Rule \
-7 of `CLAUDE.md` is why no such tool exists here. Blast radius is the agent-relevant half: that \
+a customer linked — and a caller whose URL can be influenced by the ticket text it just read. This lab gives the model no \
+such tool at all. Blast radius is the agent-relevant half: that \
 tool would have run inside the API container, which sits on `app`, `policy` and `data` at once, so \
 the same parser bug is a defect in one service and reads your authorization policy in this one."""
 
@@ -41,9 +41,9 @@ hints = [
 ]
 
 # Read-only, and nothing is armed. The capability this challenge is about — a tool that takes a URL
-# — is the unrestricted HTTP tool prohibited by rule 7 of CLAUDE.md. It is not built here, it is not
-# built anywhere in this repository, and the absence is the teaching material. The dangerous shape
-# appears as illustrative code in Stage 01, which is the shape ADR-0004 sanctions.
+# — is the unrestricted HTTP tool this lab refuses to give the model. It is not built here, it is
+# not built anywhere in this repository, and the absence is the teaching material. The dangerous
+# shape appears as illustrative code in Stage 01 and is never wired to anything.
 
 [[observation]]
 observation = "tools.surface"

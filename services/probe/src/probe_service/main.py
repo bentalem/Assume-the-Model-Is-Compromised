@@ -163,11 +163,22 @@ def run_probe(probe_id: str, request: Request, x_range_token: str = Header(defau
             status_code=502,
         )
 
+    # The body, when the registry declares one, is sent as the exact bytes written in that file.
+    # Not json=..., which would re-serialise a structure this service had built: the probe that
+    # needs a body needs the API to see a specific one, and re-encoding is how "a fixed request"
+    # quietly becomes "a request this service composed".
+    headers = {"Authorization": f"Bearer {token}"}
+    content = None
+    if probe.body is not None:
+        headers["Content-Type"] = "application/json"
+        content = probe.body.encode("utf-8")
+
     try:
         response = httpx.request(
             probe.method,
             f"{API_URL}{probe.path}",
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
+            content=content,
             timeout=30,
         )
     except Exception as exc:  # noqa: BLE001

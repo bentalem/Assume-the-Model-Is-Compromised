@@ -38,29 +38,44 @@ panels are above; read the column list in one against the declaration in the oth
 
 Which raises the question this challenge actually turns on, and it is not a rhetorical one.
 
-## So how bad is that? Go and measure it
+## So how bad is that?
 
-The obvious conclusion is "the trail can be edited and nothing would show". Check it before you
-write it down, because in this system it is wrong.
+The obvious conclusion is "the trail can be edited and nothing would show". In this system that is
+wrong, and the reason is worth following because it is not the reason people expect.
 
-Try to change a row as the API's role and you are refused outright — `sp_api_role` holds `INSERT`
-on this table and nothing else. No runtime role holds `UPDATE` or `DELETE` on it at all.
+The API's role cannot touch a written row: `sp_api_role` holds `INSERT` on this table and nothing
+else. No runtime role holds `UPDATE` or `DELETE` on it at all. That much is a grant — and since this
+is the challenge that says a schema is a promise and a query is evidence, do not take it from me.
+One of the observations reads it straight out of the catalogue, one row per command, with the roles
+that hold it and the policies that would match. The migration panel below shows where it was
+written; the observation shows what is there now.
 
-The owner does hold them. Try it as the owner and the result is this:
+The owner does hold `UPDATE` and `DELETE` — and still changes nothing. `FORCE ROW LEVEL SECURITY`
+applies the table's policies to the owner as well, and this table has **no `UPDATE` policy for
+anyone**, so the statement is permitted and matches no rows:
 
 ```
-SET ROLE sp_migrator_role;
 UPDATE app.audit_events SET reason = 'edited' WHERE true;
 UPDATE 0
 ```
 
-Not an error. **`UPDATE 0`** — the statement was permitted and matched no rows, because
-`FORCE ROW LEVEL SECURITY` applies to the owner too and this table has no `UPDATE` policy for
-anyone. `DELETE` behaves the same way.
+Not an error. `UPDATE 0`. `DELETE` behaves the same way — and the observation's last column says so
+for both, computed from the policies rather than from this paragraph.
 
 Note the shape of that, because it is the whole of challenge 7.3 arriving unannounced: the attempt
 was *prevented*, and what it looks like is *nothing happening*. If you were reading a log of that
 statement you would see a successful UPDATE.
+
+## One row in that table is not like the others
+
+Read the observation to the bottom. `TRUNCATE` is a table-level command, and row-level security does
+not filter it: there are no rows to filter, only one statement that removes all of them. No runtime
+role holds it either, so the first half of the finding stands unchanged.
+
+The second half gets sharper. Against the owner, `UPDATE` and `DELETE` are stopped by a policy that
+does not exist — and `TRUNCATE` is not stopped by anything at all. An append-only property made of
+grants protects the record from the application. It was never going to protect it from the role that
+owns the table.
 
 So the accurate finding is two sentences, not one:
 
@@ -97,7 +112,9 @@ something. A correct design, partially implemented, with no check that noticed t
    yourself.
 4. **"Which columns in this table are never populated?"** Ask for the counts. Every system has some,
    and what they are tells you which controls were designed and never finished.
-5. **"Who can update this table?"** Append-only is a property of grants, not of intentions.
+5. **"Who can update this table?"** Append-only is a property of grants, not of intentions — and
+   ask about `TRUNCATE` in the same breath, because it is the one that row-level security does not
+   cover and the one nobody lists.
 
 Question 4 is the one that transfers. It takes one query, it works on any system, and it finds
 things nobody is hiding — because nobody knows.

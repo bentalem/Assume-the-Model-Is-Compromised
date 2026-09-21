@@ -9,8 +9,10 @@ An approval that never expires is not an approval. It is a capability, sitting i
 for someone to find it."""
 
 objective = """
-Move the approval window into the past and find the reason code the worker records when it refuses \
-to execute a request whose window has closed."""
+Move the approval window into the past and give the reason code the worker records when it refuses \
+to execute a request whose window has closed. The third button lists the worker's refusals in the \
+order it checks them, read from its source; the window is one of the seven things it looks at, and \
+finding which one is yours is the exercise."""
 
 skip_test = """
 why an approval needs a deadline at all when the thing it approves has not changed, and which clock \
@@ -51,6 +53,11 @@ detail = "When it closes, what time the database thinks it is, and how long is l
 observation = "actions.payload_binding"
 label = "What the approval is bound to"
 detail = "Unchanged by this challenge — useful for seeing that nothing else is wrong."
+
+[[observation]]
+observation = "worker.refusals"
+label = "Every reason the worker can refuse, in the order it checks them"
+detail = "Read from the worker's source. Six of the seven are about things this challenge left alone."
 
 [flag]
 kind = "reason"

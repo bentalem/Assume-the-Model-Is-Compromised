@@ -35,9 +35,9 @@ dismissed.
 
 | Not bounded | Consequence |
 |---|---|
-| Minimum length of `q` | `ab` is a valid search |
 | Calls per session | nothing counts them |
 | Paging depth | the cursor advances indefinitely |
+| Rows across a session | each page is capped; the sum of the pages is not |
 
 So the leak is not a page. **It is the product of pages**, and every single call in it is correctly
 authorised, correctly scoped, and correctly logged as `allowed`.

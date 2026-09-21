@@ -5,7 +5,8 @@ title = "Four questions"
 points = 25
 
 summary = """
-Sixteen tables. Fifteen are correct. Find the one that is not, using only the query you would ask \
+Sixteen tables. Two of them do not match the rest, and only one of those is a finding. Separate \
+them using only the query you would ask \
 a client's DBA for."""
 
 objective = """
@@ -34,7 +35,7 @@ that never names it."""
 
 hints = [
   "You are looking for a disagreement between two columns, not for a missing row. Which two?",
-  "Fourteen of the sixteen rows look identical once you have armed it. What is the fastest way to make the odd one obvious?",
+  "Fourteen of the sixteen rows look identical. Two do not — and one of those is a bookkeeping table with no tenant column, which is a different answer. What is the fastest way to make the odd one obvious?",
   "Once you have the table — would this one have been caught by a review of the tenant logic? Why not?",
 ]
 

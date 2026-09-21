@@ -42,10 +42,10 @@ hints = [
 ]
 
 # Read-only, and nothing is armed. Building the capability this challenge is about — a component
-# that registers tools from a source outside the repository, at runtime — sits directly against
-# rule 10 of CLAUDE.md: external text is data, and cannot register tools. That is a design decision
-# with its own ADR, and the ADR does not exist. So the mutable server appears as illustrative code
-# in Stage 01, and every panel points at the static registration this lab actually has.
+# that registers tools from a source outside the repository, at runtime — is the thing this lab
+# refuses outright: external text is data, and cannot register tools. So the mutable server appears
+# as illustrative code in Stage 01, and every panel points at the static registration this lab
+# actually has.
 #
 # 8.4 covers who may change a tool's description. This challenge is about the description arriving
 # from somewhere else, and changing between two calls, which is a different control question.

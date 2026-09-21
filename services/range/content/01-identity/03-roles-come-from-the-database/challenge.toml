@@ -5,11 +5,11 @@ title = "Roles come from the database"
 points = 30
 
 summary = """
-Revoke a manager's role while his token keeps working, then ask the same question again. The token \
-did not change. The answer did."""
+Take a manager's role away while his token keeps working, then ask the same question again. The \
+token did not change. The answer did."""
 
 objective = """
-Read the restricted customer as bob, revoke his manager membership, and read it again with the same \
+Read the restricted customer as bob, demote him to a support agent, and read it again with the same \
 credential. Give the field that stops coming back."""
 
 skip_test = """

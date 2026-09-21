@@ -56,6 +56,11 @@ observation = "audit.column_use"
 label = "How many rows actually carry each column"
 detail = "Run this before you decide what the trail can answer. Three of these are always empty."
 
+[[observation]]
+observation = "audit.write_access"
+label = "Who may write to the audit table, per command"
+detail = "Stage 03 claims the trail is append-only. That claim is made of grants and policies — this is the catalogue, so you can check it rather than believe it."
+
 [flag]
 kind = "written"
 label = "how the four steps are linked, and how you know the approved payload is the executed one"

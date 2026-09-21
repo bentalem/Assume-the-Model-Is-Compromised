@@ -1,4 +1,4 @@
-"""The landing page: how to use this thing, for someone who has just opened it.
+"""The Range's prose: the landing page's copy, and the long-form guide behind it.
 
 Kept as Markdown in its own module rather than as HTML in `render.py`, because it is prose that will
 be edited by whoever is teaching rather than by whoever is maintaining the renderer, and because the
@@ -12,8 +12,6 @@ has spent most of its history correcting.
 from __future__ import annotations
 
 OPENING = """
-# How to use The Range
-
 This is a practice range for **securing AI agents**. It runs against a real system — a support
 agent with real tools, a real policy engine, a real database with row-level security, and a real
 approval workflow for anything that moves money.
@@ -151,3 +149,61 @@ It is also not a set of puzzles with hidden tricks. Every answer is reachable by
 front of you and running the things on the page. If you are stuck, each challenge has up to three
 hints, and every one of them is a question rather than an answer.
 """
+
+
+# --------------------------------------------------------------------------------------------------
+# The landing page.
+#
+# Short on purpose. It has one screen to say what this is, show the eight tracks, and put somebody
+# in a challenge, so every sentence here has to earn its line. The numbers are NOT written here —
+# the renderer counts what actually loaded — and neither is the track list.
+# --------------------------------------------------------------------------------------------------
+
+LANDING_TITLE = "Break a real agent, on purpose, and then put it back."
+
+LANDING_STANDFIRST = (
+    "A practice range for securing AI agents, built on a real one: real tools, a real policy "
+    "engine, a real database with row-level security, and a real approval workflow for anything "
+    "that moves money."
+)
+
+LANDING_SUB_1 = (
+    "Nothing here is a simulation of a vulnerability. Each challenge either breaks a control that "
+    "genuinely exists and lets you watch the consequence, or shows you a property the system "
+    "genuinely has and asks you what it is worth."
+)
+
+LANDING_SUB_2 = (
+    "You never open a terminal. If a challenge needs a command, the Range runs it, says what it "
+    "ran, and can put every control back in one press."
+)
+
+ROUTE_NEW = (
+    "Go in order. Identity, then the database layer, then the policy layer — almost everything "
+    "later leans on those three, and they take about an hour between them."
+)
+
+ROUTE_SHORT = (
+    "Tool authority is the part with no classical-security equivalent. 4.1 is the question you "
+    "will end up asking in every review you ever do."
+)
+
+ROUTE_PRO = (
+    "Start where the material is hardest to fake: reading evidence, and reading a test. If these "
+    "two tell you nothing new, the rest probably will not either."
+)
+
+# One line per stage, in order, for the strip at the foot of the landing page.
+STAGE_LINES = (
+    "The idea, in one or more tabs, with a skip test at the top telling you when you may skip it.",
+    "The console. Arm a named control, run a fixed observation, read what came back, submit the flag.",
+    "The answer, the lab's own source with line numbers, and the questions a reviewer would ask.",
+)
+
+GUIDE_TITLE = "How to use The Range"
+
+GUIDE_STANDFIRST = (
+    "How a challenge is laid out, what the console is allowed to do, how the three kinds of flag "
+    "are checked, and where to start. Four minutes, and it is the only page here that is not a "
+    "challenge."
+)

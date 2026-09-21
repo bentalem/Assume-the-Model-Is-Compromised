@@ -2,8 +2,8 @@
 
 Every audit row here can carry a `policy_version`. Look at what it means when it is empty.
 
-The API's order of work is fixed, and it is written down in `CLAUDE.md` as a rule rather than left
-to whoever edits the file next:
+The API's order of work is fixed, and written down as a rule rather than left to whoever edits the
+file next:
 
 ```
 validate schema

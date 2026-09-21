@@ -38,7 +38,8 @@ Three things that make it act on itself rather than sit in a backlog:
 
 You were not looking for a bug. You were looking for **one row that disagrees with the rest**, in a
 list that a team would describe as correct — and they would be describing it honestly, because
-fourteen identical rows and one documented exception is what "we do this" feels like from inside.
+fourteen identical rows, one bookkeeping table that was never in scope, and one real exception is
+what "we do this" feels like from inside.
 
 > An audit is not "does this system have the control". It is "does this system have the control
 > **everywhere**, and how would anyone know".
