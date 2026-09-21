@@ -16,6 +16,22 @@ skip_test = """
 what a policy engine can return other than yes or no, and why a system without that has to choose \
 between full access and none."""
 
+purpose = """
+You are practising field-level authorization: reading two permitted responses side by side, finding \
+the one field that differs, and then locating where that difference is enforced. Here the policy \
+returns an allow carrying a field list and trusted code removes the rest between the query and the \
+response, so the skill is knowing the three places a field could be dropped and why only one of \
+them keeps the decision in policy. The question it leaves you with is what a system's policy can \
+return other than yes and no."""
+
+agent_link = """
+This is classical application security — field-level authorization and data minimisation are old, \
+and the enforcement point is the same one a web application would use. What an agent changes is \
+blast radius within a session: a record that reaches the response also reaches the model's context \
+and stays there for the rest of the conversation, so filtering the answer at the end is too late \
+and the withheld field has to never be loaded. Narrowing an allow is also what keeps the \
+alternative from being a refusal that people route around."""
+
 hints = [
   "Both requests returned 200. If neither was refused, what part of the answer differed?",
   "Compare the two field lists character by character. Which name appears once?",

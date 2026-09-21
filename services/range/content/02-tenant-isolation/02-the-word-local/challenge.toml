@@ -17,6 +17,20 @@ skip_test = """
 why request context must be transaction-scoped rather than session-scoped, and what a test for \
 that has to do in order to mean anything."""
 
+purpose = """You work out why request context has to be scoped to the transaction rather than the session, and
+then read the check that would catch the word going missing and state precisely what it
+establishes. The second half is the transferable part: the check makes twelve pooled requests and
+then asks, with no context set at all, for a count that can only come back non-zero if context
+survived a request. Practise saying what it does not prove as well — it does not show that the pool
+reused a connection, and it covers the API's pool rather than the worker's separate connections."""
+
+agent_link = """This is a database bug that predates agents by decades; pooled connections and session-scoped
+settings behaved this way long before anyone wired a model to a tool, and the agent relevance is
+real but indirect. The leak needs a second condition — some request that queries without setting
+context first — and what an agent-backed service adds is volume and surface: connection reuse
+becomes constant rather than occasional, and endpoints, background reads and new tools accumulate
+faster than anyone re-reads the one helper that sets the tenant."""
+
 hints = [
   "A connection pool hands the same connection to different requests. What is still set on it when request one is finished?",
   "Both settings look identical while the transaction is open. At which exact moment do they stop looking identical?",

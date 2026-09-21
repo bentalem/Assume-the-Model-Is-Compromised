@@ -109,6 +109,12 @@ class Challenge:
     sources: tuple[SourceRef, ...]
     flag: Flag | None
     hints: tuple[str, ...] = ()
+    # What the learner is practising here, and how it connects to securing an agent. Separate from
+    # `summary` (which sells the challenge) and `objective` (which says what to do): these two
+    # answer "why am I doing this, and what has it got to do with agents" — including for the
+    # challenges whose subject is ordinary application security that agents only make sharper.
+    purpose: str = ""
+    agent_link: str = ""
     directory: Path = field(default=Path("."), compare=False)
 
     @property
@@ -228,6 +234,8 @@ def load_challenge(directory: Path) -> Challenge:
         summary=_require(data, "summary", str, where),
         objective=_require(data, "objective", str, where),
         skip_test=data.get("skip_test", ""),
+        purpose=data.get("purpose", ""),
+        agent_link=data.get("agent_link", ""),
         stage_01=stage_01,
         stage_03=_read_tabs(directory / "stage-03"),
         controls=tuple(

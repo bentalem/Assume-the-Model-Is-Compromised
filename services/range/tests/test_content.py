@@ -101,6 +101,37 @@ def main() -> int:
             page.count("Skip this stage only if") <= 1,
         )
 
+    # ------------------------------------------------------------------------------------------
+    # The guide is the first page a learner sees, and everything on it is a claim about how the
+    # rest of the service behaves. Its track table is generated from TRACKS and TRACK_CLAIMS so it
+    # cannot drift, and these checks prove the generation actually happened rather than that a
+    # hand-written copy happens to look right.
+    # ------------------------------------------------------------------------------------------
+    print(f"\n  {GREY}the guide{RESET}")
+    page = render.guide(challenges)
+
+    check("the guide renders", bool(page) and "How to use The Range" in page)
+    check(
+        "no unrendered markdown emphasis in the guide",
+        "**" not in page,
+    )
+    missing = [name for number, name in render.TRACKS.items() if name not in page]
+    check(
+        "every track appears in the guide",
+        not missing,
+        ", ".join(missing) if missing else f"{len(render.TRACKS)} tracks",
+    )
+    counted = sum(1 for _ in challenges)
+    check(
+        "the guide counts the challenges that actually loaded",
+        f"{counted} challenges" in page,
+        f"expected the phrase \"{counted} challenges\"",
+    )
+    check(
+        "the guide links to the catalogue and the catalogue links back",
+        'href="/"' in page and 'href="/guide"' in render.catalogue(challenges),
+    )
+
     print(f"\n  {GREY}service guards{RESET}")
 
     # The refusal to run outside a local lab is the largest single guard on this service, so it is

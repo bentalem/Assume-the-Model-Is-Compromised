@@ -11,6 +11,7 @@ import html
 from collections import defaultdict
 
 from . import source
+from . import guide as guide_text
 from .content import Challenge, TRACKS
 from .markdown import render as md
 from .theme import STYLESHEET
@@ -64,12 +65,50 @@ def footer(note: str) -> str:
 # Catalogue
 # --------------------------------------------------------------------------------------------------
 
+def guide(challenges: list[Challenge]) -> str:
+    """The landing page. Everything a learner needs before opening their first challenge.
+
+    The track list is generated from TRACKS and TRACK_CLAIMS rather than written out, and the
+    challenge counts are counted, so neither can drift from what is actually loaded.
+    """
+    per_track: dict[int, int] = defaultdict(int)
+    for challenge in challenges:
+        per_track[challenge.track] += 1
+
+    rows = ["| | Track | The claim it makes | Challenges |", "|---|---|---|---|"]
+    for track in sorted(TRACKS):
+        rows.append(
+            f"| {track:02d} | {TRACKS[track]} | {TRACK_CLAIMS[track]} | {per_track.get(track, 0)} |"
+        )
+
+    body = (
+        masthead("start here")
+        + md(guide_text.OPENING)
+        + md(guide_text.STAGES)
+        + md(guide_text.CONSOLE)
+        + md(guide_text.FLAGS)
+        + md(guide_text.TRACKS_INTRO)
+        + md(chr(10).join(rows))
+        + md(guide_text.READING)
+        + md(guide_text.START)
+        + md(guide_text.CLOSING)
+        + '<p style="margin:26px 0 0"><a class="cta" href="/">'
+        f"Open the catalogue — {len(challenges)} challenges</a></p>"
+        + footer("Nothing here knows who you are. There is no scoreboard, and nothing is timed.")
+    )
+    return body
+
+
 def catalogue(challenges: list[Challenge]) -> str:
     by_track: dict[int, list[Challenge]] = defaultdict(list)
     for challenge in challenges:
         by_track[challenge.track].append(challenge)
 
     out = [masthead(f"{len(challenges)} challenges")]
+    out.append(
+        '<p class="orient">New here? <a href="/guide">Read how to use The Range</a> — how a '
+        "challenge is laid out, what the console does, and where to start.</p>"
+    )
 
     if not challenges:
         out.append(
@@ -349,6 +388,33 @@ def _hints(challenge: Challenge) -> str:
     )
 
 
+def _why_this_challenge(challenge: Challenge) -> str:
+    """The orientation panel, shown before Stage 01.
+
+    A learner arriving at a challenge from the catalogue knows its title and one sentence. That is
+    enough to decide whether to open it and not enough to know what they are practising or why it
+    belongs in a course about agents. Several challenges here are ordinary application security
+    that agents make sharper rather than anything agent-specific, and saying which is which is the
+    honest thing to do — a learner who cannot tell will either over-apply the lesson or dismiss it.
+    """
+    if not challenge.purpose and not challenge.agent_link:
+        return ""
+
+    parts = ['<section class="why">']
+    if challenge.purpose:
+        parts.append(
+            '<div><h3>What you are practising</h3>'
+            f"{md(challenge.purpose)}</div>"
+        )
+    if challenge.agent_link:
+        parts.append(
+            '<div><h3>Why it matters for an agent</h3>'
+            f"{md(challenge.agent_link)}</div>"
+        )
+    parts.append("</section>")
+    return "".join(parts)
+
+
 def challenge_page(
     challenge: Challenge,
     tab_01: int = 0,
@@ -363,6 +429,7 @@ def challenge_page(
         masthead(f"{challenge.number} · {challenge.track_name}")
         + f'<h2 style="margin:0 0 4px;font-size:1.34rem;letter-spacing:-.015em">{E(challenge.title)}</h2>'
         + f'<p style="margin:0 0 22px;color:var(--muted);max-width:44rem">{E(challenge.summary)}</p>'
+        + _why_this_challenge(challenge)
         + _stage_01(challenge, tab_01)
         + _stage_02(challenge, state, result, ran, flag_note, flag_ok)
         + _stage_03(challenge, tab_03)

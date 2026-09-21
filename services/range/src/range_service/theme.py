@@ -301,6 +301,52 @@ tr:last-child td { border-bottom: none; }
 
 /* ---------- the skip test ---------- */
 
+/* The orientation panel above Stage 01: what you are practising, and the agent connection.
+   Two columns on a wide screen, stacked on a narrow one. Deliberately quieter than .skip — it is
+   context to read once, not an instruction. */
+/* The catalogue's one-line pointer at the guide, and the guide's way back. */
+.orient {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+.orient a { color: var(--accent); }
+.cta {
+  display: inline-block;
+  padding: 10px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: .95rem;
+  text-decoration: none;
+}
+.cta:hover { background: var(--accent-soft); }
+
+.why {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 26px;
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.why h3 {
+  margin: 0 0 6px;
+  font-size: .7rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.why p { margin: 0 0 8px; font-size: .92rem; line-height: 1.55; }
+.why p:last-child { margin-bottom: 0; }
+@media (max-width: 720px) { .why { grid-template-columns: 1fr; } }
+
 .skip {
   background: var(--accent-soft);
   border-left: 3px solid var(--accent);

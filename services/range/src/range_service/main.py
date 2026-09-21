@@ -167,6 +167,12 @@ def robots() -> PlainTextResponse:
     return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
 
+@app.get("/guide", response_class=HTMLResponse, include_in_schema=False)
+def guide() -> HTMLResponse:
+    """How to use the range. Linked from the catalogue, and the first thing to read."""
+    return HTMLResponse(render.page("How to use The Range", render.guide(_challenges)))
+
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def index() -> HTMLResponse:
     return HTMLResponse(render.page("Catalogue", render.catalogue(_challenges)))

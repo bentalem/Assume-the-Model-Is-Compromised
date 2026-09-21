@@ -16,6 +16,19 @@ skip_test = """
 what stops a valid token issued for one service from working on another, and what happens across an \
 organisation when that check is missing."""
 
+purpose = """You send three credentials at one API — a genuine token, a genuine token minted for a different
+client in the same realm, and a forgery — and work out which single claim separated the first from
+the second. The skill is treating token validation as a list of checks rather than one, and
+recognising the case where everything about a credential is correct except who it was issued to.
+It also leaves you with a test you can run against somebody else's service using only a token you
+already hold."""
+
+agent_link = """Audience validation is classical identity engineering: it mattered before anything was calling a
+tool on a model's suggestion, and the check is the one OAuth deployments have needed for years.
+What an agent changes is how many doors a token gets carried to. An agent that receives a user's
+token and calls several services on their behalf is exactly the component that can present a
+credential where it was never meant to go, at machine rate and with nobody reviewing each call."""
+
 hints = [
   "Which of the checks a verifier performs could this token possibly fail, given that nothing about it is forged?",
   "The intent column prints one claim from the token. What is it, and what is missing from it?",

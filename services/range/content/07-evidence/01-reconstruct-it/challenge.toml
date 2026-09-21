@@ -16,6 +16,22 @@ thing that was approved is the thing that was executed."""
 skip_test = """
 which column links the steps of one action together, and why it is not the request id."""
 
+purpose = """
+You reconstruct one completed action from the trail alone, with no report and no witness: who \
+asked, who approved, for what, under which rules, what was decided, and what changed outside the \
+system. Two habits come out of it — finding the column that actually links the steps when the \
+request id does not, and comparing the payload hash across propose, approve and execute. A third \
+is the column census: count how many rows carry a column before you build an argument on it, \
+because a schema says what someone meant to record and a count says what is there."""
+
+agent_link = """
+This is classical incident response. The six questions work on any system that writes a log, and \
+nothing about the method is new. What an agent changes is who appears in the trail — the executing \
+row's actor is a workload rather than a person, and `actor_type` says so — so an investigation \
+that assumes every actor is human asks the wrong questions about intent. It also changes the \
+volume: one action is already four rows under four request ids, and that is before anyone counts \
+how many actions a tool-calling caller proposes."""
+
 hints = [
   "How many different request ids appear in that chain, and what does that tell you about grouping an investigation by request?",
   "The proposal's result_reference and the later steps' resource are the same string — so what is that string?",

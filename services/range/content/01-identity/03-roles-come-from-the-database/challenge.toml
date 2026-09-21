@@ -16,6 +16,21 @@ skip_test = """
 what a token establishes and what it does not, and how long a revoked permission keeps working in a \
 system that reads roles from the token."""
 
+purpose = """You read a restricted customer as a manager, change his role in the memberships table without
+touching his token, and ask the same question again with the same credential. The skill is
+separating what a token establishes — that it is genuine, and who it names — from what the server
+has to look up on every request, so you can answer "how long does a revoked role keep working
+here?" with a measurement instead of a design intention. Note also the shape of the evidence: the
+control shows up as a field that stops coming back, not as a refusal, so it is invisible unless you
+wrote the first field list down."""
+
+agent_link = """Loading authorization attributes per request rather than reading them out of token claims is
+ordinary authorization design and predates agents entirely. Two things sharpen it here. An agent
+session holds one token across work that runs far longer than a person's click-through, and nobody
+is watching the screen: in a system that reads roles from the token, a role revoked an hour ago
+keeps being honoured, and the requests exercising it look exactly like the ones that should
+succeed."""
+
 hints = [
   "What is in bob's field list before you arm anything — and did you write it down?",
   "Nothing reissues bob's token between the two reads. So what did the second request consult that the first one did?",

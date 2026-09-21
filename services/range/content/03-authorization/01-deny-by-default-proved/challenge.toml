@@ -16,6 +16,20 @@ skip_test = """
 what "deny by default" has to mean beyond "no rule matched", and why externalising an authorization \
 decision makes that question urgent rather than academic."""
 
+purpose = """
+You are practising a one-command test that works on any system which externalises its \
+authorization: stop the decision point, repeat a request that normally succeeds, and read what \
+actually happens rather than what the design document promises. The skill is telling fail-closed, \
+fail-open and the cached middle apart, which look identical for the first few seconds of an outage. \
+You also learn to read a refusal that carries no policy version as a refusal no policy made."""
+
+agent_link = """
+This is classical application security. Fail-closed authorization predates agents and the same \
+experiment works on a web application with no model anywhere near it. What an agent changes is \
+rate and autonomy: authorization decisions arrive in bursts with nobody reading each one, so a \
+short fail-open window covers a volume of calls no human session produces, and afterwards nothing \
+in the transcript marks them out, because from the caller's side every one succeeded."""
+
 hints = [
   "Run the request before you stop anything. What does it return, and what should it return afterwards?",
   "The response body says very little. Where does this lab record what a decision was and why?",

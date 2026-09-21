@@ -16,6 +16,20 @@ skip_test = """
 which catalogue columns answer "is this table actually filtering", and why the answer needs a \
 second query about roles."""
 
+purpose = """You audit a schema you did not write, using only the two queries a DBA can run while you wait, and
+find the one table where the enabled and forced columns disagree. The skill is auditing the list
+rather than the story: ask for every table in the schema instead of the ones the team considers
+sensitive, and pair the catalogue with the role attributes, because a clean catalogue proves
+nothing if the connecting role holds BYPASSRLS. The write-up matters as much as the find — name the
+data the table holds, not the flag that is missing."""
+
+agent_link = """Nothing in the technique is agent-specific; this is a configuration audit that would have been
+worth running on a web application from fifteen years ago, and the finding is a tenant isolation
+finding. The agent angle is about which tables end up in reach. A human workflow touches the tables
+its screens were built for, while tool calls composed at run time follow the joins — an order read
+in this lab returns line items, so the table nobody thought of as tenant data is served by a tool
+that never names it."""
+
 hints = [
   "You are looking for a disagreement between two columns, not for a missing row. Which two?",
   "Fourteen of the sixteen rows look identical once you have armed it. What is the fastest way to make the odd one obvious?",

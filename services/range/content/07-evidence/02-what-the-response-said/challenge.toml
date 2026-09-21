@@ -17,6 +17,22 @@ skip_test = """
 why a narrated account of what an agent did is never evidence, and which artifact you ask for \
 instead."""
 
+purpose = """
+You read one request two ways — the status the caller was given, and the row the trail recorded — \
+and hold both without deciding that either is a lie. A `404` that refuses to confirm a resource \
+exists in another tenant is a real isolation control, and it is also insufficient for an \
+investigation, and both of those are true at once. The exercise is writing the incident report \
+that the response alone would have produced, then checking which sentence in it is wrong and who \
+it would have been sent to."""
+
+agent_link = """
+The narrow error vocabulary is classical application security: a support engineer reading the same \
+`404` reaches the same wrong conclusion, with no agent involved. What an agent changes is position \
+and rate. It sits between the response and the customer, and everything it can say about a failure \
+is built from that filtered response, because the internal reason is never sent to it. So the \
+habit worth building is to stop asking for an account of what happened and ask instead for the \
+request id, then read the row."""
+
 hints = [
   "alice owns ORD-2001. With the engine unable to answer, what status does she get, and what would anyone reading that status conclude?",
   "The audit row for that same request carries a different word. Which of the two would a support ticket be written from?",
