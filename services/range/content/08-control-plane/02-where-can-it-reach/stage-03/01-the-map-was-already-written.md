@@ -3,12 +3,12 @@
 Read straight off the table in Stage 01. Two containers can open a socket to each other if and only
 if they share a network, so the reach of any service is the union of the rows it appears in.
 
-| From | Its networks | Can open a socket to | Cannot reach |
+| From | Its networks | Can open a socket to | Notably cannot reach |
 |---|---|---|---|
-| api | app, policy, data | keycloak, approval-portal, probe, opa, opa-bundle-init, postgres, migrate, worker | range, docker-proxy |
-| range | edge, range_data, control | keycloak, approval-portal, postgres, probe, docker-proxy | api, opa, worker, migrate |
-| worker | data | postgres, migrate, api | opa, and everything on edge |
-| approval-portal | edge, app | keycloak, range, api, probe | postgres, opa |
+| api | app, policy, data | keycloak, approval-portal, probe, opa, opa-bundle-init, postgres, migrate, worker | range, docker-proxy — and that is the complete list of what it cannot reach |
+| range | edge, range_data, control | keycloak, approval-portal, postgres, probe, docker-proxy | api, opa, worker |
+| worker | data | postgres, migrate, api | opa, keycloak, and everything on `edge` and `control` |
+| approval-portal | edge, app | keycloak, range, api, probe | postgres, opa, worker |
 | probe | app, control | api, keycloak, approval-portal, range, docker-proxy | postgres, opa |
 | opa | policy | api, opa-bundle-init | everything else |
 

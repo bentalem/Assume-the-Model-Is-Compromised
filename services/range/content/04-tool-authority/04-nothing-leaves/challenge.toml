@@ -1,0 +1,72 @@
+id = "4.4-nothing-leaves"
+track = 4
+number = "4.4"
+title = "Bounded recipient, unbounded content"
+points = 40
+
+summary = """
+A delivery tool takes two arguments that ask two different questions. Reviews answer the first one \
+well. Nothing in a per-call decision can answer the second."""
+
+objective = """
+Establish for yourself that no registered operation sends anything outside this system, and say how \
+you established it rather than that you looked. Then write what would have to be true before one \
+could be added: which existing control would cover the recipient, and what would have to be \
+invented for the content."""
+
+skip_test = """
+why bounding a delivery tool's recipient does not bound what it delivers, and where in a review you \
+would find out which of the two a team has thought about."""
+
+hints = [
+  "Read the parameters column for all seven operations. Which of them names a place that is not this database?",
+  "OPA is told four things about a call. Is the body of the request one of them?",
+  "One component here is built to reach outside the system, and it is not a tool. Where does it live, and what stands between the model and it?"
+]
+
+# Read-only, and deliberately so. The subject is a capability this lab does not have, and the only
+# honest way to teach an absence is to make the learner prove it.
+
+[[observation]]
+observation = "tools.surface"
+label = "Every registered operation, and every argument it accepts"
+detail = "Read the parameters and body columns end to end. You are looking for a destination."
+
+[[observation]]
+observation = "tools.descriptions"
+label = "What each of the seven is advertised as doing"
+detail = "The prose a model reads to decide what an operation is for. Check it against the shapes rather than instead of them."
+
+[[observation]]
+observation = "api.alice.ticket_1001"
+label = "One permitted read that puts outside text into context"
+detail = "The left-hand side of the composition table: content arriving. Run it, then go looking for the right-hand side."
+
+[flag]
+kind = "written"
+label = "what leaves this system today, and what would have to exist before anything could"
+rubric = ["destination", "approve", "audit"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/pipeline.py"
+lines = [114, 134]
+highlight = [120, 134]
+caption = "Everything OPA is told about a call. Four keys, and the request body is not one of them"
+
+[[source]]
+path = "services/api/src/supportpilot_api/tools/actions.py"
+lines = [40, 50]
+highlight = [41, 46]
+caption = "The one body here that could plausibly have carried a destination, and the sentence saying why it does not"
+
+[[source]]
+path = "services/api/src/supportpilot_api/repositories/notes.py"
+lines = [92, 109]
+highlight = [95, 108]
+caption = "The nearest thing to a delivery tool, and what its evidence keeps: the note id, not the note"
+
+[[source]]
+path = "services/worker/src/supportpilot_worker/adapters/refund.py"
+lines = [94, 119]
+highlight = [104, 113]
+caption = "The only component built to reach outside. Refused at construction rather than at call time"

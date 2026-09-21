@@ -35,9 +35,16 @@ $$;
 -- What the model can actually call. A learner tracing "use the execute_sql tool" needs to be able
 -- to check the claim rather than take this lab's word for it.
 --
--- Read from the API's own route table would be better still, but the Range has no route to the API
--- and the action document is not in its mount. This reads the tool modules on disk, which is the
--- same source the document is generated from — so a tool added without a module cannot hide here.
+-- Two corrections to an earlier version of this comment, both of which claimed more than the
+-- function does. It does NOT read the tool modules on disk: a SQL function cannot, and the body
+-- below is a hand-maintained VALUES list. So the property once claimed here — "a tool added
+-- without a module cannot hide" — is exactly backwards: a tool added without an edit to this list
+-- would not appear at all. And the action document IS in the Range's mount now; `openapi/` was
+-- added for challenge 4.1, so a future version of this observation can read the real published
+-- surface instead. `tools.surface` and `tools.descriptions` already do.
+--
+-- What this list is for, honestly: a short map from operation to module, so a learner can find the
+-- code. It is not evidence of what is registered, and no challenge should treat it as such.
 CREATE FUNCTION range.registered_tool_modules()
 RETURNS TABLE (tool_module text, note text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp

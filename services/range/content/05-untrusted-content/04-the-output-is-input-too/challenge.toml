@@ -1,0 +1,81 @@
+id = "5.4-the-output-is-input-too"
+track = 5
+number = "5.4"
+title = "The output is input too"
+points = 40
+
+summary = """
+This lab has a real rendering surface: a human approver reads a refund payload in a browser. Go and \
+find the line that writes a value into that page, and decide whether you would sign off on it."""
+
+objective = """
+Find every place the approval portal interpolates a value into HTML and say whether it is safe, \
+naming the line. Then answer the question that comes first: which of those values could a model \
+have chosen, and what is the widest string it could have put there?"""
+
+skip_test = """
+why 'does it escape' is the second question about a rendering surface, and what the first one is."""
+
+hints = [
+  "The review page builds one f-string. How many values go into it, and what does each of them pass through first?",
+  "The portal writes values inside single-quoted HTML attributes. What does html.escape do to a single quote by default?",
+  "propose_refund accepts five fields and freezes six keys. Which of the five never reaches the payload, and what reads it instead?",
+]
+
+# Nothing to arm. The surface is real, it is in the repository, and the exercise is to read it.
+
+[[observation]]
+observation = "tools.surface"
+label = "The operation whose body reaches a human's screen"
+detail = "propose_refund is the only one. Note its request body schema and go and read it."
+
+[[observation]]
+observation = "tools.descriptions"
+label = "What the model is told each operation is for"
+detail = "The prose that steers which values get chosen, and what reviews it."
+
+[[observation]]
+observation = "content.injection_corpus"
+label = "The text upstream of the whole chain"
+detail = "One of these asks for a 500 USD refund inside a request to summarise. That is where a payload value would come from."
+
+[flag]
+kind = "written"
+label = "whether the approval portal is safe, and the line you would check in one that is not"
+rubric = ["escape", "enum", "payload"]
+
+[[source]]
+path = "services/approval-portal/src/approval_portal/main.py"
+lines = [126, 155]
+highlight = [127, 131]
+caption = "Every value in the review page goes through html.escape before it reaches the f-string"
+
+[[source]]
+path = "services/approval-portal/src/approval_portal/main.py"
+lines = [162, 175]
+highlight = [163, 165]
+caption = "Escaped inside single-quoted attributes, which is the case people get wrong"
+
+[[source]]
+path = "services/approval-portal/src/approval_portal/main.py"
+lines = [64, 65]
+highlight = [65, 65]
+caption = "The page wrapper escapes the title and trusts the body, because the body was built above"
+
+[[source]]
+path = "services/api/src/supportpilot_api/tools/actions.py"
+lines = [174, 182]
+highlight = [175, 182]
+caption = "The frozen payload: six keys, none of them free text"
+
+[[source]]
+path = "services/api/src/supportpilot_api/tools/actions.py"
+lines = [58, 64]
+highlight = [64, 64]
+caption = "reason is a closed enum. note is the one free-text field the model may send"
+
+[[source]]
+path = "services/range/src/range_service/markdown.py"
+lines = [30, 33]
+highlight = [31, 32]
+caption = "The contrast: escape first, then add markup. Doing it the other way round is the bug"

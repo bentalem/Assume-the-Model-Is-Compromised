@@ -56,9 +56,10 @@ comment above it.*
 Press the first observation and check the claim rather than taking it. Seven operations, their
 parameters and their request bodies. If one of them took a URL you would see it there.
 
-The single outbound HTTP destination this API has is the policy engine, and its address is fixed
-when the client object is built — read the third source panel in Stage 03. There is no URL to
-validate because there is no URL to supply.
+The API makes outbound HTTP requests to exactly two places — the policy decision point, and
+Keycloak's JWKS endpoint — and both addresses are configuration, fixed when the client object is
+built. Read the third source panel in Stage 03. There is no URL to validate because there is no URL
+to supply.
 
 ## The map, quoted
 

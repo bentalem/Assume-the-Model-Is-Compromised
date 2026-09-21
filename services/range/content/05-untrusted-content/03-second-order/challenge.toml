@@ -1,0 +1,83 @@
+id = "5.3-second-order"
+track = 5
+number = "5.3"
+title = "Second order"
+points = 35
+
+summary = """
+One of the eleven messages on TKT-1001 was written by an agent, marked internal, and carries an \
+instruction. It arrives in the next reader's context with a label that says it is staff material."""
+
+objective = """
+Count the messages on TKT-1001 by author, find the one the system wrote about itself, and then \
+trace the loop: which write path could have produced it, and which read path returns it. Answer in \
+a sentence or two: what changed about the text on the way through, and what did not."""
+
+skip_test = """
+why a system's own summary is a delivery channel, and which field has to survive the trip for a \
+later reader to tell."""
+
+hints = [
+  "Group content.injection_corpus by its author column. How many distinct values are there, and which one appears once?",
+  "The row query selects five columns and the response model declares three. Which one is loaded and then dropped?",
+  "add_internal_note writes to a table. Does any registered operation read that table back?",
+]
+
+# Nothing to arm. The agent-authored message is seed data and the lab is in its correct state — the
+# challenge is to notice that a correct system still carries this shape.
+
+[[observation]]
+observation = "content.injection_corpus"
+label = "Every message on TKT-1001, with its author and visibility"
+detail = "Count by author before reading the bodies. One of the three values appears exactly once."
+
+[[observation]]
+observation = "api.alice.ticket_1001"
+label = "Alice reads the ticket through the API"
+detail = "A support agent, a permitted request, an ordinary 200. The internal note is not what makes this unusual."
+
+[[observation]]
+observation = "content.registered_tools"
+label = "The tool modules, including the one that writes"
+detail = "notes.py is the write half of the loop. Check what the read half returns."
+
+[flag]
+kind = "written"
+label = "what changed about the text on the way through, and what did not"
+rubric = ["author", "trust", "authority"]
+
+[[source]]
+path = "database/seeds/0002_tickets_and_injection_corpus.sql"
+lines = [118, 123]
+highlight = [120, 123]
+caption = "The agent-authored message: author_kind 'agent', visibility 'internal', and an instruction inside it"
+
+[[source]]
+path = "services/api/src/supportpilot_api/repositories/tickets.py"
+lines = [53, 58]
+highlight = [57, 57]
+caption = "The query loads visibility for every message"
+
+[[source]]
+path = "services/api/src/supportpilot_api/tools/tickets.py"
+lines = [34, 42]
+highlight = [37, 41]
+caption = "The response model declares three fields, and visibility is not one of them"
+
+[[source]]
+path = "database/migrations/0006_tickets.sql"
+lines = [74, 84]
+highlight = [81, 82]
+caption = "The only visibility the row policy filters is 'restricted'. Internal passes through"
+
+[[source]]
+path = "services/api/src/supportpilot_api/repositories/notes.py"
+lines = [36, 43]
+highlight = [37, 37]
+caption = "The write half of the loop, and the table it writes to"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [173, 187]
+highlight = [176, 178]
+caption = "Where the two layers split: the policy decides the ticket, the database decides the messages"

@@ -1,0 +1,90 @@
+id = "8.3-a-tool-server-changes-its-mind"
+track = 8
+number = "8.3"
+title = "A tool server changes its mind"
+points = 40
+
+summary = """
+Every control in this lab assumes the list of things the model may call was fixed before anyone \
+reviewed it. Connect a tool server and that assumption becomes a promise made by a third party."""
+
+objective = """
+Establish, from the observations and the source, at what moment this lab's tool list is decided and \
+by whom. Then say what changes when that list arrives over the network on every connection: name \
+the two distinct things a mutable tool source puts outside your review, and say what would have to \
+be true before this repository could contain one."""
+
+skip_test = """
+what changes when the list of tools a model may call is supplied by a party outside your review, \
+and what would have to be pinned before connecting one is safe."""
+
+hints = [
+  "The tool modules are named in a migration and the routers are named in create_app. At what moment is that list decided, and by whom?",
+  "If the list arrived over the network at the start of every conversation, which control in this lab would notice that it had changed?",
+  "A tool description is text a model reads in order to decide what to call. If a third party writes it, whose instruction is it?",
+]
+
+# Read-only, and nothing is armed. Building the capability this challenge is about — a component
+# that registers tools from a source outside the repository, at runtime — sits directly against
+# rule 10 of CLAUDE.md: external text is data, and cannot register tools. That is a design decision
+# with its own ADR, and the ADR does not exist. So the mutable server appears as illustrative code
+# in Stage 01, and every panel points at the static registration this lab actually has.
+#
+# 8.4 covers who may change a tool's description. This challenge is about the description arriving
+# from somewhere else, and changing between two calls, which is a different control question.
+
+[[observation]]
+observation = "content.registered_tools"
+label = "The five tool modules, as a fixed list"
+detail = "Declared as literal rows in migration 0025, not discovered at runtime. That is worth noticing for its own sake: this list is maintained by hand, so compare it with the next panel rather than trusting it."
+
+[[observation]]
+observation = "tools.surface"
+label = "The same operations, read from the published action document"
+detail = "Seven operations, generated from the running code and committed to the repository. Count them against the five modules above and satisfy yourself the two agree."
+
+[[observation]]
+observation = "tools.descriptions"
+label = "The text each operation carries, and where it came from"
+detail = "These rows were read out of the action document, mounted read-only into the Range, at the moment you pressed Run. The question here is what would be different if they had been fetched from a server instead. 8.4 asks the other half: who may change them."
+
+[flag]
+kind = "written"
+label = "the two things a runtime tool source puts outside your review, and what would have to hold first"
+rubric = ["descript", "review", "regist"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/main.py"
+lines = [110, 119]
+highlight = [112, 116]
+caption = "The tool set is decided here, when the process starts, from code that is already in the image. Nothing outside the image contributes a router"
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [33, 43]
+highlight = [35, 43]
+caption = "The approved operation set is a literal in a reviewed file. Adding to it is a change somebody has to open a pull request for"
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [170, 182]
+highlight = [178, 182]
+caption = "What the export says when the running code has grown an operation nobody approved. It refuses to write the document at all"
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [246, 252]
+highlight = [248, 250]
+caption = "The check runs in both directions: an approved operation that has vanished from the document is a finding too"
+
+[[source]]
+path = "services/api/src/supportpilot_api/policy/client.py"
+lines = [64, 79]
+highlight = [67, 70]
+caption = "What the authorization decision is made from. Four members, and prose is not one of them — which is why a description cannot grant anything, whoever wrote it"
+
+[[source]]
+path = "services/range/src/range_service/probe.py"
+lines = [1, 10]
+highlight = [7, 9]
+caption = "The same principle in a second place: an id from a declared list, checked in two services, neither of which can extend it"

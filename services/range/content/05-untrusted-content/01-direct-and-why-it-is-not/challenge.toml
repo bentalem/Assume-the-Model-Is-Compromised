@@ -1,0 +1,82 @@
+id = "5.1-direct-and-why-it-is-not"
+track = 5
+number = "5.1"
+title = "Direct, and why it is not a finding"
+points = 25
+
+summary = """
+The instruction override and the administrator claim, run where the attacker is the user. Nothing \
+crosses a boundary, so the only question left is how much the caller could already do."""
+
+objective = """
+Establish the ceiling. Read alice's memberships and the registered operation list, then say what \
+the worst outcome of a successful direct injection in her session actually is — and why that number \
+is the finding rather than the text that produced it."""
+
+skip_test = """
+why a direct injection is bounded by the caller's own authority, and which single change to a \
+deployment makes that stop being true."""
+
+hints = [
+  "If alice typed the override herself, which row in identity.memberships would have to change for it to gain her anything?",
+  "The policy input has four fields about the subject. Which of them could a sentence in a chat window reach?",
+  "Whose token does the agent hold? What happens to the ceiling if the answer is a service account instead?",
+]
+
+# Nothing to arm. The point of this challenge is that the environment in its correct state already
+# answers the question — the ceiling is a property of the deployment, not of a broken control.
+
+[[observation]]
+observation = "identity.memberships"
+label = "Alice's authority, as the server records it"
+detail = "One active role. This is the ceiling a direct injection in her session inherits."
+
+[[observation]]
+observation = "tools.surface"
+label = "Every operation the agent can call"
+detail = "Read the whole list. A direct injection buys the attacker this set and nothing beyond it."
+
+[[observation]]
+observation = "content.injection_corpus"
+label = "The two messages this challenge borrows"
+detail = "The instruction override and the administrator claim. Here they are customer text; the exercise is to imagine them typed by the caller instead."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "Alice making a permitted request herself"
+detail = "The comparison that matters. Whatever the injection asks for, this is the authority it would be asking with."
+
+[flag]
+kind = "written"
+label = "why direct injection is the lowest-severity of the three kinds"
+rubric = ["already", "authority", "role"]
+
+[[source]]
+path = "database/seeds/0002_tickets_and_injection_corpus.sql"
+lines = [62, 74]
+highlight = [72, 73]
+caption = "The two attempts as seeded: an instruction override, and a claim of administrator"
+
+[[source]]
+path = "services/api/src/supportpilot_api/repositories/memberships.py"
+lines = [39, 46]
+highlight = [45, 45]
+caption = "Roles are loaded by the verified subject id. There is no parameter here a sentence could reach"
+
+[[source]]
+path = "services/api/src/supportpilot_api/pipeline.py"
+lines = [120, 134]
+highlight = [121, 126]
+caption = "The whole policy input. Four subject fields, each derived from the token or from app.memberships"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [1, 14]
+highlight = [3, 5]
+caption = "The policy's own statement of what it is allowed to read"
+
+[[source]]
+path = "services/probe/src/probe_service/registry.py"
+lines = [73, 80]
+highlight = [73, 74]
+caption = "The one change that raises the ceiling: the agent holding an account of its own rather than the caller's"

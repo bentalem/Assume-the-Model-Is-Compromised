@@ -1,0 +1,71 @@
+id = "4.2-shape-not-name"
+track = 4
+number = "4.2"
+title = "The generic tool wearing a business name"
+points = 40
+
+summary = """
+A tool is generic when the caller's argument chooses the operation rather than the operand, and the \
+name on it tells you nothing about which it is. Audit the seven for the parameter that would do it."""
+
+objective = """
+Read the parameter shape of all seven registered operations and report whether any parameter is an \
+object with no declared properties. Then name the check in this repository that would have caught \
+one, and the check that would not."""
+
+skip_test = """
+what an object parameter with no schema turns a tool into, and which of your own schema checks \
+would report one."""
+
+hints = [
+  "The surface prints a type beside each parameter, and two names print `?`. Is a type the listing could not find the same finding as a parameter that has no schema?",
+  "Both POST operations carry a body typed `object`. What does each of those bodies declare that a generic parameter would not?",
+  "`scripts/export_openapi.py` refuses to publish a document that breaks its rules. Is a property typed `object` with no properties one of the things it refuses?"
+]
+
+# Read-only. Nothing is armed: the finding this challenge teaches is an absence, and the only way to
+# establish an absence is to read the whole surface.
+
+[[observation]]
+observation = "tools.surface"
+label = "Every registered operation, and the type of every parameter"
+detail = "Read from the published action document. The parameters column is the subject of this challenge."
+
+[[observation]]
+observation = "tools.descriptions"
+label = "The same seven, by the prose beside them"
+detail = "Read these first and write down what you expect each tool's arguments to be. Then read the shapes."
+
+[[observation]]
+observation = "content.registered_tools"
+label = "The five modules those seven operations live in"
+detail = "Where to go when the document tells you a shape and you want to see what reads it."
+
+[flag]
+kind = "written"
+label = "the parameter audit, and the check that would not have caught one"
+rubric = ["object", "additionalProperties", "export_openapi"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/tools/actions.py"
+lines = [40, 64]
+highlight = [48, 64]
+caption = "A body that is genuinely typed object. Every field inside it names a pattern, a length or a value set"
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [186, 219]
+highlight = [199, 219]
+caption = "Every rule this audit applies to a parameter. Two are about the name, two about the shape"
+
+[[source]]
+path = "scripts/export_openapi.py"
+lines = [232, 246]
+highlight = [243, 246]
+caption = "Every rule it applies to a schema property. Read it for the rule that is not here"
+
+[[source]]
+path = "database/migrations/0011_range_mutations_rls.sql"
+lines = [1, 32]
+highlight = [3, 9]
+caption = "The same finding, applied to the service that teaches it. One function per mutation, no target parameter"
