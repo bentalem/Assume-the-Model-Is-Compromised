@@ -1,0 +1,65 @@
+id = "2.2-the-word-local"
+track = 2
+number = "2.2"
+title = "The word LOCAL"
+points = 40
+
+summary = """
+One word, in one statement, decides whether a connection handed back to the pool still knows who \
+the last request was. Get it wrong and tenant isolation leaks between strangers."""
+
+objective = """
+Work out what `SET LOCAL` does that `SET` does not, and why that difference matters only on a \
+pooled connection. Then find the check in this repository that would fail if the word were \
+removed, and say what it actually proves."""
+
+skip_test = """
+why request context must be transaction-scoped rather than session-scoped, and what a test for \
+that has to do in order to mean anything."""
+
+hints = [
+  "A connection pool hands the same connection to different requests. What is still set on it when request one is finished?",
+  "Both settings look identical while the transaction is open. At which exact moment do they stop looking identical?",
+  "The check makes twelve requests and then asks a question with no context set at all. Why twelve, and why no context?",
+]
+
+# Read-only. ADR-0004 refused to make this armable: `SET` rather than `SET LOCAL` is not a control
+# at its wrong setting, it is a code path that leaks request context between users, and adding one
+# to the API would be shipping the vulnerability this lab exists to warn about.
+
+[[observation]]
+observation = "orders.as_owner"
+label = "A read that establishes tenant context, then uses it"
+detail = "Context is set inside the transaction that needs it. Nothing about it outlives the read."
+
+[[observation]]
+observation = "api.alice.own_order"
+label = "alice's request"
+detail = "Run this, then the next one. They share a pool."
+
+[[observation]]
+observation = "api.mallory.cedar_order"
+label = "A different user, probably on the same connection"
+detail = "The other tenant, immediately afterwards. Note what she gets."
+
+[[observation]]
+observation = "audit.recent"
+label = "What the trail says about both"
+detail = "Two users, two decisions, and no sign that either affected the other."
+
+[flag]
+kind = "written"
+label = "the difference the word makes, and what the check proves"
+rubric = ["transaction", "pool", "context"]
+
+[[source]]
+path = "services/api/src/supportpilot_api/db.py"
+lines = [66, 82]
+highlight = [71, 80]
+caption = "The whole control. `is_local => true` is SET LOCAL, and it is inside an explicit transaction"
+
+[[source]]
+path = "scripts/verify_local.py"
+lines = [364, 373]
+highlight = [366, 372]
+caption = "The check that would fail if the word were removed — note that it asks with no context at all"

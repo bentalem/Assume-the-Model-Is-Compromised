@@ -104,6 +104,20 @@ vulnerability the lab exists to warn about, living in the lab's own API.
 
 **Deferred, on the same grounds, with the same two acceptable shapes.**
 
+**Update: 2.2 has since been built, and the API still has exactly one behaviour.** Not by making the
+context mode togglable — that refusal stands and is the reason the challenge reads the way it does.
+Challenge 2.2 is a reading exercise built on the one word the whole of track 2 depends on, together
+with `V-12`, the check that would fail if it went missing. The semantics it teaches were measured
+against PostgreSQL directly rather than asserted: a procedure that sets both scopes, commits, and
+looks again reports `SET: alice   SET LOCAL: (gone)`.
+
+Worth recording for whoever tries to make that demonstration live one day: it cannot be a `range.*`
+routine as things stand. Crossing a transaction boundary needs `COMMIT`, PostgreSQL forbids
+transaction control inside `SECURITY DEFINER`, and the permission smoke test requires every `range`
+routine to be `SECURITY DEFINER` owned by the migrator — which is the rule that keeps `sp_range_role`
+holding no privilege of its own. Two controls that are each right, which together rule the
+demonstration out. The smoke test caught the attempt, which is the system working.
+
 **A second reason, found later while looking for a way to build it.** After 3.3 and 3.4 were built
 without giving the API anything, 2.2 was worth another attempt on the same principle: demonstrate
 the consequence somewhere that is not the API. It does not work, and the reason is worth keeping.

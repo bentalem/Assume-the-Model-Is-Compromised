@@ -161,36 +161,47 @@ that actually proved it was asking the database afterwards.
 
 ## State
 
-**Phases 0 and 1 are done, and Phase 2 is under way.** Twenty challenges are live, and between
-them they exercise all three flag kinds and both halves of the console:
+**All thirty-one challenges in `.dev/ctf/design.md` are built.** They exercise all three flag kinds
+and both halves of the console:
 
 | | | Flag | Arms anything |
 |---|---|---|---|
-| 2.1 | The policy that filters nothing | `value` | two controls |
-| 2.3 | Four questions | `value` | one, unnamed |
-| 5.2 | Indirect, and why it is a finding | `written` | no — the corpus is seed data |
+| 1.1 | Whose token is it | `value` | one control |
+| 1.2 | A token for another service | `written` | no |
+| 1.3 | Roles come from the database | `written` | one control |
+| 1.4 | The claim that changes nothing | `value` | no |
+| 2.1 | The policy that filters nothing | `value` | 2 controls |
+| 2.2 | The word LOCAL | `written` | no |
+| 2.3 | Four questions | `value` | one control |
+| 3.1 | Deny by default, proved | `reason` | one control |
+| 3.2 | Yes, and only these fields | `written` | no |
+| 3.3 | Which layer stops what | `written` | 2 controls |
+| 3.4 | The failure that looks like consent | `reason` | 3 controls |
+| 4.1 | The worst legal call | `written` | no |
+| 4.2 | The generic tool wearing a business name | `written` | no |
+| 4.3 | Inside every limit | `value` | no |
+| 4.4 | Bounded recipient, unbounded content | `written` | no |
+| 5.1 | Direct, and why it is not a finding | `written` | no |
+| 5.2 | Indirect, and why it is a finding | `written` | no |
+| 5.3 | Second order | `written` | no |
+| 5.4 | The output is input too | `written` | no |
 | 6.1 | Approve one payload, execute another | `reason` | one control |
-| 6.2 | Self-approval, three times over | `value` | no — attempts a write that rolls back |
-| 6.3 | Exactly once | `value` | no — attempts a write that rolls back |
+| 6.2 | Self-approval, three times over | `value` | no |
+| 6.3 | Exactly once | `value` | no |
 | 6.4 | The approval that outlived its payload | `reason` | one control |
-| 1.1 | Whose token is it | `value` | configures a service account |
-| 1.2 | A token for another service | `written` | no — a genuine token for the wrong door |
-| 1.3 | Roles come from the database | `written` | one control, then a real API request |
-| 1.4 | The claim that changes nothing | `value` | no — three tampered tokens |
-| 3.1 | Deny by default, proved | `reason` | stops the policy engine |
-| 3.2 | Yes, and only these fields | `written` | no — two real API requests |
-| 3.3 | Which layer stops what | `written` | two controls, both on the live policy |
-| 3.4 | The failure that looks like consent | `reason` | three, two of them on the live policy |
-| 4.1 | The worst legal call | `written` | no — the authority is in the schema |
-| 7.1 | Reconstruct it | `written` | no — read-only |
-| 7.3 | Prevented, or merely failed | `reason` | no — read-only |
-| 7.4 | The test that lied in its own name | `written` | no — read-only |
-| 8.4 | The text nobody approved | `written` | no — the finding is an absence |
+| 7.1 | Reconstruct it | `written` | no |
+| 7.2 | What the response said | `written` | one control |
+| 7.3 | Prevented, or merely failed | `reason` | no |
+| 7.4 | The test that lied in its own name | `written` | no |
+| 8.1 | The third copy | `written` | no |
+| 8.2 | Where can it reach | `written` | no |
+| 8.3 | A tool server changes its mind | `written` | no |
+| 8.4 | The text nobody approved | `written` | no |
 
 `range_suite.py` also runs **every observation every challenge declares**, on every challenge. The
 content tests prove a challenge renders and that its control ids resolve; they never call an
 observation, so a renamed SQL function or a dropped column would pass every test and fail the first
-learner who pressed Run. Sixty-four observations, checked against the console's own `ran` line rather
+learner who pressed Run. A hundred and one observations, checked against the console's own `ran` line rather
 than against the word "failed" — 7.4 renders a source panel containing that string, and the first
 version of this check reported it as a broken observation.
 
@@ -248,159 +259,58 @@ than a missing column: an indicator that fires on clean rows teaches people to i
 which is what it actually checks. Detecting tampering stays in the worker, which recomputes the hash —
 and the challenge's own Stage 01 explains why the console must not try to do that job.
 
-### What the remaining challenges need
+### How the eleven hard ones were built
 
-Twenty of the thirty-one rows in `.dev/ctf/design.md` are built. Eleven are not, and they are not
-all the same kind of not-built. Three of them the design marks `Ready`, and the honest position on
-each has changed now that the Range exists to test the assumption against.
+All thirty-one rows of `.dev/ctf/design.md` are built. Eleven of them were, at various points,
+recorded in this document as blocked — five by a rule, four by needing a model, two by needing the
+Range to write the repository working tree. None of those obstacles was wrong. What changed is that
+the design's *stated mechanism* turned out not to be the only way to reach its *stated lesson*, and
+the pattern that got each one built is worth recording, because the next person will meet it too.
 
-**Blocked on a model in the loop.** 4.3, 5.1, 5.3 and 7.2 need a conversation, not an HTTP request.
-The probe service makes requests; it cannot be steered by text it reads, which is the entire subject
-of those four. That means driving Onyx, a separate compose project and its own decision.
+**The pattern.** When the design asked for a capability this lab must not have, the question that
+unlocked it was never "how do we add this safely". It was: **where does this property already exist
+in the system as built?** Every time, it did.
 
-5.1 carries a second problem worth recording before anyone builds it. Its stated outcome is *"two
-identical refusals"* — an assertion about what the model did. `CLAUDE.md` forbids exactly that, and
-for a good reason: two identical runs produce different tool calls. If 5.1 is built, the flag has to
-be about the boundary around the model, never about the model's answer.
+| | The design asked for | What it was built on instead |
+|---|---|---|
+| 2.2 | a togglable request-context mode | the word `LOCAL`, and the check that would fail without it |
+| 3.3 | a permissive policy revealing RLS underneath | the policy is never consulted for that read — so the lesson became which layer covers what |
+| 3.4 | a deliberately wrong fallback mode | three ways to break the engine that all deny, and are not equally visible |
+| 4.2 | a deliberately bad tool | the checker, which has no rule for the shape it describes |
+| 4.3 | session budgets, and a way to drive the agent | two permitted searches and the cursor between them |
+| 4.4 | an outbound tool | the absence of one, and what would have to exist first |
+| 5.1 | two refusals from a model | the ceiling: a direct injection's author is the caller |
+| 5.3 | a seeded second-order path | a seeded note, and the honest fact that the loop is not closed |
+| 5.4 | a rendering surface | the approval portal, which a human reads and which does escape |
+| 7.2 | an agent transcript that lied | a true response and a truer record, disagreeing |
+| 8.1 | the document drifting from the code | the third copy, which a person pastes into a form |
+| 8.2 | a URL-taking tool | the network map, and what would have answered |
+| 8.3 | an MCP-style tool source | static registration, and what an ADR would have to decide first |
 
-**3.3 is built, and it is not the challenge the design describes.** The design has it install a
-permissive policy and the learner discover that row-level security refuses anyway. Building it
-turned up something better and more uncomfortable: for a cross-tenant order read, *the policy is
-never consulted at all*. The API loads the trusted resource before it builds the policy input, so a
-read the database will not satisfy is refused at the load with `resource_not_visible` and no policy
-version. Arming a permissive tenant rule changes nothing — not the response, not the audit row.
+**Nothing was weakened to get there.** No fallback-allow path, no generic tool, no URL-taking tool,
+no egress, no togglable context mode. The API has exactly the behaviour it had before this work
+started, and `verify_local.py` proves it on every run.
 
-So the challenge as shipped removes two different conditions from the same action and asks why the
-results differ. Removing the tenant check does nothing, because a second layer was already holding
-that property up. Removing the role check returns order data to a `finance_approver`, because
-nothing underneath the policy has an opinion about roles. The lesson is sharper than "we have two
-layers": **one property has two layers and the rest have one**, and the severity of a policy bug is
-decided by which of those you are looking at.
+**Three were built by measuring rather than arguing**, and each one contradicted a premise this
+document had previously asserted:
 
-The mechanism is worth recording because the obvious one does not work. `decision` is a complete
-rule with many definitions, so an overlay file asserting it produces a conflict, OPA errors, and the
-API denies — which reproduces challenge 3.1 and teaches nothing. The bundle has to be replaced
-wholesale. It is therefore a named volume, populated from `./policy/supportpilot` by
-`opa-bundle-init` on every `compose up`, never the working tree: a mutation that wrote to the
-working tree could leave a crashed container's permissive authorization policy checked out in a git
-clone, and "no mutation without a proven inverse" stops being true the moment the inverse depends on
-the container still being alive.
+  * 3.3 was designed around a permissive policy revealing row-level security underneath. Arming it
+    changed nothing observable, because the API loads the trusted resource before it builds the
+    policy input, so a cross-tenant read never reaches OPA at all.
+  * 5.3 was briefed on the basis that the second-order loop was already seeded. The note exists;
+    the loop does not. `add_internal_note` writes `app.internal_notes` and `get_ticket` reads
+    `app.ticket_messages`, and nothing reads the former back.
+  * 5.4 was expected to find an unescaped rendering surface. The approval portal escapes everything,
+    through `html.escape` with its `quote=True` default. Its test directory is empty, which is the
+    finding the challenge ends on.
 
-Recovering the bundle, if it is ever left wrong. `restore` and `reset` both rewrite it from the
-read-only repository mount, and the Range refuses to start quietly about it — startup reports any
-control that is not at its designed setting. If the Range itself is the thing that is broken, the
-volume can be thrown away instead:
+**What is still deferred, and it is not a challenge.** 8.3 ships as a design exercise and says so.
+Building the thing it describes — a tool source that alters its list at runtime — needs an ADR
+first, because rule 10 says external text cannot register tools and a runtime tool source is
+exactly a component that does. The challenge names the six questions that ADR would have to answer.
 
-```
-docker compose --profile range down
-docker volume rm supportpilot_opa_bundle
-docker compose --profile range up -d
-```
-
-`opa-bundle-init` repopulates it from `./policy/supportpilot` before OPA starts, so the policy comes
-back from the repository rather than from anything the Range wrote. This path is tested rather than
-assumed: the volume was removed and the lab cold-started from it, with the suites run afterwards.
-Note the absence of `-v` on that `down` — it takes the containers, not `postgres_data`.
-
-The permissive policy is **derived, never stored**. There is no wrong `.rego` file in this
-repository or in the Range image. Arming reads the real policy from the read-only mount and removes
-one named condition, asserting first that the text it expects is present — so the armed policy is
-always the real one minus one control, and editing the policy makes arming fail loudly rather than
-arm something stale. Against the correct bundle the policy suite is 53/53; against the permissive
-one exactly two tests fail, named for the control that was removed.
-
-`range_suite.py` asserts both outcomes, including the containment half: no order crosses a tenant
-boundary while the policy permits it. "A permissive policy is safe here because the database
-refuses" is precisely the kind of sentence that has to be measured rather than believed.
-
-**3.4 is built, and not by adding a fallback mode.** ADR-0004 refused to give the API a
-cached-allow path and deferred the challenge, listing source reading as an acceptable weaker shape.
-What shipped is stronger than that shape and still adds nothing to the API.
-
-The policy client has five branches that return without a decision: timeout, unreachable, bad
-status, unparseable body, and a 200 whose result is undefined. Three of them can be caused from the
-console — stopping the engine, a rule collision that makes evaluation error, and moving the package
-so the decision the API asks for does not exist. All three deny, which is the control working.
-
-The finding is what they look like from outside. Stopping the engine and the evaluation error both
-surface as `503` with `policy_unavailable`. The undefined decision surfaces as **`404` with
-`policy_malformed`, from an engine that is running and healthy** — indistinguishable, to a caller or
-a dashboard, from an order that does not exist. The single line at `pipeline.py:152` decides which
-failures are visible to whoever is watching, and it is not wrong: `404` rather than `403` is
-deliberate elsewhere, so that a refusal never confirms a resource exists in another tenant. The gap
-is between two correct decisions, which is where most real findings are.
-
-So 3.4 teaches the question that actually separates fail-open from fail-closed systems in a review —
-*"show me what the last policy outage looked like in your logs"* — without the repository containing
-a fallback allow. The two new mutations reuse the 3.3 bundle mechanism and store nothing: the broken
-bundles are derived from the real policy by appending one rule or moving the package.
-
-**8.1 is still not Ready.** It turns on the published action document drifting from the registered
-code, which means arming a change to a file in the repository, with the same un-guaranteed inverse
-that the policy bundle avoided by being a volume. The acceptable shape is the same one: put the
-drifting copy somewhere that is not the working tree. It has not been built.
-
-**Blocked on capability the design already names — and not all the same kind of blocked.** An
-earlier version of this section called all of these "ordinary unbuilt work", which was wrong for
-three of them and needs saying plainly, because "not built yet" and "the rules forbid this" are
-different answers to give a reviewer.
-
-*Refused by a non-negotiable rule, not merely unbuilt.* Rule 7 of `CLAUDE.md` reads: **the model
-never gets a generic tool — no SQL, shell, file, or unrestricted HTTP tool.**
-
-  * **4.2** wants a tool whose parameter is an unschema'd `object`. Challenge 4.1's own material
-    says what that is: *"a generic tool wearing a business name, which is worse than one that looks
-    generic, because nobody in the room becomes suspicious."* Building 4.2 by adding one to the API
-    means shipping the exact thing the lab teaches people to find.
-  * **8.2** wants a URL-taking tool pointed at an internal address. That is the unrestricted HTTP
-    tool, named in the rule.
-
-Both fall the way 3.4 fell, by a stronger route: not a judgement call in an ADR, a rule. And both
-have the same escape that 3.3 and 3.4 turned out to have — the lesson does not require the API to
-hold the capability. 4.1 already teaches half of 4.2 by having the learner audit the real surface
-and find that no such parameter exists; a full 4.2 needs the bad schema somewhere that is not the
-registered surface.
-
-*In tension with rule 10.* **8.3** connects a tool server that alters its tool list at runtime.
-Rule 10 says external text cannot register tools. A demonstration needs the lab to contain a
-component that does exactly that, and where it is allowed to sit is the whole design question. Not
-refused, not ordinary either — it needs its own ADR before anyone writes code.
-
-*Genuinely ordinary unbuilt work.* **4.4** (an outbound tool) and **5.4** (a rendering surface).
-Both are privilege grants and should be reviewed as such, but neither collides with a rule.
-
-**8.4 is built, and not by adding the capability it asks for.** The design wants a prompt store
-with and without review. Building one here would be a table nothing reads — Onyx is a separate
-deployment and is not running in this compose project, so the challenge would describe an outcome
-nobody can run. The lesson did not need it. The summaries in the published action document are
-prose a model reads to decide what an operation is for, and `export_openapi.py` calls them exactly
-that. So the text is already a control surface, and the challenge asks which of this system's
-controls cover changing it. None of them do, which the audit trail confirms rather than implies: it
-holds fourteen distinct actions and not one concerns the document, its tools, or any prompt.
-
-**A warning about reading `.dev/ctf/design.md` on its own.** That file is the original
-specification and it has not been amended as things were built, deliberately — it is a record of
-what was asked for. Two of its entries are now actively misleading and it is worth naming them
-here, because following either would breach a rule this repository treats as non-negotiable:
-
-  * §5 lists *"a deliberately wrong policy-fallback mode"* as a capability to grow, unlocking 3.4.
-    ADR-0004 **refused** that capability. Adding a cached or fallback allow path for when OPA is
-    unavailable is prohibited by `CLAUDE.md`, and 3.4 was built without it.
-  * §5 lists *"a reviewable prompt store"* as unlocking 8.4. 8.4 was built without one, because a
-    prompt store nothing reads would be a table and a narration.
-
-The design document is the question. This section is the answer, and where they disagree, this one
-is later.
-
-*Refused, and recorded above.* **2.2**, for two independent reasons. **3.4 is built** — it appeared
-in this list as refused long after it had shipped, which is the kind of staleness this section is
-supposed to prevent.
-
-**Resolved.** 7.1 was blocked on seeded evidence — the trail on a fresh lab is empty, and a flag
-that depends on whether somebody happened to run the verification suite is a flag that fails for the
-next learner. `database/seeds/0004_completed_refund.sql` now ships one completed refund as fixture
-history: the action request, its approval, its job, its execution evidence and its four audit rows,
-all consistent, with a payload hash that is the real sha256 of the canonical payload. The separation
-of duty trigger accepts it because alice proposes and fiona approves — a fixture that tried to seed
-a self-approval fails the seed file rather than producing a trail the system could never have
-written.
+**A note on reading `.dev/ctf/design.md` now.** It is the original specification and has
+deliberately not been amended. Its §5 lists capabilities to grow that were never grown, and two of
+them must not be: a deliberately wrong policy-fallback mode, which ADR-0004 refused and `CLAUDE.md`
+prohibits, and a URL-taking tool, which rule 7 names directly. The design document is the question.
+This section is the answer, and where they disagree, this one is later.
