@@ -376,7 +376,7 @@ def landing(
         f'<a class="btn quiet" href="/catalogue">All {total} challenges</a>'
         "</div>"
         '<dl class="key">'
-        '<div><span class="sw held" aria-hidden="true"></span><dt>Held</dt>'
+        '<div><span class="sw held" aria-hidden="true"></span><dt>Correct</dt>'
         "<dd>every control at its designed setting</dd></div>"
         '<div><span class="sw armed" aria-hidden="true"></span><dt>Armed</dt>'
         "<dd>a control is deliberately in its wrong setting</dd></div>"

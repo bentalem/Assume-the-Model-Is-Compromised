@@ -14,9 +14,10 @@ The article this lab was built for is [`README.md`](README.md). Read it first if
 explains *why* each control is where it is.
 
 **This file does one job: get the system installed, running and verified, and tell you what you are
-looking at.** What to do with it once it runs lives elsewhere — [`docs/learning/`](docs/learning/)
-for working through the material, and [`docs/architecture/`](docs/architecture/) for how the pieces
-fit.
+looking at.** Practice happens in **The Range**, a browser app that ships with the lab and that
+[A5](#a5--the-range) starts — every exercise lives there, not here.
+[`docs/architecture/`](docs/architecture/) is how the pieces fit, and
+[`docs/learning/`](docs/learning/) is the reading track.
 
 **This guide has two halves.** Part A is the lab itself and takes about fifteen minutes. Part B adds
 Onyx and a real model, and takes about an hour the first time. **Part A is complete on its own** —
@@ -96,6 +97,7 @@ succeeded is not the same as an environment that is correct — this is what tel
 | `https://localhost:8443` | Keycloak, realm `supportpilot`. Self-signed certificate — your browser will warn once. |
 | `http://localhost:8080` | The same Keycloak over plain HTTP, for the test harness. |
 | `http://localhost:8090` | The approval portal. |
+| `http://127.0.0.1:8095` | The Range, once [A5](#a5--the-range) has started it. |
 | — | The API has **no published port**. That is deliberate: it is reachable only from inside the `app` network, so every request arrives the way a real one does. The scripts reach it by running a probe container on that network. |
 
 ### The people
@@ -140,6 +142,7 @@ Learning your way around the system, rather than installing it, is
 | `python scripts/action_suite.py` | approval and execution: no self-approval, no double execution |
 | `python scripts/contract_suite.py` | every call built from the published tool document |
 | `python scripts/backup_restore_drill.py drill` | a backup is restored and re-verified |
+| `python scripts/range_suite.py` | the Range: every arm restores, the console reports the true state, reset restores, no flag is free — needs A5 |
 | `opa test policy/` | the policy rules, including every deny arm |
 | `pytest services/api` | token verification, policy client, pipeline, hashing, pagination |
 
@@ -149,12 +152,78 @@ as an error — while 219 tests passed throughout, because every one of them bui
 
 > **A test that constructs the request is testing your assumptions, not your system.**
 
-## A5 · Starting over
+## A5 · The Range
+
+The Range is where you practise. It is a web app that comes with the lab: 31 challenges in eight
+tracks, each one explaining a control, letting you break it in the running system, and then showing
+you the lab's own source for why it behaved the way it did. **Everything is done with buttons in the
+browser.** No challenge needs a terminal.
+
+It is installed with the lab but started on its own, because it is the one service that is allowed
+to break the others:
 
 ```bash
-python scripts/bootstrap_local.py --reset    # back to a known state, database rebuilt
-docker compose down -v                        # stop everything and destroy the volumes
+docker compose --profile range up -d --build
 ```
+
+Then open **http://127.0.0.1:8095**. It needs Part A only — no Onyx, no model.
+
+| Page | What it is |
+|---|---|
+| `/` | Start here. The eight tracks, the claim each one makes, and three suggested ways in. |
+| `/catalogue` | All 31 challenges by track, with points and what each one arms. |
+| `/guide` | How a challenge is laid out, what the console does, the three kinds of flag. Read it once. |
+
+Progress is kept in your browser. There are no accounts, no scoreboard and no timer.
+
+### What it adds
+
+Three containers, all behind the `range` profile, so a plain `docker compose up` never starts them:
+
+| Container | Job |
+|---|---|
+| `range` | The web app. The only service allowed to put a control into its broken state — and back. |
+| `probe` | A fixed list of API requests the Range can ask for by name. The Range itself cannot reach the API; this is how a challenge makes a real call without the browser ever holding a token. |
+| `docker-proxy` | A narrow allowlist in front of the Docker socket, so the Range can stop and start lab containers without being root on the host. |
+
+It refuses to start anywhere but a local lab. With it running, `verify_local.py` also runs `V-17` to
+`V-21`, which prove it cannot reach the API or OPA, holds no privilege on any application table, and
+is absent from the tools the model can see.
+
+### The banner
+
+Every page opens with the state of the lab:
+
+| Banner | Meaning |
+|---|---|
+| **Correct** | Every control is at its designed setting. |
+| **Armed** | At least one control is deliberately in its wrong setting. The banner names it. |
+| **State unreadable** | The Range could not read a control, so nothing on the page can be trusted. The banner names it; see Troubleshooting. |
+
+**Reset the lab**, on the banner, puts every control back — not only the current challenge's — and
+reports what it had to restore. An armed control is armed in the real system, so while the banner
+says Armed, other checks in this file will fail. That is the lab working: reset, then verify.
+
+### After you update the repository
+
+The Range's code and all 31 challenges are built into its image. After a `git pull`, nothing you see
+changes until the images are rebuilt — this one command rebuilds the lab and the Range together and
+applies any new migrations:
+
+```bash
+docker compose --profile range up -d --build
+```
+
+Then reload the page with `Ctrl+F5`.
+
+## A6 · Starting over
+
+```bash
+python scripts/bootstrap_local.py --reset       # back to a known state, database rebuilt
+docker compose --profile range down -v          # stop everything, the Range too, and destroy the volumes
+```
+
+To put the controls back without losing anything, use **Reset the lab** in the Range instead.
 
 `--reset` is the answer to most confusion. Note that it destroys the Keycloak realm too, so if you
 have completed Part B you will need to re-run `python scripts/connect_onyx.py` and update the client
@@ -445,6 +514,11 @@ trail recorded `allowed`, twice. That gap is the most valuable thing Part B can 
 | `V-01` fails | A container is not running. `docker compose ps`, then that container's logs. |
 | A check fails after you changed something | That is the lab working. Find out which layer changed before you change anything back. |
 | Cross-tenant reads suddenly succeed | A policy was replaced and not put back. `python scripts/learn_authorization.py restore` reinstalls the real one. |
+| `127.0.0.1:8095` refuses the connection | The Range is profile-gated. `docker compose --profile range up -d`. |
+| The Range does not show a change you pulled | Its code and content are in the image. `docker compose --profile range up -d --build`, then `Ctrl+F5`. |
+| The Range's banner says **State unreadable** | The probe or the database is not answering. `docker compose --profile range ps`, then the logs of `probe` and `range`. |
+| `verify_local.py` fails while the Range says **Armed** | Expected — a control is broken on purpose. Press **Reset the lab**, then verify again. |
+| The `range` container exits at start, `SUPPORTPILOT_ENV` in its log | It runs only in a local lab, by design. Do not change the variable to get past it. |
 | Everything is confusing | `python scripts/bootstrap_local.py --reset`. |
 
 Start with `docker compose ps` and `docker compose logs --tail 100 api` — substitute `keycloak`,
@@ -493,13 +567,15 @@ services/
   api/                    auth · policy · tools · repositories · audit
   worker/                 jobs · adapters · idempotency
   approval-portal/        renders a payload hash, forwards a decision
+  range/                  The Range — the practice app; all 31 challenges are under content/
+  probe/                  the fixed list of API requests the Range may ask for
 database/
   migrations/             schema, roles, grants, RLS — owned by sp_migrator_role
   seeds/                  the two tenants and the injection corpus
 policy/supportpilot/      authz.rego + limits.json
 policy/tests/             the policy tests
 openapi/                  the registered action set — paste the .json into Onyx
-infrastructure/local/     Keycloak realm, Onyx overlay, agent instructions
+infrastructure/local/     Keycloak realm, Onyx overlay, agent instructions, Docker-socket proxy
 scripts/                  bootstrap, verify, the suites, the learning modules
 docs/
   architecture/           how it fits together, with diagrams
@@ -508,8 +584,9 @@ docs/
 specs/                    the exact contracts: schema, API, policy
 ```
 
-Start with [`docs/architecture/`](docs/architecture/) to understand the system, and
-[`docs/learning/00-curriculum.md`](docs/learning/00-curriculum.md) to work through it as a course.
+Practise in the Range. Read [`docs/architecture/`](docs/architecture/) to understand the system,
+and [`docs/learning/00-curriculum.md`](docs/learning/00-curriculum.md) to work through it as a
+course.
 
 ---
 
@@ -518,26 +595,3 @@ Start with [`docs/architecture/`](docs/architecture/) to understand the system, 
 No autonomous refunds without approval. No free-form SQL from the model. No general shell,
 file-system or cloud-administration tool. No model training. And no production deployment — this is
 Compose on one machine, holding invented data, built to be attacked.
-
----
-
-## The Range — practice, rather than reading
-
-The lab proves its controls to a machine. The Range proves them to you.
-
-```bash
-docker compose --profile range up -d
-```
-
-Then open **http://127.0.0.1:8095**, and read **/guide** first — it explains how a challenge is
-laid out, what the console does, and where to start. Nothing in The Range needs a terminal.
-
-It arms the lab's own controls into broken states, lets you watch what changes, shows the source for
-why, and puts everything back. Challenge 2.1 is the one to start with: a tenant policy that is
-correctly written, visible in every schema dump, attached to the right role — and returning every
-tenant's rows.
-
-You never need a terminal for any of it. The service is profile-gated, refuses to start outside a
-local environment, and cannot reach the API; see
-[docs/architecture/the-range.md](docs/architecture/the-range.md) for why a service that can break the
-others is the one most worth reviewing.
