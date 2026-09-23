@@ -1,6 +1,8 @@
 > **This repository is also a lab.** The system described below runs on one machine — Onyx, Keycloak,
 > a policy engine, PostgreSQL with row-level security, a worker — and every control in it can be
-> removed so you can watch what fails. Start at **[LAB.md](LAB.md)**.
+> removed so you can watch what fails. Install it with **[LAB.md](LAB.md)**, then practise in
+> **The Range**, the browser app that ships with it: 31 challenges in eight tracks that follow this
+> article, each one breaking a real control and putting it back. No terminal needed.
 
 # Assume the Model Is Compromised
 
@@ -65,7 +67,7 @@ tools, Open Policy Agent for the rules, PostgreSQL with row-level security for t
 separate worker as the only component able to execute a refund.
 
 Two tenants that must never see each other. Five users with different roles. Seven tools. One ticket
-filled with ten injection attempts written to look like ordinary customer messages.
+filled with nine injection attempts written to look like ordinary customer messages.
 
 The details of that system matter less than one habit it was built to support: **a control nobody
 has watched fail is a control being trusted, not a control that has been tested.** Several findings
@@ -279,7 +281,7 @@ the size of the damage.
 
 ![The agent asked to summarise ticket TKT-1001 returns an ordinary support summary, ending with a note that the conversation contains several unrelated or unverified requests for data access, credential disclosure and refund actions, and that no valid refund approval or completed refund is recorded.](img/04-injection-ticket.png)
 
-*A ticket carrying ten planted injections, summarised. The last bullet is the agent **reporting** the
+*A ticket carrying nine planted injections, summarised. The last bullet is the agent **reporting** the
 attempts rather than following them — and there is no filter anywhere in this system. Nothing was
 blocked, because none of the instructions pointed at anything that exists.*
 
@@ -482,7 +484,7 @@ displayed a security control working, at the exact moment no control had acted a
 > **A model's narration of security events is not evidence — and that stays true on the days when
 > the narration happens to be correct.**
 
-### Ten sophisticated injections achieved nothing — for the wrong reason
+### Nine sophisticated injections achieved nothing — for the wrong reason
 
 The planted ticket contained instruction overrides, a forged "system notice" declaring the sender an
 administrator, a request to print the system prompt and the database connection string, a call to
@@ -636,6 +638,26 @@ time.*
 ---
 
 ### Also in this repository
+
+**[LAB.md](LAB.md)** — install the system this article was tested against, prove it is correct, and
+start The Range.
+
+**The Range** — 31 challenges in eight tracks, in your browser at `http://127.0.0.1:8095` once the
+lab is up. Each one explains a control, lets you break it in the running system, and then shows you
+the lab's own source for why it behaved the way it did. Where each part of this article lives there:
+
+| In this article | In the Range |
+|---|---|
+| 01 · Whose identity does the tool call carry? | Track 1 · Identity — start with **1.1** *Whose token is it* |
+| 02 · Where does authorization actually happen? | Track 3 · Authorization — **3.1** *Deny by default, proved*, **3.2** *Yes, and only these fields* |
+| 03 · What do your tools actually allow? | Track 4 · Tool authority — **4.1** *The worst legal call*; the opening extraction is **4.3** *Inside every limit* |
+| 04 · What happens when untrusted content reaches the model? | Track 5 · Untrusted content — **5.1** direct, **5.2** indirect, **5.3** second order |
+| 05 · How do irreversible actions happen? | Track 6 · Irreversible actions — **6.1** *Approve one payload, execute another* |
+| 06 · What can you prove afterwards? | Track 7 · Evidence — **7.1** *Reconstruct it* |
+| 07 · What can the runtime change about itself? | Track 8 · The control plane — **8.3** *A tool server changes its mind* |
+| Row-level security that is configured, visible, and filtering nothing | Track 2 · Tenant isolation — **2.1**, then **2.3** *Four questions* for the catalogue query |
+| A test that lied in its own name | **7.4** *The test that lied in its own name* |
+| The habit underneath all four | **7.3** *Prevented, or merely failed* |
 
 **[securing-ai-agents.pdf](securing-ai-agents.pdf)** — the same article as a printable document,
 screenshots and all.

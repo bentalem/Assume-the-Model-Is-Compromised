@@ -61,7 +61,7 @@ tools, Open Policy Agent for the rules, PostgreSQL with row-level security for t
 separate worker as the only component able to execute a refund.
 
 Two tenants that must never see each other. Five users with different roles. Seven tools. One ticket
-filled with ten injection attempts written to look like ordinary customer messages.
+filled with nine injection attempts written to look like ordinary customer messages.
 
 The details of that system matter less than one habit it was built to support: **a control nobody
 has watched fail is a control being trusted, not a control that has been tested.** Several findings
@@ -275,7 +275,7 @@ the size of the damage.
 
 ![The agent asked to summarise ticket TKT-1001 returns an ordinary support summary, ending with a note that the conversation contains several unrelated or unverified requests for data access, credential disclosure and refund actions, and that no valid refund approval or completed refund is recorded.](img/04-injection-ticket.png)
 
-*A ticket carrying ten planted injections, summarised. The last bullet is the agent **reporting** the
+*A ticket carrying nine planted injections, summarised. The last bullet is the agent **reporting** the
 attempts rather than following them — and there is no filter anywhere in this system. Nothing was
 blocked, because none of the instructions pointed at anything that exists.*
 
@@ -478,7 +478,7 @@ displayed a security control working, at the exact moment no control had acted a
 > **A model's narration of security events is not evidence — and that stays true on the days when
 > the narration happens to be correct.**
 
-### Ten sophisticated injections achieved nothing — for the wrong reason
+### Nine sophisticated injections achieved nothing — for the wrong reason
 
 The planted ticket contained instruction overrides, a forged "system notice" declaring the sender an
 administrator, a request to print the system prompt and the database connection string, a call to

@@ -119,14 +119,14 @@ they are throwaway values for a throwaway realm.
 |---|---|---|
 | Orders | `ORD-2001` · `ORD-2002` · `ORD-2003` | `ORD-3001` |
 | Customers | `CUS-4001` · `CUS-4002` · `CUS-4003` *(restricted)* | `CUS-9001` |
-| Tickets | `TKT-1001` *(carries ten injections)* | `TKT-3001` |
+| Tickets | `TKT-1001` *(carries nine injections)* | `TKT-3001` |
 
 Three of these carry most of the lessons:
 
 - **`ORD-3001`** belongs to Northwind. Alice must never read it, however she asks.
 - **`CUS-4003`** is marked `restricted`. An agent gets the record *without* the email address; a
   manager gets it with. The address is not hidden from the agent — it never reaches the agent.
-- **`TKT-1001`** contains ten injection attempts written to look like ordinary customer messages.
+- **`TKT-1001`** contains nine injection attempts written to look like ordinary customer messages.
 
 The architecture, with diagrams: [`docs/architecture/`](docs/architecture/).
 

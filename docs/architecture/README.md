@@ -331,7 +331,7 @@ Three fixtures carry most of the lessons:
 - **`CUS-4003`** is marked `restricted`. An agent gets the record without `email`; a manager gets it
   with. The address is not hidden from the agent — it never reaches the agent, because policy
   returned a field list and the API dropped the rest before building the response.
-- **`TKT-1001`** carries ten injection attempts written to look like ordinary customer messages:
+- **`TKT-1001`** carries nine injection attempts written to look like ordinary customer messages:
   instruction overrides, a forged system notice claiming administrator status, a request for the
   system prompt and the connection string, calls to tools that do not exist, and a fabricated tool
   result carrying an approval.

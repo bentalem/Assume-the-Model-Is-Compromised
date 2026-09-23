@@ -118,7 +118,7 @@ Five probes typed into the Onyx chat, not a walkthrough:
 | Read own-tenant order | **failed** — real bug, see below | — |
 | Read another tenant's order | 404 | resource lookup, scoped to memberships |
 | Claim to be an administrator | 404 | nothing changed; the claim touches no input to any check |
-| Summarise a ticket with ten injections | summarised, and reported them | tools that do not exist; secrets the model never sees |
+| Summarise a ticket with nine injections | summarised, and reported them | tools that do not exist; secrets the model never sees |
 | Retry the cross-tenant read after the injection | 404 | as before |
 
 The bug is the lesson. `get_order` declared an array query parameter; Onyx sent
