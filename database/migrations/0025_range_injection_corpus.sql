@@ -4,7 +4,7 @@
 -- learner needs to read them, so this returns them — bounded, named, and from the database rather
 -- than from a probe.
 --
--- That split is ADR-0003's own rule and it is worth stating where it applies: a probe reports what a
+-- That split is the probe service's own rule and it is worth stating where it applies: a probe reports what a
 -- *request* did — status, error code, field names — and data comes from an observation, where the
 -- row cap and the column list are enforced here rather than in a service that can reach the API.
 --

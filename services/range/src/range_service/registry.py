@@ -672,7 +672,7 @@ register_observation(
 #
 # The Range cannot reach the API. These ask `probe` for one of its registered requests, by id, over
 # the control network. Two registries have to agree before anything happens, and neither service can
-# extend the other's vocabulary — see docs/architecture/adr-0003-range-request-probes.md.
+# extend the other's vocabulary — see docs/architecture/the-range.md.
 #
 # The result is the status, the error code and the *field names* in the response. Never values: a
 # challenge that needs data reads it from the database through an observation above, where the row

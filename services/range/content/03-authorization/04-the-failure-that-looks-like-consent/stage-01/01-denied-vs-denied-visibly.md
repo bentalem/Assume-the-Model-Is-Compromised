@@ -20,7 +20,7 @@ reviewing an authorization change, and by every ordinary engineering standard th
 ## This is not the challenge
 
 This lab fails closed, and it will not be made to do otherwise. There is no fallback mode to switch
-on — deliberately, and the reasoning is written down in `docs/architecture/adr-0004`: a repository
+on — deliberately: a repository
 that teaches people to ask *"what can your runtime turn off about itself?"* cannot also ship a
 switch that turns off its own authorization.
 

@@ -1,4 +1,4 @@
-# Secrets never enter version control (P0-07). Files live here; values are generated locally.
+# Secrets never enter version control. Files live here; values are generated locally.
 .secrets/
 !.secrets/.gitkeep
 *.pem
@@ -40,3 +40,6 @@ _to_delete/
 
 # Our own working documents. The lab is published; how we build it is not.
 .dev/
+CLAUDE.md
+.claude/
+.githooks/

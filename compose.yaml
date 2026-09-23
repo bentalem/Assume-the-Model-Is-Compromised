@@ -5,7 +5,7 @@
 # check V-02 proves it.
 #
 #   docker compose up -d                   SupportPilot + Keycloak + OPA + PostgreSQL
-#   docker compose --profile onyx up -d    adds Onyx (see ADR-0002)
+#   docker compose --profile onyx up -d    adds Onyx (see LAB.md, Part B)
 
 name: supportpilot
 
@@ -323,7 +323,7 @@ services:
 
   # --------------------------------------------------------------------------------------------
   # Worker. Data network only: no inbound, and no route to OPA or the edge.
-  # Phase 4 gives it real jobs; it holds a claim loop and health state now.
+  # The only component that executes a refund, and only one that was approved.
   # --------------------------------------------------------------------------------------------
   worker:
     <<: *python-base
@@ -452,7 +452,7 @@ services:
   #
   # The Range cannot reach the API (V-17) and twelve challenges need a request made through it.
   # This service can reach the API, holds one hand-written list of requests, and answers to an id.
-  # See docs/architecture/adr-0003-range-request-probes.md.
+  # See docs/architecture/the-range.md.
   #
   # It is on `app` because it must reach the API, which means anything else on `app` can open a
   # socket to it. Network placement alone cannot make the direction one-way, so the shared secret

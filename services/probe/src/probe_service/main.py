@@ -4,8 +4,8 @@ The Range cannot reach the API, and that boundary is asserted (`V-17`). Twelve c
 a learner to make a request *through* the API. This service is the answer: it can reach the API, it
 holds one fixed list of requests, and the Range can ask it for one of them by name.
 
-Read `docs/architecture/adr-0003-range-request-probes.md` for why this rather than the one-line fix
-of putting the Range on the `app` network.
+This, rather than the one-line fix of putting the Range on the `app` network, because a fixed list
+a human wrote down is a review surface and a route to the API is not.
 
 Three properties, in the order they matter:
 

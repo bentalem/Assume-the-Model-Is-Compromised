@@ -121,7 +121,7 @@
     {
       "clientId": "supportpilot-test-harness",
       "name": "Local test harness",
-      "description": "Direct grant client used by verify-local.ps1 to exercise the API without Onyx. Local realm only; see ADR-0002. It grants no authority the browser flow would not, and is not a substitute for the Onyx OAuth-forwarding evidence.",
+      "description": "Direct grant client used by verify-local.ps1 to exercise the API without Onyx. Local realm only. It grants no authority the browser flow would not, and is not a substitute for the Onyx OAuth-forwarding evidence.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": false,
@@ -159,7 +159,7 @@
     {
       "clientId": "another-service",
       "name": "Another service in the same realm",
-      "description": "Teaching fixture for the audience check. Tokens from here are valid but carry no SupportPilot audience, so the API must refuse them. The absent audience mapper is the fixture; see docs/architecture/ ADR-0003 and challenge 1.2.",
+      "description": "Teaching fixture for the audience check. Tokens from here are valid but carry no SupportPilot audience, so the API must refuse them. The absent audience mapper is the fixture; see challenge 1.2 in the Range.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": false,

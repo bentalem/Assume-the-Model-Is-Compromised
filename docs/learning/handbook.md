@@ -601,8 +601,9 @@ If a tool server changed its tool list tonight, who would know?
 
 **The worked example.** Secrets are mounted per service. The API has **no published port** — it is
 reachable only from inside the app network. OPA sits on its own internal network. The policy bundle
-is versioned and every decision carries that version. `CLAUDE.md` names control-plane changes as a
-separate class of change, which is what makes them reviewable rather than routine.
+is versioned and every decision carries that version. A new tool, grant, policy rule or outbound
+destination is treated as a privilege grant rather than a configuration change, which is what makes
+it reviewable rather than routine.
 
 ### 2.11 Proving it
 

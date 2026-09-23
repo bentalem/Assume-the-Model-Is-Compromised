@@ -2,7 +2,7 @@
 
 This directory existed and was empty. Challenge 5.4 sends a learner to read `main.py`, find that
 every interpolated value goes through `html.escape`, and then observe that nothing in the repository
-would catch it if one of them did not — which breaches the convention in `CLAUDE.md` that every
+would catch it if one of them did not — which breaches the lab's own convention that every
 capability ships with tests. This is that gap closed.
 
 Why it matters here specifically: this page is the one screen a human reads before authorising money

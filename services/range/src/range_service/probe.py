@@ -2,7 +2,7 @@
 
 The Range cannot reach the API. It can ask `probe` for one of a fixed list of requests, by id, over
 the `control` network and with a shared secret. That is a smaller thing than a route to the API, and
-the difference is the whole of ADR-0003.
+the difference is the whole point of the probe service.
 
 Nothing in this module composes a request. `run()` takes an id that came from a challenge's declared
 observation list, and the probe service refuses any id that is not in its own registry — so the

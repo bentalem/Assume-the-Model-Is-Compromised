@@ -210,7 +210,7 @@ def main() -> int:
         )
         # Exact, not a prefix. Disabling row security leaves relforcerowsecurity set, so the armed
         # state is `false/true` — and a test that matched only `false` would pass for a state it
-        # never checked, which is the kind of lie CLAUDE.md names.
+        # never checked, which is a test lying in its own name.
         expected = {
             "rls.orders.force_off": "true/false",
             "rls.orders.disable": "false/true",

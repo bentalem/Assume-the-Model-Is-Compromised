@@ -547,9 +547,21 @@ Start with `docker compose ps` and `docker compose logs --tail 100 api` — subs
 | Onyx reported as absent by the scripts | Your Compose project is not named `onyx`. Use `-p onyx`. |
 | The agent answers but never calls a tool | No model provider configured, or the action is not attached to this agent. |
 
-**Never fix a failing check by weakening a control.** Disabling row-level security, granting a bypass,
-or relaxing a token check to make something work invalidates every result you produce afterwards.
-[`CLAUDE.md`](CLAUDE.md) lists the nine shortcuts that are never acceptable.
+**Never fix a failing check by weakening a control.** Any one of these invalidates every result you
+produce afterwards, however temporary and however "just the test tenant":
+
+- disable row-level security, or grant `BYPASSRLS`
+- let the API own protected tables
+- add a cached or fallback allow path for when OPA is unavailable
+- accept an organization or user id from a tool argument
+- register a generic SQL, shell, or HTTP tool
+- let the API execute a refund directly
+- let a requester approve their own action
+- mount the migration credential into a runtime service
+- skip an audit write for latency
+
+If a demo only works with one of these, the demo is the thing that is wrong. (Arming a control in the
+Range is different: it is deliberate, visible on every page, and one press puts it back.)
 
 When something surprising happens and you want to know what actually occurred:
 [`docs/runbooks/investigation.md`](docs/runbooks/investigation.md).
@@ -561,7 +573,6 @@ When something surprising happens and you want to know what actually occurred:
 ```
 README.md                 the article
 LAB.md                    this file
-CLAUDE.md                 the invariants — what must never be weakened
 compose.yaml              six networks, eleven services — three gated on the `range` profile
 services/
   api/                    auth · policy · tools · repositories · audit
