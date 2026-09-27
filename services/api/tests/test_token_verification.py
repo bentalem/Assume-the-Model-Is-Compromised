@@ -136,6 +136,25 @@ def test_missing_expiry_is_rejected(verifier, signing_key):
     assert_rejected(verifier, token)
 
 
+def test_missing_audience_is_rejected(verifier, signing_key):
+    """A correctly signed token that names no audience at all is not a token for this API.
+
+    python-jose checks the audience only when an `aud` claim is present, so without require_aud
+    this token was accepted as though it had named the API. The wrong-audience cases above could
+    not catch it: each of them carries an `aud`.
+    """
+    from jose import jwt
+
+    now = int(time.time())
+    token = jwt.encode(
+        {"sub": ALICE_SUB, "iss": ISSUER, "iat": now, "exp": now + 300},
+        signing_key["private_pem"],
+        algorithm="RS256",
+        headers={"kid": signing_key["kid"]},
+    )
+    assert_rejected(verifier, token)
+
+
 def test_missing_subject_is_rejected(verifier, make_token):
     assert_rejected(verifier, make_token(sub=""))
 

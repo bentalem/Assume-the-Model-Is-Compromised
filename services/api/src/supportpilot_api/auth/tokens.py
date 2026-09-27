@@ -149,6 +149,10 @@ class TokenVerifier:
                 issuer=self._issuer,
                 audience=self._audience,
                 options={
+                    # python-jose's audience check runs only when an `aud` claim is present, so
+                    # without this a correctly signed token naming no audience at all was accepted
+                    # as though it had named this API. verify_aud alone does not cover it.
+                    "require_aud": True,
                     "require_exp": True,
                     "require_iat": True,
                     "verify_aud": True,
