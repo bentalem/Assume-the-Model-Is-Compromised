@@ -1,16 +1,28 @@
-# Reading history is an access decision
+# What the transcript setting granted
 
-The database policies on `mem.sessions` and `mem.turns` normally allow only the owner to read a conversation.
+## What your result proves
 
-When `history.org_readable` is enabled, a manager may also read a colleague's transcripts **within the same organisation**. The service records whether the read was made as the owner or under the review setting.
+Before manager review access was enabled, Bob could not see Alice's saved conversation. After you enabled it, the read succeeded **as a manager in the same organisation**.
 
-The setting does not expand write access. A manager still cannot add turns to another user's session, and another organisation remains blocked.
+The difference was not the user's token, the model's instructions or the original ticket. It was a change in the database's read policy. The transcript contained data saved from Alice's earlier interaction, so Bob's new access could include tool results that were originally fetched with Alice's rights.
 
-Without review access, the service does not confirm that a colleague's session exists. A hidden session and an unknown session both appear unavailable to the caller.
+## Where access is enforced
+
+The `history.org_readable` setting is read by the row-level security policies on `mem.sessions` and `mem.turns`. The normal policy permits the owner. The optional review rule permits a support manager to read a colleague's session in the same organisation.
+
+The service also records **why** the read succeeded: as the owner or through manager review. A request for an inaccessible session does not confirm that the session exists. It looks unavailable to the caller.
+
+The setting widens **read** access only. Bob cannot add messages to Alice's session, and a user from a different organisation still cannot read it.
+
+## What this means for a real deployment
+
+History is not just a record of a chat. It can contain information returned by other systems. A transcript reviewer may receive a second copy of information that the original source would not return to them.
+
+The review setting may be useful for a support team, but it must be treated as an access grant: give it to defined roles, record its use, and check the data it exposes.
 
 ## Take it to a review
 
-- Which roles can change the history review setting?
-- Does review access include old tool results fetched with another person's rights?
-- Does the audit log show who read the transcript and why?
-- Can review access be granted without also granting write access?
+- Who can enable manager review, and is that change logged?
+- Does the transcript contain tool results with stricter access rules than the transcript itself?
+- Can the team audit each manager's reads without granting them write access?
+- Should some tool results be excluded or masked in the review view?
