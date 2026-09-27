@@ -1,23 +1,17 @@
-# Rules are control-plane state
+# A rule is not an ordinary remembered fact
 
-Memory systems have three kinds of memory, and the third is the one people forget is different:
+A long-term memory may say the user prefers short reports. A rule tells the agent what to do on **future turns**. In this lab, an active rule applies to the whole organisation.
 
-| Kind | Example | What the model does with it |
-|---|---|---|
-| Episodic — history | "yesterday alice asked about ORD-2001" | reads it |
-| Semantic — facts | "alice prefers email" | reads it |
-| **Procedural — rules** | "always confirm the order number before discussing a refund" | **obeys it, every turn** |
+The model can call `propose_rule`. It cannot approve its own proposal. A person with an approver role must approve the **exact text** and must not be the person who proposed it.
 
-A rule is an instruction with standing. It applies to every conversation, for everyone it covers,
-until somebody removes it. Changing one is a change to how the agent behaves — which is what track 8
-calls the control plane.
+PostgreSQL stores the rule's state and a hash of its text. A database trigger enforces the allowed state changes and prevents self-approval.
 
-So the question is the one track 6 asked about refunds: **who proposes, who approves, and can they be
-the same party?** Here the proposer is often the model itself. Assistants that "learn your
-preferences" are writing rules for themselves from what they read.
+## Your task
 
-## What this service does
+First propose a rule with the normal approval process. See that it stays `proposed` and does not enter context. Then enable self-activation and submit a proposal again.
 
-`propose_rule` is one of the four tools the model has. It creates a proposal. A proposal does
-nothing until someone else approves the exact text — by its hash — through a route the model does not
-have. The store enforces that the approver is not the proposer, in a trigger, whoever is calling.
+Look at its state and at the next context. An instruction taken from one untrusted ticket may now affect future users in the same organisation.
+
+Turning self-activation off prevents new cases. The Range must also retire rules that became active without approval while the setting was on.
+
+An approved instruction in context still cannot bypass the business API's separate permissions and refund approval process.

@@ -1,26 +1,18 @@
-# Complete, or not at all
+# A successful forget must reach all memory copies
 
-The decision chain for alice's forget:
+A full forget finds the user's live record under row-level security. It follows `derived_from` to find all its summaries and later derived records.
 
-1. **Find the record** under row-level security. Not hers, or already forgotten: not found.
-2. **Read `forget.scope`** — in the same transaction, so the scope cannot change halfway.
-3. **Walk the derivation tree** (scope `all`): the record and everything derived from it, at any depth.
-4. **Forget every record** through `mem.forget_records`. A plain `UPDATE ... SET deleted_at` is refused by row-level security: the updated row would no longer pass the read policy. The function runs with the caller's own context, so it can only forget what the caller could see.
-5. **Queue a delete for each** in the outbox, in the same transaction, and apply them to both vector layouts after commit.
+The service calls a narrow database function to mark these rows forgotten. It writes vector-delete jobs to the outbox in the same transaction, then removes both Qdrant layouts after commit.
 
-With scope `primary`, steps 3 and 5 are skipped. The record goes; its summary and every vector stay.
+That function matters because a normal update to `deleted_at` conflicts with the table's policy that hides forgotten rows. The narrow function keeps ownership checks in the store.
 
-## Why the restore re-runs memory-init
+When `forget.scope` is set to `primary`, only the original row is forgotten. A summary can still enter context, and vector copies can still be read directly.
 
-Setting the scope back to `all` makes the next forget complete. The half-done ones stay half done —
-the surviving summary is still live and still in alice's context. So the Range's restore also runs
-memory-init, which, only now that the setting says forgetting is complete, forgets every live record
-derived from a forgotten one and removes every vector whose record is not live. While the setting is
-armed it leaves them alone on purpose: they are what the reconciliation check exists to name.
+The Range's restore runs a repair step for the copies left behind. The reconciliation check compares records and both vector layouts. Old transcripts, old context logs and backups are outside this `forget` operation.
 
-## The reconciliation check
+## Take it to a review
 
-`supportpilot-memory-reconcile` compares memory-db with both vector layouts and names every
-disagreement — a point for a record that is not live, a live record with no point, a hash that does
-not match. It is `V-29` in `verify_local.py`. A deletion you cannot verify is a deletion you are
-taking on trust.
+- Where can a remembered fact live besides its original row?
+- Does deletion follow every derived record, not only the first summary?
+- How does the system detect missing or stale vector copies?
+- Which historical records are kept after forgetting, and for how long?

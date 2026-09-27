@@ -1,21 +1,17 @@
-# A second copy of everything
+# Conversation history is a second copy of private data
 
-An agent's history is not a log file somebody might look at. It is a store, and it holds:
+A transcript contains user messages, assistant replies and tool results. Some tool results may have been fetched using permissions that another user does not have.
 
-- what the user typed — which is often more than they would write anywhere else;
-- what every tool returned — fetched **with that user's permissions**, from every system the agent can reach;
-- what the model said back.
+The history database stores this copy even after the original request has finished.
 
-So a transcript is a copy of a person's access, taken at the moment they used it, kept for as long
-as history is kept. Whoever can read it later gets that access without holding it.
+By default, users can read their own conversations. In the lab, a setting can also allow managers to read the transcripts of colleagues **in the same organisation** for quality review.
 
-## Quality review is a real requirement
+That may be useful for a support team, but it changes who can read sensitive information. A manager who can see a transcript is not automatically allowed to see everything that the original user fetched from other systems.
 
-Support organisations review conversations. Managers want to see how their team — and now their
-agent — handles customers. "Let managers read transcripts" is a reasonable-sounding setting, and it
-is the kind that gets turned on in a settings page without anyone treating it as the access-control
-change it is.
+## Your task
 
-The question it raises is not whether review is legitimate. It is: **when alice spoke to the agent,
-did she know this was the audience?** And: **does bob's reading it mean reading data alice was
-allowed to see and he is not?**
+Try reading a colleague's session before and after enabling the quality-review setting. Compare the response and the audit record.
+
+The setting changes **read** access only. The manager cannot add messages to the colleague's conversation. A user in another organisation still cannot read it.
+
+Treat history access like access to any other database that stores private information.

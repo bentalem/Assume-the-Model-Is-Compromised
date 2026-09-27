@@ -1,19 +1,16 @@
-# A confirmation the model cannot give
+# Confirmation must be outside the model
 
-The decision chain for the model's write:
+The `remember` tool accepts only a fact to save. The service fixes the source to `agent` and normally saves it as `unconfirmed`. PostgreSQL's insert policy enforces that choice too.
 
-1. **`remember` is called** — the model-facing tool, in the memory action document. The request body has one field, `content`. It cannot say who wrote it, what channel it came from, or whether it is confirmed; the action-document gate refuses any of those in a body.
-2. **The channel is fixed by the route**: this is the model's endpoint, so the record is `agent`.
-3. **Status is `unconfirmed`** — unless `write.auto_confirm` is on, in which case it is born `confirmed` with `confirmed_via = 'auto'`. The insert policy in the store checks the same setting, so the service alone cannot decide it.
-4. **Context selects confirmed memories only.** Unconfirmed, the note exists and is never used.
-5. **Confirmation** is `POST /v1/memories/{id}/confirm` — a runtime route, absent from the action document. The model has no tool that reaches it. That is what makes it a person's decision.
+Context assembly selects only confirmed memories. A separate runtime route lets the user confirm a pending record. The model cannot call that route through its memory action document.
 
-## What restoring the setting does
+Turning on `write.auto_confirm` lets the same tool call create a confirmed record immediately. That means untrusted ticket text can become persistent context without a person's decision.
 
-Closing auto-confirm stops new memories being born confirmed. On its own it does nothing about the
-ones that already were — they would stay in alice's context indefinitely. So the Range's restore does
-a second thing: every memory whose `confirmed_via` is `auto` goes back to `unconfirmed`, to wait for
-its owner, with an audit event each. Nothing is deleted; alice can still confirm what she wants.
+Turning the setting back off only changes new writes. The Range's restore also returns auto-confirmed records to the pending state so they stop entering context.
 
-That second step is the part real incidents usually lack. Fixing the setting is the patch. Finding
-what came through while it was open is the response.
+## Take it to a review
+
+- Can the model mark a memory confirmed in its own tool call?
+- Who can see and approve pending memories?
+- How do you find memories that were auto-confirmed while the setting was unsafe?
+- Does deleting a poisoned memory also remove its summaries and vector copies?

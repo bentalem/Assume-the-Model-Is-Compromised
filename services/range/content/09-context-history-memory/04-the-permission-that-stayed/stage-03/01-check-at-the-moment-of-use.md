@@ -1,28 +1,16 @@
-# Check at the moment of use
+# Check history permissions when it is used again
 
-The decision chain for one replayed turn:
+Each saved turn records `authz`: the user's roles when that turn was written. These roles come from the verified principal, not from the model's input.
 
-1. **At write**, the runtime appends bob's tool turn. The service captures `authz` — `{"roles": ["support_manager"], "at": ...}` — from bob's verified principal. The caller cannot supply it.
-2. **At replay**, the service resolves bob's principal again from the core database. His roles are what they are *now*.
-3. **For each tool or assistant turn**, it compares the roles the turn was produced under with the roles bob holds now. Any role lost means the turn is omitted, and the block says which role.
-4. **The log records both** — `produced_under`, `roles_now`, `included`, and whether an included item `outlived_its_permission` — so the state is reviewable afterwards, not only at the time.
+Before replay, context assembly gets the user's **current roles** from the core database. It leaves out tool and assistant turns if any role recorded at write time has been lost. The context log says what was omitted and why.
 
-User turns are not re-authorised: what bob typed carries nothing the system fetched for him.
+This rule is intentionally broad. It may hide a turn even when the lost role did not matter for that particular result. The current implementation does not track the exact permissions for every field fetched by every tool.
 
-## Why this is conservative, and why that is right
+When revalidation is disabled, the old result can enter the context despite the role change.
 
-Losing *any* role the turn was produced under drops it, even if the role lost had nothing to do with
-that particular turn. A precise check — "was this specific field visible only to that role?" — would
-need the field obligations of every tool recorded with every turn. The conservative check costs some
-history after a demotion. The precise one, done wrong, costs the data. In a system where a
-demotion is rare and an over-broad replay is invisible, pay the first cost.
+## Take it to a review
 
-## The same control, three times in this lab
-
-| Where | What is re-checked on every use |
-|---|---|
-| The API (track 1) | roles, from the database, not from the token |
-| The worker (track 6) | the approval, against the payload hash, at execution |
-| History replay (here) | the roles a stored result was produced under |
-
-Authorisation is not something you pass once. It is something you ask again, where the data is used.
+- Does history record the permissions under which each tool result was fetched?
+- Does the runtime check those permissions again before replay?
+- What happens when access to one record changes but the user's role does not?
+- Can an investigator find the contexts that included an old result?

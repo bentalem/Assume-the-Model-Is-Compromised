@@ -1,27 +1,24 @@
-# History is a cache of authorised answers
+# Old history can outlive an old permission
 
-In 1.3, bob was demoted and his very next request to the API came back without the customer's email.
-The API loads his roles on every request, so the demotion took effect at once.
+Suppose a manager uses a tool to read a restricted customer record. The runtime saves the tool result in history while that manager has the required role.
 
-Now put history in between.
+Later, the manager loses that role. The main business API checks current permissions, so a new request would no longer return the same restricted data. But history already contains the old answer.
 
-```
-09:00  bob (manager)  get_customer CUS-4003   → email shown, because he may see it
-09:00  runtime        stores the tool turn in bob's session
-10:00  bob is demoted to support_agent
-10:05  bob            "prepare the escalation call"
-       runtime        rebuilds context — including the 09:00 tool turn
+```text
+09:00  Manager fetches restricted record
+09:01  Runtime saves tool result and roles at write time
+10:00  Manager role is removed
+10:05  Runtime tries to replay the old turn
 ```
 
-At 10:05 the API would refuse bob that email. The history does not ask the API. It replays what was
-stored, and the email reaches the model in bob's context as if nothing had changed.
+## The check you built
 
-That is a cache with no invalidation — the same shape as roles read from a token, which 1.3 was
-about. The source of truth changed; the copy did not.
+The saved turn has an `authz` field containing the roles held at write time. Context assembly checks the user's current roles again. If they lost a recorded role, it leaves out that tool or assistant turn.
 
-## What re-authorisation on replay means
+This is a broad role check; it does not track permission changes to individual fields or records.
 
-Every turn this service stores records **the roles it was produced under**, captured from the
-verified principal at write time. When history is replayed into context, a tool or assistant turn
-produced under a role the caller no longer holds is **left out** — and the block says that it was,
-so the omission is not silent.
+## Your task
+
+Observe the replay before demotion. Then remove the manager role and observe it again. Finally disable history revalidation and see what reaches the context.
+
+The old record was allowed **when it was fetched**. The question now is whether it is still allowed **when replayed**.

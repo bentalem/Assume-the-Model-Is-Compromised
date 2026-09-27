@@ -1,27 +1,25 @@
-# How many copies does one memory make?
+# Forgetting means finding every copy
 
-alice tells the agent: *the customer on TKT-1003 asked us to call this number until the case closes.*
-She confirms it should be remembered. Here is where it now lives:
+One remembered fact may exist in more than one place:
 
-| Copy | Why it exists |
-|---|---|
-| the record in memory-db | the source of truth, with its provenance |
-| a point in `memories__cedar` | per-tenant recall |
-| a point in `memories__shared` | the shared layout (this lab writes both) |
-| a summary record | memory layers summarise to keep context small |
-| the summary's two points | the summary is recalled like any memory |
+- Its original row in `mem.records`.
+- A point containing its vector and text in a per-organisation Qdrant collection.
+- A second point in the lab's shared collection.
+- A summary derived from the original.
+- Vector copies of that summary.
 
-Six copies of one fact, and that is before backups, logs or the context blocks it has already
-appeared in. Real memory layers add more: extracted entities, graph edges, cached embeddings.
+There may also be older copies in transcripts, context logs and backups. Our `forget` tool does **not** erase those historical records.
 
-Then the case closes and alice says: **forget it.**
+## The full memory delete path
 
-## What "forget" has to mean
+The service starts with the memory the user owns. It follows `derived_from` to find summaries and later derived records. It marks those records as forgotten in PostgreSQL and places vector deletions in the outbox. After commit, it removes the Qdrant copies.
 
-A forget that removes the record and leaves the summary has not forgotten anything that matters.
-The summary is recalled, selected into context and read by the model exactly like the original — it
-*is* the original, shorter. A forget that removes both records and leaves the vectors has left the
-content in a store that can be queried directly, as 9.6 showed.
+The database's row-level security still limits whose records can be forgotten.
 
-This service's `forget` walks the derivation tree — everything whose `derived_from` leads back to
-the record — and removes every record in it and every point for each, in both layouts.
+## Your task
+
+Save and confirm a memory. Make a summary from it. Then forget it with complete deletion enabled and check every memory copy the observation can see.
+
+Repeat with primary-only forgetting enabled. The original disappears, but derived records and vector copies can remain.
+
+Turning the safe setting back on does not fix copies left behind. The Range's restore also runs the repair step and compares both stores.

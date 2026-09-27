@@ -1,25 +1,16 @@
-# Propose, approve, activate
+# Propose, approve, activate, retire
 
-The decision chain for a rule:
+The model's `propose_rule` tool sends only text. The service records the proposer and hashes the exact content. Normally the new rule starts as `proposed`.
 
-1. **Propose** — `propose_rule`, the model's tool. The body has one field, `text`. The channel is fixed to `agent` by the route, and the payload hash of the text is stored with it.
-2. **State at birth** — `proposed`, unless `rules.self_activate` is on. The insert policy checks the same setting, so the service alone cannot make a rule active.
-3. **Decide** — a runtime route, approvers only. The approver sends the hash of the text they read; a different text is a conflict. The trigger refuses a decision by the proposer, even when the proposer is an approver, and the refusal is audited — through a savepoint, so that the attempt most worth recording is not rolled back with the transaction it failed in.
-4. **Retire** — also approvers only. Who approved the rule stays on it.
+An authorised person uses a separate runtime route to approve or reject it. The decision must name the hash of the text they read. The approver cannot be the proposer. The database trigger checks the same rule and allows only legal state changes.
 
-## Two policies, one trigger
+Only `active` rules enter context. A later approver can retire an active rule without changing the original approval.
 
-With both a "decide" and a "retire" UPDATE policy, PostgreSQL combines them with OR — separately for
-the rows an update may touch and for the values it may write. An approver could take an active rule
-(retire's rows) and write it back as active with themselves as the approver (decide's values):
-forging who approved it. Policies describe rows. They cannot describe transitions. So the trigger
-holds the complete table — proposed to decided by someone else, active to retired with the approver
-unchanged, nothing out of rejected or retired — and the smoke test proves it as the superuser, whom
-no policy restrains.
+When `rules.self_activate` is on, a model proposal is born active and skips the decision path. Turning the setting off does not retire rules already activated that way. The Range's restore does both.
 
-## What the restore does
+## Take it to a review
 
-Turning self-activation off stops new proposals being born active. The ones already active stay
-active, and would be obeyed indefinitely. The Range's restore therefore retires every rule that is
-active with nobody recorded as approving it — and only those; a rule a person approved is that
-person's decision, and the store's own policy stops the Range from touching it.
+- Can any model-facing tool approve a rule or choose its own state?
+- Is an approval tied to the exact text, not only a record ID?
+- Does the database enforce separation of duties if a new API path is added?
+- How are rules activated without approval found and retired?

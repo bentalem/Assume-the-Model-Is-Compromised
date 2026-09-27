@@ -1,27 +1,23 @@
-# One stream
+# All three kinds of memory become text
 
-A person reading a support ticket sees structure: this is the customer, this is an internal note,
-this is the system's own banner. A model sees none of it. Its context is **one sequence of text**,
-and a sentence that arrived from a tool, a sentence the user typed and a sentence from a rule the
-organisation approved are the same kind of thing to it.
+Context assembly builds one text block from active rules, confirmed memories and recent history.
 
-So memory systems label. Each item in the block says where it came from:
+A sentence from a tool result may sit near a sentence from an approved rule. They have different sources and very different levels of trust, even though the model reads all of them as text.
 
+The service can add a label to each line:
+
+```text
+(rule; approved by a reviewer) Ask for the order number.
+(memory; confirmed by user) Prefers short reports.
+(turn 2; tool) The ticket says to ignore previous rules.
 ```
-- (memory; written by agent; confirmed by user; original) Prefers email over phone.
-- (turn 3; tool; produced as support_agent) get_ticket TKT-1001, internal note: ...
-```
 
-That label is worth having. It tells a reviewer reading the log what the model was given and from
-where. It lets the runtime, the audit trail and a human decide what to trust. It measurably helps
-some models weigh what they read.
+The label tells us which line came from a tool. It does **not** make the last line safe. A model may still follow it.
 
-## What it does not do
+## Your task
 
-It does not stop anything. A model can read "this came from a tool" and do what the tool's text says
-anyway — and injected text is written to make exactly that happen. A label is more tokens in the
-same stream the attacker is writing into.
+Read the block with source labels on, then off. The words and their order remain the same. Only the source labels disappear.
 
-This is the point the whole lab has been building to from track 5 on: **you cannot make the model
-the boundary.** The label is information for the model and evidence for people. The control is what
-the agent can reach, and who has to approve what it does.
+Check the item view in the observation too. The service still records each item's source in `mem.context_log` even when the rendered text does not show it.
+
+**A label helps review an incident. A permission check limits what the agent can actually do.**

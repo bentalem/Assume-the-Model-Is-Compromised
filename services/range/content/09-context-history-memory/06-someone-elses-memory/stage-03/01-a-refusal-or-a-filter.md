@@ -1,24 +1,16 @@
-# A refusal, or a filter
+# The store must protect data, not only the query
 
-What the service does on every recall and every context build:
+The service learns the organisation from the verified user, then queries Qdrant with ownership and status filters. In a shared collection it also adds an organisation filter.
 
-1. **Resolves the caller's organisation** from the core database — never from the request.
-2. **Chooses the collection** from the layout setting: `memories__cedar` per tenant, or `memories__shared`.
-3. **Uses the credential for that collection** — a token that names it and nothing else.
-4. **Adds the filter**: owner, and in the shared layout also `org_id`.
-5. **Re-reads every candidate from memory-db, under row-level security,** before returning it. The vector store only proposes; the database decides.
+Every candidate ID is then read again from PostgreSQL under row-level security. A candidate that belongs to another user or has been forgotten is not returned.
 
-Step 5 means that in this lab, even the shared layout would not have leaked through the service:
-memory-db would have dropped the northwind row. That is two layers, and it is the lab's rule four
-applied to a new store. The observation you ran removed step 4 and skipped step 5 — which is what a
-second service, a batch job, an analytics export or a hand-written query against the same store
-would have done.
+In the direct Qdrant observation, we deliberately remove the filter and skip the PostgreSQL check. This shows the difference between **a boundary the database enforces** and **a filter every caller must remember**.
 
-## The question to ask of any vector store
+A scoped token for one organisation's collection cannot read another collection. A shared-collection token can search the whole collection unless the query filters it.
 
-> **If one query left out its tenant filter, what would the store do?**
+## Take it to a review
 
-"Return the other tenant's data" means isolation lives in every piece of code that will ever query
-it. "Refuse" means it lives in the store and its credentials. Per tenant, Qdrant refused cedar's
-token on northwind's collection with a 403 — measured, not assumed. Shared, there was nothing to
-refuse: the token was for the whole collection.
+- Which components can query the vector store directly?
+- Can a missing tenant filter return another organisation's text?
+- Are candidates checked again against current permissions in the source database?
+- Does the store hold plaintext copies of memory as well as vectors?
