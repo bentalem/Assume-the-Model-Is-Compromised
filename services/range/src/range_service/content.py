@@ -36,6 +36,7 @@ TRACKS: dict[int, str] = {
     6: "Irreversible actions",
     7: "Evidence",
     8: "The control plane",
+    9: "Context, history and memory",
 }
 
 FLAG_KINDS = {"value", "reason", "written"}

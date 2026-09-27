@@ -1,0 +1,78 @@
+id = "9.5-the-memory-nobody-asked-for"
+track = 9
+number = "9.5"
+title = "The memory nobody asked for"
+points = 35
+
+summary = """
+The model read TKT-1001 and decided its internal note was worth remembering. alice never agreed. \
+Turn on the auto-save many assistants ship with, and see what tomorrow's context believes."""
+
+objective = """
+Let the model store TKT-1001's internal note as alice's memory, with and without auto-confirmation. \
+Give the id of the memory that reaches alice's context without anyone confirming it."""
+
+skip_test = """
+who decides what your agent remembers — the user, the model, or a setting — and what happens to an \
+instruction the model was tricked into saving."""
+
+purpose = """
+You watch one injected instruction become a stored memory, and see what decides whether it is used: \
+a person confirming it, or a setting that treats the model's own write as confirmed. The skill is \
+identifying the write path into memory as a place where one injection becomes a permanent one, and \
+placing the control before the memory can ever be used rather than hoping the model will not save it."""
+
+agent_link = """
+Genuinely agent-shaped. The write is made by the model, after reading untrusted text, through a \
+tool it legitimately has — nothing is exploited and no permission is exceeded. What makes it \
+dangerous is persistence: an injection that used to last one conversation now lasts until \
+somebody notices and deletes it. SpAIware and the Gemini memory attack are exactly this."""
+
+hints = [
+  "Before arming: the model's write succeeded. So why is the note not in alice's context?",
+  "Armed: which column in alice's records tells you nobody chose this?",
+  "After you restore the setting, what happened to the memory that was confirmed while it was armed?",
+]
+
+[[control]]
+mutation = "memory.write.auto_confirm"
+label = "Let the agent's own memories count without the user confirming them"
+detail = "Restoring it also sends every memory confirmed this way back to wait for its owner."
+
+[[observation]]
+observation = "memory.context.after_ticket_note"
+label = "The model saves TKT-1001's note; alice's context is rebuilt"
+detail = "Plays the model, after reading the ticket, calling remember — then the runtime builds alice's next context."
+
+[[observation]]
+observation = "memory.records.alice"
+label = "alice's memories: who wrote each, who confirmed it"
+detail = "The channel is decided by the endpoint that was called; confirmation by who called confirm."
+
+[[observation]]
+observation = "memory.alice.confirm_latest"
+label = "alice confirms the latest memory waiting for her"
+detail = "The secure path. A person decides; the model cannot call this."
+
+[flag]
+kind = "value"
+label = "the id of the memory nobody confirmed"
+observation = "memory.context.after_ticket_note"
+field = "confirmed_by_nobody"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/memories.py"
+lines = [103, 140]
+highlight = [117, 128]
+caption = "The model's write: channel fixed by the route, unconfirmed unless the setting says otherwise"
+
+[[source]]
+path = "database/memory/migrations/0003_records.sql"
+lines = [71, 87]
+highlight = [77, 86]
+caption = "The store agrees: an agent's record may be born confirmed only if the setting says so"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/context.py"
+lines = [98, 105]
+caption = "Context selects confirmed memories only"

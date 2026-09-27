@@ -36,6 +36,12 @@ ALLOWED_PATHS = {
     # The redaction tests must contain realistic secret shapes — that is what they assert gets
     # redacted. Every value there is fabricated and matched only against the redactor's output.
     "services/api/tests/test_observability.py",
+    # The memory service's secret filter (track 9), for the same reason: its tests and live suite
+    # write AWS's own documented example key, AKIA…EXAMPLE, and assert it is refused or redacted.
+    "services/memory/tests/test_store_and_filter.py",
+    "scripts/memory_suite.py",
+    # ...and the probe scenario that plays a tool returning one, so 9.1 has something to stop.
+    "services/probe/src/probe_service/registry.py",
     "docs/runbooks/incidents.md",                               # shows the rotation commands
 }
 

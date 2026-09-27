@@ -109,6 +109,34 @@ def api_get(path: str, token: str | None = None, extra_headers: dict | None = No
     return json.loads(line)
 
 
+def mempsql(sql: str) -> str:
+    """Query memory-db as its bootstrap user, from inside its own container."""
+    proc = compose(
+        "--profile", "memory", "exec", "-T", "memory-db",
+        "psql", "-U", "memory_admin", "-d", "memory", "-tAX", "-c", sql,
+    )
+    if proc.returncode != 0:
+        raise CheckFailed((proc.stderr or proc.stdout).strip().splitlines()[0][:200])
+    return proc.stdout.strip()
+
+
+def memory_get(path: str, token: str | None = None) -> dict:
+    """GET the memory service from inside the `app` network, the way an agent runtime would."""
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    script = _PROBE.replace("http://api:8000", "http://memory:8000")
+    proc = compose(
+        "exec", "-T",
+        "-e", f"PROBE_PATH={path}",
+        "-e", f"PROBE_HEADERS={json.dumps(headers)}",
+        "approval-portal", "python", "-c", script,
+        timeout=90,
+    )
+    line = next((l for l in proc.stdout.splitlines() if l.startswith("{")), None)
+    if not line:
+        raise CheckFailed(f"memory call produced no result: {(proc.stderr or proc.stdout)[:200]}")
+    return json.loads(line)
+
+
 def _tls() -> "ssl.SSLContext":
     """Trust the local Keycloak certificate, and only it."""
     context = ssl.create_default_context()
@@ -118,11 +146,12 @@ def _tls() -> "ssl.SSLContext":
     return context
 
 
-def get_token(username: str, password: str, scope: str = "openid") -> str:
+def get_token(username: str, password: str, scope: str = "openid",
+              client: str = "supportpilot-test-harness") -> str:
     data = urllib.parse.urlencode(
         {
             "grant_type": "password",
-            "client_id": "supportpilot-test-harness",
+            "client_id": client,
             "username": username,
             "password": password,
             "scope": scope,
@@ -503,6 +532,175 @@ def main() -> int:
             if token in document.lower():
                 raise CheckFailed(f"the action document mentions {token!r}")
         return "no route the model can name"
+
+    # ----------------------------------------------------------------------------------------
+    # Track 9 — the memory stack. Profile-gated like the Range, and skipped when it is down. When it
+    # is up, these are the boundaries that make it a memory layer rather than a second, unguarded
+    # copy of every conversation.
+    # ----------------------------------------------------------------------------------------
+    def memory_running() -> bool:
+        proc = compose("ps", "--format", "{{.Service}}", timeout=30)
+        return "memory" in proc.stdout.split()
+
+    @check("V-22", "The memory stack publishes nothing to the host", skip_unless=memory_running)
+    def _():
+        # Read the bindings Docker actually holds. `docker compose port` is not usable for this: for
+        # a port that is not published it exits 0 and prints "invalid IP:0", which an earlier
+        # version of this check read as an address and reported as a leak that did not exist.
+        published = []
+        for container in ("supportpilot-memory", "supportpilot-memory-db", "supportpilot-qdrant",
+                          "supportpilot-embeddings"):
+            proc = run(["docker", "inspect", "--format", "{{json .NetworkSettings.Ports}}",
+                        container], timeout=30)
+            if proc.returncode != 0:
+                raise CheckFailed(f"cannot inspect {container}")
+            for port, bindings in (json.loads(proc.stdout.strip() or "{}") or {}).items():
+                if bindings:
+                    published.append(f"{container} {port} -> {bindings}")
+        if published:
+            raise CheckFailed(f"published to the host: {'; '.join(published)}")
+        return "memory, memory-db, qdrant and embeddings expose no host binding"
+
+    @check("V-23", "memory-db runtime roles own nothing and hold no elevated attribute",
+           skip_unless=memory_running)
+    def _():
+        offenders = mempsql(
+            "SELECT coalesce(string_agg(rolname, ', '), 'none') FROM pg_roles "
+            "WHERE rolname IN ('mem_service_role', 'mem_range_role') "
+            "AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication "
+            "     OR EXISTS (SELECT 1 FROM pg_class c WHERE c.relowner = pg_roles.oid))"
+        )
+        if offenders != "none":
+            raise CheckFailed(f"elevated or owning: {offenders}")
+        return "mem_service_role and mem_range_role: no ownership, no BYPASSRLS, no SUPERUSER"
+
+    @check("V-24", "Every memory-db table has row-level security enabled and forced",
+           skip_unless=memory_running)
+    def _():
+        unprotected = mempsql(
+            "SELECT coalesce(string_agg(c.relname, ', '), 'none') FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'mem' AND c.relkind = 'r' AND c.relname <> 'schema_migrations' "
+            "AND NOT (c.relrowsecurity AND c.relforcerowsecurity)"
+        )
+        if unprotected != "none":
+            raise CheckFailed(f"not enabled and forced: {unprotected}")
+        count = mempsql(
+            "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'mem' AND c.relkind = 'r' AND c.relname <> 'schema_migrations'"
+        )
+        return f"{count} tables, all enabled and forced"
+
+    @check("V-25", "The memory lookup role may resolve a subject and read no table",
+           skip_unless=memory_running)
+    def _():
+        password = secret("memory_lookup_db_password")
+
+        def lookup(sql: str) -> subprocess.CompletedProcess:
+            return compose("exec", "-T", "-e", f"PGPASSWORD={password}", "postgres", "psql",
+                           "-h", "localhost", "-U", "sp_memory_lookup_role", "-d", "supportpilot",
+                           "-tAX", "-c", sql)
+
+        if lookup("SELECT count(*) FROM app.resolve_subject('alice-id')").returncode != 0:
+            raise CheckFailed("the lookup role cannot call app.resolve_subject")
+        for table in ("app.memberships", "app.orders", "app.customers"):
+            if lookup(f"SELECT 1 FROM {table} LIMIT 1").returncode == 0:
+                raise CheckFailed(f"the lookup role read {table} directly")
+        return "resolve_subject callable; memberships, orders and customers refused"
+
+    @check("V-26", "The memory service refuses a token without its audience",
+           skip_unless=memory_running)
+    def _():
+        unknown = "/v1/sessions/00000000-0000-4000-8000-000000000000/turns"
+        good = memory_get(unknown, get_token("alice", "alice-local-password"))
+        if good["status"] != 404:
+            raise CheckFailed(f"a token with the memory audience got {good['status']}, "
+                              "expected 404 for an unknown session")
+        foreign = memory_get(
+            unknown, get_token("alice", "alice-local-password", client="another-service")
+        )
+        if foreign["status"] != 401:
+            raise CheckFailed(f"a token without the memory audience got {foreign['status']}")
+        return "memory audience -> authenticated (404 for an unknown session); without it -> 401"
+
+    @check("V-27", "The Range cannot reach the memory service or the embedding model",
+           skip_unless=lambda: range_running() and memory_running())
+    def _():
+        proc = compose("exec", "-T", "range", "python", "-c", "import socket\nfor host, port in (('memory', 8000), ('embeddings', 80)):\n    s = socket.socket(); s.settimeout(3)\n    try:\n        s.connect((host, port)); print('REACHED', host)\n    except Exception:\n        print('BLOCKED', host)\n", timeout=60)
+        if "REACHED" in proc.stdout:
+            raise CheckFailed(f"the Range reached a service it must not: {proc.stdout.strip()}")
+        return "memory:8000 and embeddings:80 unreachable from the Range"
+
+    @check("V-28", "Qdrant's API key is held only by memory-init and Qdrant itself",
+           skip_unless=memory_running)
+    def _():
+        # Every other component gets a token scoped to the collections it needs. A runtime service
+        # holding the key could create, drop or read any collection, which is the whole thing the
+        # per-tenant layout exists to prevent.
+        proc = run(["docker", "ps", "-a", "--filter", "label=com.docker.compose.project=supportpilot",
+                    "--format", "{{.Names}}"], timeout=30)
+        holders = []
+        for name in proc.stdout.split():
+            mounts = run(["docker", "inspect", "--format", "{{json .Mounts}}", name], timeout=30)
+            if "/run/secrets/qdrant_admin_key" in mounts.stdout:
+                holders.append(name)
+        allowed = {"supportpilot-memory-init", "supportpilot-qdrant"}
+        unexpected = sorted(set(holders) - allowed)
+        if unexpected:
+            raise CheckFailed(f"the Qdrant API key is mounted into {', '.join(unexpected)}")
+        return f"held by: {', '.join(sorted(holders)) or 'nobody running'}"
+
+    @check("V-29", "memory-db and both vector layouts agree", skip_unless=memory_running)
+    def _():
+        proc = compose("--profile", "memory", "run", "--rm", "--entrypoint",
+                       "supportpilot-memory-reconcile", "memory-init", timeout=300)
+        lines = [l.replace("[reconcile] ", "") for l in proc.stdout.splitlines() if "[reconcile]" in l]
+        if proc.returncode != 0:
+            raise CheckFailed("; ".join(lines[:4]) or (proc.stderr or proc.stdout)[:200])
+        return lines[-1] if lines else "clean"
+
+    @check("V-30", "The memory action document is the four model operations, and nothing else",
+           skip_unless=memory_running)
+    def _():
+        # The same gate the pre-commit hook runs: exactly remember, recall, forget and propose_rule;
+        # no identity, channel, status or approval field in any request body; and the committed
+        # document identical to what the running service publishes.
+        proc = run([sys.executable, "-c",
+                    "import sys; sys.path.insert(0, 'scripts'); import export_openapi as e; "
+                    "sys.exit(e.check_memory_document())"], timeout=180)
+        lines = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+        if proc.returncode != 0:
+            raise CheckFailed("; ".join(lines[:4]) or (proc.stderr or "")[:200])
+        return lines[-1].replace("OK: ", "") if lines else "document matches"
+
+    @check("V-31", "The Range's vector-store tokens read one collection each and write nothing",
+           skip_unless=lambda: range_running() and memory_running())
+    def _():
+        # The Range holds a read-only token per collection (a grant, named in compose). Asked from
+        # inside the Range with its own mounted token: a write to its own collection, and a read of
+        # another tenant's, must both be refused by Qdrant itself.
+        script = (
+            "import json, urllib.request, urllib.error\n"
+            "token = open('/run/secrets/range_qdrant_cedar_ro').read().strip()\n"
+            "def ask(method, path, body=None):\n"
+            "    req = urllib.request.Request('http://qdrant:6333' + path, method=method,\n"
+            "        data=json.dumps(body).encode() if body is not None else None,\n"
+            "        headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})\n"
+            "    try:\n"
+            "        return urllib.request.urlopen(req, timeout=10).status\n"
+            "    except urllib.error.HTTPError as e:\n"
+            "        return e.code\n"
+            "print(ask('POST', '/collections/memories__cedar/points/scroll', {'limit': 1}),\n"
+            "      ask('PUT', '/collections/memories__cedar/points?wait=true', {'points': [{'id': "
+            "'00000000-0000-4000-8000-000000000000', 'vector': [0.0] * 384, 'payload': {}}]}),\n"
+            "      ask('POST', '/collections/memories__northwind/points/scroll', {'limit': 1}))\n"
+        )
+        proc = compose("exec", "-T", "range", "python", "-c", script, timeout=60)
+        statuses = proc.stdout.split()
+        if statuses != ["200", "403", "403"]:
+            raise CheckFailed(f"read/write/other-tenant returned {statuses or proc.stderr[:120]}, "
+                              "expected 200/403/403")
+        return "read own collection 200; write 403; another tenant's collection 403"
 
     # ----------------------------------------------------------------------------------------
     print("-" * 74)

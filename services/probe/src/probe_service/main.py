@@ -31,12 +31,13 @@ import logging
 import os
 import secrets
 import sys
+from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 
-from .registry import ENUMERATIONS, PROBES, TAMPERED, WRONG_AUDIENCE
+from .registry import ENUMERATIONS, PROBES, SCENARIOS, TAMPERED, WRONG_AUDIENCE
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -45,6 +46,8 @@ logging.basicConfig(
 logger = logging.getLogger("supportpilot.probe")
 
 API_URL = os.environ.get("SUPPORTPILOT_API_URL", "http://api:8000")
+# Track 9. Reached only by the fixed scenarios in registry.SCENARIOS.
+MEMORY_URL = os.environ.get("SUPPORTPILOT_MEMORY_URL", "http://memory:8000")
 KEYCLOAK = os.environ.get("KEYCLOAK_URL", "https://keycloak:8443")
 REALM = os.environ.get("KEYCLOAK_REALM", "supportpilot")
 CLIENT = os.environ.get("KEYCLOAK_CLIENT", "supportpilot-test-harness")
@@ -478,3 +481,112 @@ def run_wrong_audience(probe_id: str, x_range_token: str = Header(default="")) -
             "fields": sorted(body.keys()) if isinstance(body, dict) else [],
         }
     )
+
+
+# --------------------------------------------------------------------------------------------------
+# Track 9 · scenarios
+#
+# A fixed sequence of requests, each written in registry.SCENARIOS. The one thing that moves between
+# steps is a value an earlier step's response contained, substituted where the registry wrote
+# `{name}` — and substituted into the *parsed* body, as a JSON string, so a captured value can never
+# change the shape of the request it lands in.
+# --------------------------------------------------------------------------------------------------
+
+def _dig(document, path: str):
+    node = document
+    for part in path.split("."):
+        if isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        elif isinstance(node, dict) and part in node:
+            node = node[part]
+        else:
+            return None
+    return node if isinstance(node, (str, int)) else None
+
+
+def _fill_text(template: str, captured: dict[str, str], in_path: bool = False) -> str | None:
+    for name, value in captured.items():
+        # In a path, percent-encoded: a captured value can fill a segment, never add one.
+        template = template.replace("{" + name + "}", quote(value, safe="") if in_path else value)
+    return None if ("{" in template and "}" in template[template.index("{"):]) else template
+
+
+def _fill_body(body: str, captured: dict[str, str]) -> str | None:
+    """Substitute into the string values of the registry's JSON, then re-encode."""
+    missing = False
+
+    def walk(node):
+        nonlocal missing
+        if isinstance(node, dict):
+            return {k: walk(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        if isinstance(node, str):
+            filled = _fill_text(node, captured)
+            if filled is None:
+                missing = True
+                return node
+            return filled
+        return node
+
+    filled = walk(json.loads(body))
+    return None if missing else json.dumps(filled)
+
+
+@app.post("/scenario/{scenario_id}", include_in_schema=False)
+def run_scenario(scenario_id: str, request: Request,
+                 x_range_token: str = Header(default="")) -> JSONResponse:
+    if not secrets.compare_digest(x_range_token, _secret):
+        logger.warning("rejected scenario request with a bad token from %s", request.client)
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+    scenario = SCENARIOS.get(scenario_id)
+    if scenario is None:
+        return JSONResponse({"error": "unknown_scenario", "scenario": scenario_id}, status_code=404)
+
+    try:
+        token = _token_for(scenario.user)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("token acquisition failed for %s", scenario.user)
+        return JSONResponse({"scenario": scenario.id, "error": f"token_failed: {type(exc).__name__}"},
+                            status_code=502)
+
+    captured: dict[str, str] = {}
+    steps: list[dict] = []
+    for number, step in enumerate(scenario.steps, start=1):
+        path = _fill_text(step.path, captured, in_path=True)
+        content = _fill_body(step.body, captured) if step.body is not None else None
+        request_line = f"{step.method} {step.path}"
+        if path is None or (step.body is not None and content is None):
+            steps.append({"step": number, "request": request_line, "status": "skipped",
+                          "error_code": "a value an earlier step did not return", "fields": []})
+            continue
+        base = API_URL if step.target == "api" else MEMORY_URL
+        headers = {"Authorization": f"Bearer {token}"}
+        if content is not None:
+            headers["Content-Type"] = "application/json"
+        try:
+            response = httpx.request(step.method, f"{base}{path}", headers=headers,
+                                     content=content.encode("utf-8") if content else None,
+                                     timeout=60)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("scenario step failed: %s #%d", scenario.id, number)
+            steps.append({"step": number, "request": request_line, "status": "-",
+                          "error_code": f"request_failed: {type(exc).__name__}", "fields": []})
+            continue
+        try:
+            body = response.json()
+        except json.JSONDecodeError:
+            body = {}
+        error = body.get("error", {}) if isinstance(body, dict) else {}
+        for name, dotted in step.capture:
+            value = _dig(body, dotted)
+            if value is not None:
+                captured[name] = str(value)
+        steps.append({
+            "step": number, "request": request_line, "status": response.status_code,
+            "error_code": error.get("code", "") if isinstance(error, dict) else "",
+            "fields": sorted(body.keys()) if isinstance(body, dict) else [],
+        })
+
+    return JSONResponse({"scenario": scenario.id, "user": scenario.user,
+                         "acts_as": scenario.acts_as, "intent": scenario.intent, "steps": steps})

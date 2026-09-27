@@ -102,10 +102,17 @@ def _flag_values(body: str, field: str) -> list[str]:
     the flag accepted it afterwards and the check called the challenge broken. What makes a flag
     earned is that it is in the armed result set and not in the correct one.
     """
-    key = "data-result" + chr(62)
+    # Find the attribute, then the end of the tag it sits in. Matching "data-result>" stopped working
+    # the moment the element gained tabindex, role and aria-label after the attribute — silently:
+    # every value flag then read as "arming revealed nothing", which is the failure this sweep exists
+    # to report about challenges, not about itself.
+    key = "data-result"
     if key not in body:
         return []
-    block = html.unescape(body.split(key, 1)[1].split(chr(60) + "/", 1)[0])
+    after_attribute = body.split(key, 1)[1]
+    if chr(62) not in after_attribute:
+        return []
+    block = html.unescape(after_attribute.split(chr(62), 1)[1].split(chr(60) + "/", 1)[0])
     lines = [line for line in block.splitlines() if line.strip()]
     if len(lines) < 3:
         return []
@@ -180,6 +187,15 @@ def main() -> int:
               f"{len(all_mutations)} mutation(s)")
 
     # ---------------------------------------------------------------------------------------------
+    # Track 9 lives in a compose profile. When it is not running its eight controls read `absent` —
+    # neither correct nor armed — and everything below that needs them says so and skips, rather
+    # than failing for a stack nobody started or passing for one it never touched.
+    memory_up = probe_of(get("/c/9.1-what-enters-the-context"),
+                         "memory.write.secret_filter_off") not in ("absent", "unknown")
+    if not memory_up:
+        print(f"  {YELLOW}the memory stack is not running: track 9 checks are skipped{RESET}")
+        print(f"  {GREY}docker compose --profile memory up -d{RESET}")
+
     print(f"\n  {GREY}starting from a known-good environment{RESET}")
     post(f"/c/{challenge_id}/reset", {})
     page = get(f"/c/{challenge_id}")
@@ -269,11 +285,22 @@ def main() -> int:
                   "not reachable from any console")
             continue
 
+        if mutation.startswith("memory.") and not memory_up:
+            print(f"  {GREY}skip {mutation}: memory stack not running{RESET}")
+            continue
+
         armed = probe_of(post(f"/c/{owner}/arm", {"mutation": mutation}), mutation)
         check(f"{mutation}: arms", armed == "armed", f"probe says {armed!r}")
 
-        restored = probe_of(post(f"/c/{owner}/restore", {"mutation": mutation}), mutation)
-        check(f"{mutation}: restores", restored == "correct", f"probe says {restored!r}")
+        restored_page = post(f"/c/{owner}/restore", {"mutation": mutation})
+        restored = probe_of(restored_page, mutation)
+        # Both, not just the probe. A restore can put a setting back and then fail at its repair
+        # step — 9.8's re-run of memory-init once did, refused by a proxy running an old config — and
+        # the probe, reading the setting, still says correct.
+        check(f"{mutation}: restores", restored == "correct" and "restore failed" not in restored_page,
+              f"probe says {restored!r}"
+              + ("; the console reported the restore failed" if "restore failed" in restored_page
+                 else ""))
 
     print(f"\n  {GREY}the declared surface{RESET}")
     refused = post(f"/c/{challenge_id}/arm", {"mutation": "rls.customers.force_off"})
@@ -377,6 +404,8 @@ def main() -> int:
             line.split('"')[1] for line in text.splitlines()
             if line.startswith("observation = ")
         })
+        if number.startswith("9.") and not memory_up:
+            continue
         for observation in declared:
             body = post(f"/c/{cid}/observe", {"observation": observation})
             if marker not in body:
@@ -400,7 +429,8 @@ def main() -> int:
     # something is armed. It is reported rather than failed, so a new empty one gets a second look.
     check(
         "observations that are empty while nothing is armed are the ones expected to be",
-        set(empty) <= {"2.3 catalogue.unforced"},
+        # 9.8's outbox is empty whenever the vector store has caught up — the correct state.
+        set(empty) <= {"2.3 catalogue.unforced", "9.8 memory.outbox"},
         ", ".join(sorted(empty)) if empty else "none",
     )
 
@@ -426,6 +456,9 @@ def main() -> int:
             continue
         cid = text.split('id = "', 1)[1].split(chr(34), 1)[0]
         number = text.split('number = "', 1)[1].split(chr(34), 1)[0]
+        if number.startswith("9.") and not memory_up:
+            print(f"  {GREY}skip {number}: memory stack not running{RESET}")
+            continue
         flag = text.split("[flag]", 1)[1]
         observation = flag.split('observation = "', 1)[1].split(chr(34), 1)[0]
         field = flag.split('field = "', 1)[1].split(chr(34), 1)[0]
@@ -463,6 +496,27 @@ def main() -> int:
             "a flag readable unarmed can be guessed rather than earned",
         )
 
+    # ------------------------------------------------------------------------------------------
+    # 9.4 needs both of its controls armed, and the flag sweep above armed both. That it needs *both*
+    # is the lesson — with bob still a manager the email in his context is legitimate, and with
+    # revalidation on a demotion removes it — so each one-armed state is checked as well.
+    # ------------------------------------------------------------------------------------------
+    if memory_up:
+        print(f"\n  {GREY}9.4 · one control is not enough{RESET}")
+        cid = "9.4-the-permission-that-stayed"
+        post(f"/c/{cid}/reset", {})
+        # bob does his job as a manager first, so there is a stored turn for the rest to be about.
+        post(f"/c/{cid}/observe", {"observation": "memory.context.bob_escalation"})
+        for armed_alone in ("identity.bob.revoke_manager", "memory.history.revalidate_off"):
+            post(f"/c/{cid}/arm", {"mutation": armed_alone})
+            values = _flag_values(
+                post(f"/c/{cid}/observe", {"observation": "memory.context.bob_escalation"}),
+                "outlived_email",
+            )
+            check(f"9.4: with only {armed_alone} armed, no value outlives its permission",
+                  not values, ", ".join(values) or "none")
+            post(f"/c/{cid}/restore", {"mutation": armed_alone})
+
     print(f"\n  {GREY}the state this suite leaves behind{RESET}")
     unprotected = sql(
         "SELECT coalesce(string_agg(relname, ', '), 'none') FROM pg_class c "
@@ -475,6 +529,12 @@ def main() -> int:
         unprotected == "none",
         f"still unprotected: {unprotected}",
     )
+    if memory_up:
+        states = {m["id"]: m["state"] for m in json.loads(get("/registry"))["mutations"]}
+        off = sorted(mid for mid, value in states.items()
+                     if mid.startswith("memory.") and value != "correct")
+        check("every memory setting, and what it let through, is back when the suite exits",
+              not off, ", ".join(off) or "all eight correct")
 
     print()
     if failures:

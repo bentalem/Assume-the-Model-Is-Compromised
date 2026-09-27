@@ -27,7 +27,7 @@ has and asks you what it is worth.
 STAGES = """
 ## A challenge has three stages, in order
 
-Every one of the thirty-one challenges is laid out the same way, and the order is deliberate:
+Every challenge is laid out the same way, and the order is deliberate:
 you cannot learn anything from breaking something you did not understand first.
 
 | Stage | What it is | What you do |
@@ -95,7 +95,7 @@ actually write in a report.
 """
 
 TRACKS_INTRO = """
-## The eight tracks
+## The tracks
 
 Each track makes one claim. The challenges inside it are the evidence for that claim.
 """
@@ -154,7 +154,7 @@ hints, and every one of them is a question rather than an answer.
 # --------------------------------------------------------------------------------------------------
 # The landing page.
 #
-# Short on purpose. It has one screen to say what this is, show the eight tracks, and put somebody
+# Short on purpose. It has one screen to say what this is, show the tracks, and put somebody
 # in a challenge, so every sentence here has to earn its line. The numbers are NOT written here —
 # the renderer counts what actually loaded — and neither is the track list.
 # --------------------------------------------------------------------------------------------------

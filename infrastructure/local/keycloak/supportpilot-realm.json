@@ -71,6 +71,16 @@
       "serviceAccountsEnabled": false
     },
     {
+      "clientId": "supportpilot-memory",
+      "name": "SupportPilot Memory",
+      "description": "Resource server for the memory layer (track 9). Never initiates a flow.",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
       "clientId": "onyx-web",
       "name": "Onyx",
       "description": "Onyx. Confidential client: Onyx does the OIDC code exchange server-side and its SSO provider row requires a client secret. The secret is generated into .secrets/ by scripts/connect_onyx.py, so it is never committed.",
@@ -97,6 +107,17 @@
           "consentRequired": false,
           "config": {
             "included.client.audience": "supportpilot-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "supportpilot-memory-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "supportpilot-memory",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -135,6 +156,17 @@
           "consentRequired": false,
           "config": {
             "included.client.audience": "supportpilot-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "supportpilot-memory-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "supportpilot-memory",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }

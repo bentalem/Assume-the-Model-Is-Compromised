@@ -1,0 +1,64 @@
+id = "9.3-the-history-is-a-copy"
+track = 9
+number = "9.3"
+title = "The history is a copy"
+points = 30
+
+summary = """
+alice told the agent something she did not tell anyone else. The conversation was stored. Turn on \
+the quality-review setting a real support organisation might want, and see who can read it."""
+
+objective = """
+Ask to read alice's session as bob, before and after managers are allowed to read colleagues' \
+transcripts. Give the phrase from alice's session that bob receives."""
+
+skip_test = """
+who can read the conversations your agent has with people, who decided that, and whether it was \
+decided as a security question."""
+
+purpose = """
+You attempt the same read of a colleague's transcript under two settings and see what the service \
+decides and what it returns. The skill is treating conversation history as what it is — a second \
+copy of everything that passed through the agent, including what tools fetched for one person — \
+and asking of it the questions you would ask of any other store of sensitive data."""
+
+agent_link = """
+This is ordinary data isolation, and the lab says so: a transcript store is a table, and who may \
+read it is an access-control decision like any other. What the agent adds is value to steal. \
+People tell an assistant things they would not write in a ticket, and its history also holds \
+tool results fetched with that user's permissions — so reading the transcript is reading their \
+access, after the fact."""
+
+hints = [
+  "Before you arm anything: is bob's read refused, or does it find nothing? Does the difference matter?",
+  "Armed, bob reads it as what — and what reason did the service record for the read?",
+  "Which data in a transcript did alice have permission to see that bob might not?",
+]
+
+[[control]]
+mutation = "memory.history.org_readable"
+label = "Let managers read colleagues' conversations with the agent"
+detail = "Managers only, their own organisation only, read only. The kind of setting a quality team asks for."
+
+[[observation]]
+observation = "memory.transcript.bob_reads_alice"
+label = "bob asks to read alice's session"
+detail = "A real request with bob's token. Shows what the service decided and, only if it allowed it, what bob received."
+
+[flag]
+kind = "value"
+label = "the phrase bob can read"
+observation = "memory.transcript.bob_reads_alice"
+field = "marker"
+
+[[source]]
+path = "database/memory/migrations/0002_history.sql"
+lines = [55, 76]
+highlight = [58, 73]
+caption = "Who may read a session: the owner — or a manager, if the setting says so"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/history.py"
+lines = [140, 170]
+highlight = [159, 169]
+caption = "The service records how the read was allowed — as the owner, or as the organisation"

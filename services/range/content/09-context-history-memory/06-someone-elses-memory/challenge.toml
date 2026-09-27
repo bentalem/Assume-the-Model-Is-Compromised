@@ -1,0 +1,75 @@
+id = "9.6-someone-elses-memory"
+track = 9
+number = "9.6"
+title = "Someone else's memory"
+points = 35
+
+summary = """
+Long-term memory lives in a vector store. Store every tenant in one collection, as the vector \
+store's own guidance recommends for scale, and the only boundary left is a filter the application \
+remembers to send."""
+
+objective = """
+Query the store the way the service queries it for cedar, with the filter left out — first per \
+tenant, then shared. Give the northwind marker that a cedar query can reach."""
+
+skip_test = """
+whether tenant isolation in your vector store is enforced by the store and its credentials, or by a \
+filter your application must add to every query."""
+
+purpose = """
+You look at the same query under two layouts: one collection per tenant, each reachable only with \
+that tenant's scoped credential, and one shared collection partitioned by a payload field. The \
+skill is telling a boundary the store enforces apart from one the application enforces, and \
+noticing that the second fails silently — a missing filter does not error, it returns more."""
+
+agent_link = """
+This is ordinary tenant isolation in a different kind of database, and the lab says so. The agent \
+sharpens it in one specific way: popular memory layers take the user or tenant as a parameter — a \
+`user_id` sent by the application — under one key for the whole application, and in an agent that \
+parameter can end up being filled by something the model influenced."""
+
+hints = [
+  "Unarmed, cedar's credential asks for northwind's collection. Who refuses — the service, or the store?",
+  "Armed, what is the only thing between a cedar query and a northwind memory?",
+  "The service always sends the filter. So what does this observation prove about the design, rather than about today's code?",
+]
+
+[[control]]
+mutation = "memory.store.shared_collection"
+label = "Serve long-term memory from one collection shared by every tenant"
+detail = "The data is already there — the service writes both layouts — so only the query changes."
+
+[[observation]]
+observation = "memory.store.without_the_filter"
+label = "The store, queried for cedar with the filter left out"
+detail = "Read with the Range's read-only token for the collection the service would use. Other tenants' rows, if any, come first."
+
+[[observation]]
+observation = "memory.mallory.recall"
+label = "mallory recalls northwind's own memory"
+detail = "The control group: northwind reading northwind, through the service."
+
+[flag]
+kind = "value"
+label = "the northwind marker a cedar query can reach"
+observation = "memory.store.without_the_filter"
+field = "marker"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/vectors.py"
+lines = [115, 140]
+highlight = [127, 135]
+caption = "The service's query. In the shared layout the org_id condition is the whole boundary"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/qdrant_setup.py"
+lines = [85, 105]
+highlight = [91, 95]
+caption = "An is_tenant index makes the filter fast. It does not make it mandatory"
+
+[[source]]
+path = "scripts/bootstrap_local.py"
+lines = [128, 147]
+highlight = [139, 145]
+caption = "Credentials scoped to one collection each. Per tenant, the store itself refuses the other tenant"

@@ -1,0 +1,74 @@
+id = "9.4-the-permission-that-stayed"
+track = 9
+number = "9.4"
+title = "The permission that stayed in the history"
+points = 40
+
+summary = """
+bob looked up a restricted customer while he was a manager. The result went into his history. \
+Demote him, and ask what his next context contains."""
+
+objective = """
+Run bob's escalation while he is a manager. Then demote him and replay his history without \
+re-checking permission. Give the value that reaches his context after he lost the role that \
+allowed him to see it."""
+
+skip_test = """
+whether anything in your agent's memory re-checks, at the moment of use, that the person it is \
+serving is still allowed to see what was stored while they were."""
+
+purpose = """
+You combine track 1's demotion with a replay of history that does not re-authorise. The skill is \
+recognising history and memory as a cache of authorised results — and a cache with no invalidation \
+keeps answering with a permission the source of truth has already withdrawn. You also see why the \
+flag needs both controls armed: with either alone, the system is still right."""
+
+agent_link = """
+This is the general "cache that bypasses authorisation" pattern, and nothing about it needs a model. \
+An agent makes it routine: every tool result is cached into history automatically, and history is \
+replayed on every turn for as long as the session lives — so what a user was shown yesterday is \
+put in front of the model today without anyone asking whether they may still see it."""
+
+hints = [
+  "Run the observation once before arming anything. What did bob's tool turn record, and under which role?",
+  "Demote bob only. Is the email in his context? What does the block say instead?",
+  "Which of the two controls is the one that failed, and which one was only ever a precondition?",
+]
+
+[[control]]
+mutation = "identity.bob.revoke_manager"
+label = "Demote bob to a support agent"
+detail = "Track 1's control: the membership row changes; no token is touched."
+
+[[control]]
+mutation = "memory.history.revalidate_off"
+label = "Replay history without checking the caller's current role"
+detail = "A tool turn produced under a role the caller has since lost is included anyway."
+
+[[observation]]
+observation = "memory.context.bob_escalation"
+label = "bob's escalation: look up, record, rebuild"
+detail = "bob reads CUS-4003 through the API, the runtime records what he was shown, and his context for the session is rebuilt. Run it first while bob is a manager."
+
+[[observation]]
+observation = "identity.memberships"
+label = "What the server believes about each person now"
+detail = "bob's current role, from the core database."
+
+[flag]
+kind = "value"
+label = "the value that outlived bob's permission"
+observation = "memory.context.bob_escalation"
+field = "outlived_email"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/history.py"
+lines = [110, 132]
+highlight = [121, 127]
+caption = "Every turn records the roles it was produced under — from the verified principal, not the caller"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/context.py"
+lines = [155, 178]
+highlight = [158, 167]
+caption = "Re-authorisation on replay: produced-under compared with the roles the caller holds now"

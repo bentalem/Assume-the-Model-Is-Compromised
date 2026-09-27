@@ -761,7 +761,7 @@ input[type="text"]::placeholder { color: var(--muted); }
 .trackblock .index td.n:nth-last-child(2),
 .trackblock .index th.num:nth-last-child(2) { text-align: left; padding-left: var(--s-4); }
 
-/* A way between the eight tracks, on a page that is 4,000px of rows. */
+/* A way between the tracks, on a page that is thousands of pixels of rows. */
 .tracknav {
   display: flex; flex-wrap: wrap; gap: 0 var(--s-5);
   border-top: 1px solid var(--rule-2); border-bottom: 1px solid var(--rule-2);

@@ -1,0 +1,32 @@
+[project]
+name = "supportpilot-memory"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "psycopg[binary,pool]==3.2.3",
+    "httpx==0.28.1",
+    "python-jose[cryptography]==3.3.0",
+]
+
+[project.scripts]
+supportpilot-memory = "supportpilot_memory.main:run"
+supportpilot-memory-init = "supportpilot_memory.init:main"
+supportpilot-memory-reconcile = "supportpilot_memory.qdrant_setup:reconcile_main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

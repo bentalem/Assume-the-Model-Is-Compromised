@@ -1,0 +1,73 @@
+id = "9.8-forgetting-that-does-not-forget"
+track = 9
+number = "9.8"
+title = "Forgetting that does not forget"
+points = 35
+
+summary = """
+alice asks the agent to forget something. It disappears from the list. Then look in the summary \
+made from it, and in both vector layouts."""
+
+objective = """
+Store, summarise and forget one of alice's memories — with forgetting complete, and with it \
+removing the primary record only. Give the id of a copy that outlived the forget."""
+
+skip_test = """
+how many copies of one remembered fact your agent's memory makes, and whether deleting it deletes \
+all of them."""
+
+purpose = """
+You follow one memory through every copy the system makes of it — the record, a summary derived \
+from it, a point in each vector layout — and check which of them a forget actually removes. The \
+skill is enumerating derived and replicated data before you believe a deletion, and treating \
+"forget" as a promise about all of it."""
+
+agent_link = """
+Deletion across derived data is an old problem; the right to be forgotten made it a legal one. \
+Memory layers make it routine: they summarise, embed and replicate what they store as a matter of \
+course, and each of those is a copy that a delete on the primary record does not reach. An agent's \
+memory is usually the place in a system with the most copies per fact."""
+
+hints = [
+  "With nothing armed, how many rows does the observation show for one forgotten memory — and in how many places?",
+  "Armed: forget succeeded. Which copy would a recall still find, and which would a context build still use?",
+  "The restore re-runs memory-init. What does it do that setting the switch back alone would not?",
+]
+
+[[control]]
+mutation = "memory.forget.primary_only"
+label = "Forget only the record itself, not its summaries or vectors"
+detail = "Restoring it re-runs memory-init, which completes what was left half done."
+
+[[observation]]
+observation = "memory.forget.remaining_copies"
+label = "Store, summarise, forget — then look everywhere"
+detail = "alice's memory is stored, confirmed and summarised, then forgotten. Each row is a place its content could still live."
+
+[[observation]]
+observation = "memory.outbox"
+label = "Changes not yet applied to the vector store"
+detail = "memory-db is the source of truth; the vectors follow it through this outbox."
+
+[flag]
+kind = "value"
+label = "the id of a copy that outlived the forget"
+observation = "memory.forget.remaining_copies"
+field = "survivor"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/memories.py"
+lines = [218, 253]
+highlight = [223, 243]
+caption = "Forget: the derivation tree and both vector layouts — or the one row"
+
+[[source]]
+path = "database/memory/migrations/0007_forget.sql"
+lines = [1, 30]
+caption = "Why forgetting goes through a function, not an UPDATE"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/init.py"
+lines = [154, 192]
+highlight = [164, 182]
+caption = "The recovery: complete every forget left half done, only once forgetting is set to be complete"

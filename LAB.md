@@ -5,7 +5,8 @@ A working multi-tenant AI support agent you can install, attack, and take apart.
 It is a real system, not a mock: Keycloak issues the identities, a FastAPI service exposes seven
 tools, Open Policy Agent decides, PostgreSQL enforces row-level security, a separate worker is the
 only component that can move money, and — optionally — Onyx runs a real model that chooses its own
-tool calls.
+tool calls. An optional memory stack ([A6](#a6--the-memory-stack-track-9)) adds history, long-term
+memory and rules, with four more tools of its own.
 
 > **The core rule:** the model may *propose* tool use. Trusted services decide what is allowed, and
 > trusted services perform every real action.
@@ -137,14 +138,16 @@ Learning your way around the system, rather than installing it, is
 
 | Command | What it proves |
 |---|---|
-| `python scripts/verify_local.py` | 21 environment checks, `V-01` to `V-21` |
+| `python scripts/verify_local.py` | 31 environment checks, `V-01` to `V-31` — `V-17` to `V-21` need A5, `V-22` to `V-31` need A6, and each skips without it |
 | `python scripts/abuse_suite.py` | injection and abuse cases — two need Part B and skip without it |
 | `python scripts/action_suite.py` | approval and execution: no self-approval, no double execution |
 | `python scripts/contract_suite.py` | every call built from the published tool document |
 | `python scripts/backup_restore_drill.py drill` | a backup is restored and re-verified |
-| `python scripts/range_suite.py` | the Range: every arm restores, the console reports the true state, reset restores, no flag is free — needs A5 |
+| `python scripts/range_suite.py` | the Range: every arm restores, the console reports the true state, reset restores, no flag is free — needs A5; track 9's checks need A6 too |
+| `python scripts/memory_suite.py` | the memory service against its real stores: identity, the write paths, both vector layouts, history, rules, context — needs A6 |
 | `opa test policy/` | the policy rules, including every deny arm |
 | `pytest services/api` | token verification, policy client, pipeline, hashing, pagination |
+| `pytest services/memory` | the memory service's own logic: its audience, identity, the secret filter, rules and context assembly |
 
 `contract_suite.py` exists because of a real failure. One tool declared an array query parameter,
 Onyx serialised it one way, the API expected another, and a perfectly correct model request came back
@@ -154,7 +157,7 @@ as an error — while 219 tests passed throughout, because every one of them bui
 
 ## A5 · The Range
 
-The Range is where you practise. It is a web app that comes with the lab: 31 challenges in eight
+The Range is where you practise. It is a web app that comes with the lab: 39 challenges in nine
 tracks, each one explaining a control, letting you break it in the running system, and then showing
 you the lab's own source for why it behaved the way it did. **Everything is done with buttons in the
 browser.** No challenge needs a terminal.
@@ -166,12 +169,14 @@ to break the others:
 docker compose --profile range up -d --build
 ```
 
-Then open **http://127.0.0.1:8095**. It needs Part A only — no Onyx, no model.
+Then open **http://127.0.0.1:8095**. It needs Part A only — no Onyx, no model. Track 9 (context,
+history and memory) also needs the memory stack in A6; without it, track 9's controls read **absent**
+and everything else is unchanged.
 
 | Page | What it is |
 |---|---|
-| `/` | Start here. The eight tracks, the claim each one makes, and three suggested ways in. |
-| `/catalogue` | All 31 challenges by track, with points and what each one arms. |
+| `/` | Start here. The tracks, the claim each one makes, and three suggested ways in. |
+| `/catalogue` | Every challenge by track, with points and what each one arms. |
 | `/guide` | How a challenge is laid out, what the console does, the three kinds of flag. Read it once. |
 
 Progress is kept in your browser. There are no accounts, no scoreboard and no timer.
@@ -184,7 +189,7 @@ Three containers, all behind the `range` profile, so a plain `docker compose up`
 |---|---|
 | `range` | The web app. The only service allowed to put a control into its broken state — and back. |
 | `probe` | A fixed list of API requests the Range can ask for by name. The Range itself cannot reach the API; this is how a challenge makes a real call without the browser ever holding a token. |
-| `docker-proxy` | A narrow allowlist in front of the Docker socket, so the Range can stop and start lab containers without being root on the host. |
+| `docker-proxy` | A narrow allowlist in front of the Docker socket, so the Range can stop and start lab containers without being root on the host. Four names: `opa`, `worker`, `api`, and `memory-init` for track 9's repair. |
 
 It refuses to start anywhere but a local lab. With it running, `verify_local.py` also runs `V-17` to
 `V-21`, which prove it cannot reach the API or OPA, holds no privilege on any application table, and
@@ -199,6 +204,7 @@ Every page opens with the state of the lab:
 | **Correct** | Every control is at its designed setting. |
 | **Armed** | At least one control is deliberately in its wrong setting. The banner names it. |
 | **State unreadable** | The Range could not read a control, so nothing on the page can be trusted. The banner names it; see Troubleshooting. |
+| **Correct**, with controls "not running" | Every control the Range can reach is correct; the memory stack (A6) is not up, so track 9's eight are left out rather than guessed at. |
 
 **Reset the lab**, on the banner, puts every control back — not only the current challenge's — and
 reports what it had to restore. An armed control is armed in the real system, so while the banner
@@ -206,7 +212,7 @@ says Armed, other checks in this file will fail. That is the lab working: reset,
 
 ### After you update the repository
 
-The Range's code and all 31 challenges are built into its image. After a `git pull`, nothing you see
+The Range's code and every challenge are built into its image. After a `git pull`, nothing you see
 changes until the images are rebuilt — this one command rebuilds the lab and the Range together and
 applies any new migrations:
 
@@ -214,13 +220,49 @@ applies any new migrations:
 docker compose --profile range up -d --build
 ```
 
-Then reload the page with `Ctrl+F5`.
+Add `--profile memory` if you run A6. Then reload the page with `Ctrl+F5`.
 
-## A6 · Starting over
+`docker-proxy` reads its allowlist once, at start, from a mounted file — a rebuild does not restart
+it. If a pull changed `infrastructure/local/docker-proxy/haproxy.cfg`, recreate it:
+`docker compose --profile range up -d --force-recreate docker-proxy`.
+
+## A6 · The memory stack (track 9)
+
+A memory layer beside the agent — history, long-term memory and rules, and the context block an
+agent runtime gives the model — built the way organisations deploy one, and held to this lab's rules.
+It changes nothing in the core. It is profile-gated, so a plain `docker compose up` never starts it:
+
+```bash
+docker compose --profile memory up -d --build
+```
+
+The first build downloads the embedding model once, at a pinned revision with every file
+hash-checked; after that it runs offline. The stack uses about half a gigabyte of memory in total.
+
+| Container | Job |
+|---|---|
+| `memory` | The memory service. Verifies the user's token — its own audience, `supportpilot-memory` — and asks the core database which organisation and roles that identity holds, on every request. |
+| `memory-db` | PostgreSQL for history, memories, rules, settings, the context log and audit. Its runtime roles own nothing, and every table has row-level security, forced. |
+| `qdrant` | The vector store. One collection per tenant, plus the shared layout track 9 arms. Nobody at runtime holds its API key; each component has a token scoped to the collections it needs. |
+| `embeddings` | A small embedding model, local and offline. Reachable from the memory stack only. |
+| `memory-init` | One-shot, like `migrate`: roles, schema, seeds, smoke tests, collections. The only holder of memory-db's bootstrap credential and of Qdrant's API key. The Range re-runs it to repair what 9.8 leaves behind. |
+
+With it running, `verify_local.py` also runs `V-22` to `V-31`: nothing published to the host, runtime
+roles bounded, row-level security forced, the lookup role able to call one function and nothing else,
+the audience enforced, the Range unable to reach the service or the model, the Qdrant key held only
+by `memory-init` and Qdrant itself, the stores in agreement, the memory action document exactly four operations,
+and the Range's own vector-store tokens able to read and not write.
+
+The model gets four tools — `remember`, `recall`, `forget`, `propose_rule` — in their own action
+document, registered in B10. History, confirmation and context assembly are for an agent runtime,
+not for the model. Onyx keeps its own conversation history and does not write to this one, so in the
+Range the runtime is played by the probe service.
+
+## A7 · Starting over
 
 ```bash
 python scripts/bootstrap_local.py --reset       # back to a known state, database rebuilt
-docker compose --profile range down -v          # stop everything, the Range too, and destroy the volumes
+docker compose --profile range --profile memory down -v   # stop everything and destroy the volumes
 ```
 
 To put the controls back without losing anything, use **Reset the lab** in the Range instead.
@@ -420,6 +462,18 @@ publishes no host port on purpose; this is the only route to it.
 Do this as your Onyx admin, not as alice. A user-facing account that can register a tool is a
 control-plane boundary that does not exist, which is exactly what the architecture is built to avoid.
 
+### The memory action (track 9, optional)
+
+If you run A6, register a **second** action the same way, from
+**`openapi/supportpilot-memory-actions.json`**: passthrough on, no custom headers, no tool-level
+OAuth. It holds four operations — `remember`, `recall`, `forget`, `propose_rule` — and its `servers`
+entry is `http://memory:8000`, the memory service on the same internal network as the API. Onyx's
+token already names the memory service's audience; the realm file adds it.
+
+Keep it a separate action. Its review is separate too: `export_openapi.py --check` holds it to the
+same rules as the first, plus one — no request body may carry a field the server decides, such as the
+write channel or a status.
+
 ## B11 · Attach it to an agent (manual)
 
 Registering an action does not make any agent use it. This is the step people forget.
@@ -519,6 +573,10 @@ trail recorded `allowed`, twice. That gap is the most valuable thing Part B can 
 | The Range's banner says **State unreadable** | The probe or the database is not answering. `docker compose --profile range ps`, then the logs of `probe` and `range`. |
 | `verify_local.py` fails while the Range says **Armed** | Expected — a control is broken on purpose. Press **Reset the lab**, then verify again. |
 | The `range` container exits at start, `SUPPORTPILOT_ENV` in its log | It runs only in a local lab, by design. Do not change the variable to get past it. |
+| `memory-init` exits 1 | Its log names the step. A smoke-test FAIL means a memory-db grant or policy is wrong — fix the migration, never the test. A password error means the volume outlived a regenerated `.secrets/`: `docker compose --profile memory down -v`, then up again. |
+| Track 9's controls read **absent** | The memory stack is not up. `docker compose --profile memory up -d`. |
+| 9.8's restore reports it failed | `docker-proxy` is running an older allowlist without `memory-init`. Recreate it (A5, after you update). |
+| `V-29` names records and layouts | memory-db and the vector store disagree. If 9.8 is armed, that is the finding; otherwise restore it in the Range, which re-runs `memory-init` to repair them. |
 | Everything is confusing | `python scripts/bootstrap_local.py --reset`. |
 
 Start with `docker compose ps` and `docker compose logs --tail 100 api` — substitute `keycloak`,
@@ -573,19 +631,22 @@ When something surprising happens and you want to know what actually occurred:
 ```
 README.md                 the article
 LAB.md                    this file
-compose.yaml              six networks, eleven services — three gated on the `range` profile
+compose.yaml              eight networks, sixteen services — three gated on `range`, five on `memory`
 services/
   api/                    auth · policy · tools · repositories · audit
   worker/                 jobs · adapters · idempotency
   approval-portal/        renders a payload hash, forwards a decision
-  range/                  The Range — the practice app; all 31 challenges are under content/
-  probe/                  the fixed list of API requests the Range may ask for
+  range/                  The Range — the practice app; every challenge is under content/
+  probe/                  the fixed list of requests the Range may ask for, and track 9's scenarios
+  memory/                 the memory service and memory-init (track 9)
+  embeddings/             the pinned, offline embedding model
 database/
   migrations/             schema, roles, grants, RLS — owned by sp_migrator_role
   seeds/                  the two tenants and the injection corpus
+  memory/                 memory-db's migrations, seeds and smoke tests — applied by memory-init
 policy/supportpilot/      authz.rego + limits.json
 policy/tests/             the policy tests
-openapi/                  the registered action set — paste the .json into Onyx
+openapi/                  the registered action sets — paste the .json files into Onyx
 infrastructure/local/     Keycloak realm, Onyx overlay, agent instructions, Docker-socket proxy
 scripts/                  bootstrap, verify, the suites, the learning modules
 docs/

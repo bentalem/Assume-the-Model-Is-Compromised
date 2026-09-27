@@ -12,7 +12,7 @@ docker compose --profile range up -d        # http://127.0.0.1:8095
 
 Profile-gated, because a lab being used as a lab does not need it running.
 
-Three pages, one vocabulary. `/` is the landing page: what this is, the eight tracks and what
+Three pages, one vocabulary. `/` is the landing page: what this is, the tracks and what
 each one establishes, and three named ways in — with the challenge count, this browser's solved
 count and a live probe of the environment on it, because a landing page that reads "correct"
 while the lab is armed would be the first lie the course tells. `/catalogue` is the index, a
@@ -29,7 +29,7 @@ down, so they cannot drift from what is loaded — and a test asserts the genera
 To arm a challenge the Range must drop `FORCE` on a table, disable row security, and — later — stop
 a container and install a different policy bundle. **That is more authority than anything else in
 this repository holds**, and a service that can do all of it is precisely the control-plane
-violation the lab spends eight tracks teaching people to find.
+violation the lab spends every track teaching people to find.
 
 So it is bounded the way the lab would demand of anything else. Each of these is asserted somewhere,
 not promised here.
@@ -41,7 +41,10 @@ not promised here.
 | Cannot reach the API or OPA | networks `edge`, `range_data`, `control` — never `app` or `data` | `V-17` |
 | The model has no route to it | absent from `openapi/supportpilot-actions.*` | `V-19` |
 | Never runs outside a local lab | `assert_local()` exits before binding a port | `services/range/tests/test_content.py` |
-| Container control is three verbs | HAProxy allowlist, not the Docker socket | `infrastructure/local/docker-proxy/` |
+| Container control is three verbs on four names | HAProxy allowlist, not the Docker socket | `infrastructure/local/docker-proxy/` |
+| Track 9: reach into memory-db is a fixed function list | `mem_range_role` owns nothing; `EXECUTE` on `range_mem.*` only | memory-db `permissions_smoke.sql`, `V-23` |
+| Track 9: reads the vector store, never writes it | a read-only token per collection; no API key | `V-28` |
+| Track 9: cannot reach the memory service or the model | `range_memory` only — never `memory_data` | `V-27` |
 | Every action is evidence | writes `app.audit_events` as `actor_type='range'` | `scripts/range_suite.py` |
 
 Two of these were not obvious and are worth stating plainly.
@@ -65,7 +68,8 @@ Twelve challenges need a request made *through* the API, and the Range cannot re
 The one-line fix — put the Range on the `app` network — would hand the service that can break every
 control a route to the thing those controls protect. So a second service, `probe`, does it instead:
 
-- It can reach the API, and it holds **one hand-written list of requests**. The Range asks for one by
+- It can reach the API — and, for track 9, the memory service, which is on the same `app`
+  network — and it holds **one hand-written list of requests**. The Range asks for one by
   id; `probe` refuses any id that is not in its own registry. Nothing composes a request, and the
   list is the review surface — the same property that makes a parameterless `SECURITY DEFINER`
   function acceptable.
@@ -169,10 +173,96 @@ button. Migration `0013` fixed the policy rather than the test.
 |---|---|
 | `python scripts/range_suite.py` | round trip for **every registered mutation**, read from the service's own `/registry`; probe honesty against the catalogue; reset from an arbitrary armed set; flag unobtainable unarmed; refusal of undeclared ids; and the state the suite leaves behind |
 | `python services/range/tests/test_content.py` | manifest validation, source references resolving, the local-only refusal |
-| `python scripts/verify_local.py` | `V-17`–`V-19`, the Range's boundaries, skipped with a count when it is not running |
+| `python scripts/verify_local.py` | `V-17`–`V-21`, the Range's boundaries, and `V-22`–`V-31` for the memory stack, each skipped with a count when its profile is not running |
 
 `range_suite.py` drives the service over HTTP rather than calling the registry in process. A registry
 that works behind a console that cannot reach it is still a broken product.
+
+---
+
+## Track 9: the memory stack
+
+Track 9's controls live in a second database. The arrangement is the same one, applied again:
+`mem_range_role` owns nothing and may `EXECUTE` only the functions in the `range_mem` schema
+(memory-db migrations `0006`, `0008`, `0009`, `0010`), each `SECURITY DEFINER`, bounded, and
+returning named columns. The Range reads Qdrant with a read-only token per collection and never
+holds its API key.
+
+### Eight settings, one function
+
+Every track 9 mutation is a row in `mem.settings`, flipped by `range_mem.set_setting` — which accepts
+a key and a value, checks both against fixed lists, and writes an audit event in the same
+transaction. The browser can name a setting; it cannot invent one.
+
+| Mutation | Setting | Secure → armed | Challenge |
+|---|---|---|---|
+| `memory.write.secret_filter_off` | `write.secret_filter` | `on` → `off` | 9.1 |
+| `memory.context.provenance_off` | `context.provenance` | `on` → `off` | 9.2 |
+| `memory.history.org_readable` | `history.org_readable` | `false` → `true` | 9.3 |
+| `memory.history.revalidate_off` | `history.revalidate` | `on` → `off` | 9.4 |
+| `memory.write.auto_confirm` | `write.auto_confirm` | `false` → `true` | 9.5 |
+| `memory.store.shared_collection` | `store.layout` | `per_tenant` → `shared` | 9.6 |
+| `memory.rules.self_activate` | `rules.self_activate` | `false` → `true` | 9.7 |
+| `memory.forget.primary_only` | `forget.scope` | `all` → `primary` | 9.8 |
+
+The service reads settings per request, so nothing restarts. The probe reads `setting_state` in a
+**separate call** from any `set_setting`: read in the statement that changed it, a setting still
+shows its old value, and an early version reported an armed switch as correct for exactly that
+reason.
+
+### Restoring a switch is not recovery
+
+Three settings let something through that outlives them: a memory born confirmed (9.5), a rule that
+activated itself (9.7), a summary that survived its source's forget (9.8). Putting the switch back
+closes the hole and does nothing about what already came through it — so for these three the probe
+also asks `range_mem.leftovers()`, and reports `correct` only when the setting is secure **and**
+nothing it let through remains. The restores do the second half: send auto-confirmed memories back to
+unconfirmed, retire rules nobody approved, and re-run `memory-init` through the proxy to complete
+half-done forgets. Each writes an audit event per row. None of them can touch what a person did — a
+rule someone approved, a memory someone confirmed — and the store's own policies say so, not only
+the `WHERE` clauses.
+
+The 9.8 restore waits for **that run** of `memory-init` to exit 0. A one-shot container is `exited`
+before it starts as well as after, so waiting for the state alone would report a repair that never
+ran. That exact failure happened once: the proxy was still running an allowlist from before
+`memory-init` was added, refused the start with a 403, and the switch went back while the repair did
+not. `range_suite.py` now fails a round trip whose console reports the restore failed, even if the
+probe reads correct.
+
+### Observations run a scenario, then read the log
+
+A memory challenge is rarely one request — "a tool result reaches the model" is a turn written, then a
+context block assembled. So the probe service gained **scenarios**: fixed sequences, each step a
+literal method, path and body in its registry. The one thing that moves between steps is a value an
+earlier step's response returned (a new session's id, a memory's id, the email the API showed bob),
+substituted into the parsed body as a JSON string or into the path percent-encoded — so it can fill a
+field or a segment and never change the request's shape.
+
+The flag observations run their scenario first and then read what the memory service logged —
+`mem.context_log` for every context block, written in the same transaction as its audit event. That
+makes each one a measurement of the system as it is now: arm a control, run it, and the value
+appears; restore, run it again, and it does not. It is also why a flag check re-runs the scenario,
+and why 9.8's observation looks at alice's last three forgets rather than one.
+
+Every flag column is computed in memory-db from the evidence, so a value appears only in the state the
+challenge is about — a credential only if one was *included* in a block, an email only on a turn the
+log marks as having outlived its permission. 9.4 needs two controls armed, and `range_suite.py`
+proves the flag is unobtainable with either one alone.
+
+### Absent is a state
+
+The memory stack is a compose profile. When it is not running, memory-db cannot be reached and its
+eight controls read **`absent`** — never `correct`, and not `unknown` either, because the Range knows
+exactly why it cannot read them. The banner leaves them out of its count and says how many; reset
+skips them, because there is nothing running to restore; `range_suite.py` skips track 9 and says so.
+
+### The dual-write artifact
+
+The memory service writes every memory to **both** vector layouts — its tenant's collection and the
+shared one — so that arming 9.6 needs no re-indexing. A real deployment would write one layout. It is a
+lab artifact, and it is the reason 9.6's observation reads the layout the setting selects rather than
+whatever happens to exist: the shared collection is always populated, and what 9.6 measures is what
+the service's query reaches when that is the layout it uses.
 
 ---
 

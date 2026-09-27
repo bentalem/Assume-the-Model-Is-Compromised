@@ -1,8 +1,9 @@
 > **This repository is also a lab.** The system described below runs on one machine — Onyx, Keycloak,
 > a policy engine, PostgreSQL with row-level security, a worker — and every control in it can be
 > removed so you can watch what fails. Install it with **[LAB.md](LAB.md)**, then practise in
-> **The Range**, the browser app that ships with it: 31 challenges in eight tracks that follow this
-> article, each one breaking a real control and putting it back. No terminal needed.
+> **The Range**, the browser app that ships with it: 39 challenges in nine tracks — eight that follow
+> this article, and a ninth on agent memory that goes past it — each one breaking a real control and
+> putting it back. No terminal needed.
 
 # Assume the Model Is Compromised
 
@@ -642,7 +643,7 @@ time.*
 **[LAB.md](LAB.md)** — install the system this article was tested against, prove it is correct, and
 start The Range.
 
-**The Range** — 31 challenges in eight tracks, in your browser at `http://127.0.0.1:8095` once the
+**The Range** — 39 challenges in nine tracks, in your browser at `http://127.0.0.1:8095` once the
 lab is up. Each one explains a control, lets you break it in the running system, and then shows you
 the lab's own source for why it behaved the way it did. Where each part of this article lives there:
 
@@ -658,6 +659,17 @@ the lab's own source for why it behaved the way it did. Where each part of this 
 | Row-level security that is configured, visible, and filtering nothing | Track 2 · Tenant isolation — **2.1**, then **2.3** *Four questions* for the catalogue query |
 | A test that lied in its own name | **7.4** *The test that lied in its own name* |
 | The habit underneath all four | **7.3** *Prevented, or merely failed* |
+| Beyond this article: what an agent remembers | Track 9 · Context, history and memory — start with **9.5** *The memory nobody asked for*, then **9.1** *What enters the context* |
+
+**Track 9** goes one step past this article. Memory is where one injection becomes a permanent one —
+and every kind of it ends up in context, where nothing says where it came from. It adds a memory
+layer beside the agent (history, long-term memory in a vector store, and rules the agent follows),
+held to the same rules as everything above: identity from the verified token, row-level security in
+the store, and the model allowed to *propose* a memory or a rule but never to confirm or approve
+one. Its eight challenges cover what reaches the context (9.1, 9.2), who can read a conversation
+(9.3), a permission that outlives itself in history (9.4), a memory the model saved on its own
+(9.5), tenant isolation in a vector store (9.6), a rule the agent wrote for itself (9.7), and
+forgetting that does not forget (9.8). It runs as an optional part of the lab: see LAB.md, A6.
 
 **[securing-ai-agents.pdf](securing-ai-agents.pdf)** — the same article as a printable document,
 screenshots and all.

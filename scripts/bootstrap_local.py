@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
+import hmac
+import json
 import os
 import secrets
 import shutil
@@ -31,6 +34,16 @@ SECRET_NAMES = [
     "worker_db_password",
     "auditor_db_password",
     "range_db_password",
+    # Track 9, the memory stack. Generated for every install, like range_db_password, because
+    # migration 0029 creates the core lookup role whether or not the `memory` profile ever runs —
+    # and a secret that exists but is unused costs nothing, while one that is missing fails the
+    # migration job for everyone.
+    "memory_lookup_db_password",
+    "memory_db_bootstrap_password",
+    "memory_migrator_db_password",
+    "memory_db_password",
+    "range_memory_db_password",
+    "qdrant_admin_key",
     "probe_shared_secret",
     "keycloak_admin_password",
 ]
@@ -101,6 +114,60 @@ def generate_secrets() -> None:
     if not env.exists():
         shutil.copy(REPO / ".env.example", env)
         detail(".env created from .env.example")
+
+
+# ------------------------------------------------------------------------------------------------
+# Qdrant credentials for track 9.
+#
+# Qdrant's JWT access control signs tokens with the server's API key (HS256), and each token names
+# the collections it may touch and whether it may write. Nobody at runtime holds the API key
+# itself: memory-init uses it to create collections, and every other component gets a token scoped
+# to what it needs. Measured in the pinned version before this was built — a token for cedar's
+# collection gets 403 on northwind's, a read-only token cannot write, and neither can drop a
+# collection.
+#
+# Minted here, where every other secret is generated. They carry no `exp` and no `iat`, so minting
+# is deterministic: re-running bootstrap with the same key reproduces the same tokens, and a new key
+# produces new ones. A real deployment would give them lifetimes and rotate them; a lab that has to
+# survive being left alone for a month does not.
+# ------------------------------------------------------------------------------------------------
+TENANTS = ("cedar", "northwind")
+
+QDRANT_TOKENS = {
+    # The memory service: read-write on its tenants' collections, and on the shared one because it
+    # dual-writes both layouts (see docs/architecture/the-range.md for why that is a lab artifact).
+    **{f"qdrant_jwt_{t}": [{"collection": f"memories__{t}", "access": "rw"}] for t in TENANTS},
+    "qdrant_jwt_shared": [{"collection": "memories__shared", "access": "rw"}],
+    # The Range: read-only, one token per collection rather than one for all three. Challenge 9.6
+    # has to show a tenant-scoped credential failing to reach another tenant's collection, and a
+    # Range holding a read-everything key could not show that honestly.
+    **{f"range_qdrant_{t}_ro": [{"collection": f"memories__{t}", "access": "r"}] for t in TENANTS},
+    "range_qdrant_shared_ro": [{"collection": "memories__shared", "access": "r"}],
+}
+
+
+def _b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+
+def _mint(key: str, access: list[dict]) -> str:
+    header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+    body = _b64(json.dumps({"access": access}, separators=(",", ":")).encode())
+    signature = hmac.new(key.encode(), f"{header}.{body}".encode(), hashlib.sha256).digest()
+    return f"{header}.{body}.{_b64(signature)}"
+
+
+def mint_qdrant_tokens() -> None:
+    key_file = SECRETS_DIR / "qdrant_admin_key"
+    key = key_file.read_text(encoding="utf-8").strip()
+    for name, access in QDRANT_TOKENS.items():
+        path = SECRETS_DIR / name
+        token = _mint(key, access)
+        if path.exists() and path.read_text(encoding="utf-8").strip() == token:
+            detail(f"{name} (current)")
+            continue
+        path.write_text(token, encoding="utf-8", newline="")
+        detail(f"{name} (minted)")
 
 
 def ensure_tls() -> None:
@@ -221,6 +288,7 @@ def main() -> int:
         raise SystemExit(f"{RED}docker is not on PATH{RESET}")
 
     generate_secrets()
+    mint_qdrant_tokens()
     ensure_tls()
 
     if args.reset:

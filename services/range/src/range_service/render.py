@@ -7,7 +7,7 @@ neither of those is load-bearing.
 
 Three pages, one vocabulary:
 
-    /            the landing page: what this is, the eight tracks, and three ways in
+    /            the landing page: what this is, the tracks, and three ways in
     /catalogue   the index: every challenge, as a table per track
     /c/<id>      one challenge: the stage spine, the console, the source
 
@@ -37,6 +37,8 @@ TRACK_CLAIMS: dict[int, str] = {
     6: "For anything that cannot be undone, the control is structure.",
     7: "What you can prove afterwards, and what only looked like proof.",
     8: "What the runtime may change about itself, and where data can leave.",
+    9: "Memory is where one injection becomes a permanent one — and every kind of it ends up in "
+       "context, where nothing says where it came from.",
 }
 
 STAGE_TITLES = ("Learn the mechanism", "Break it", "Understand what you did")
@@ -232,6 +234,10 @@ def _summarise(state: dict[str, str] | None) -> tuple[str, str, str]:
     """
     if not state:
         return ("", "", "")
+    # A control whose stack is not running (track 9 without the memory profile) is neither read nor
+    # guessed: it is left out of the count, and the headline says how many were left out.
+    absent = sorted(mid for mid, value in state.items() if value == "absent")
+    state = {mid: value for mid, value in state.items() if value != "absent"}
     unknown = sorted(mid for mid, value in state.items() if value == "unknown")
     armed = sorted(mid for mid, value in state.items() if value == "armed")
     if unknown:
@@ -246,6 +252,9 @@ def _summarise(state: dict[str, str] | None) -> tuple[str, str, str]:
             "Armed · " + plural(len(armed), "control") + " away from correct",
             ", ".join(armed),
         )
+    if absent:
+        return ("held", f"Correct · all {len(state)} running controls at their designed setting",
+                f"{plural(len(absent), 'control')} not running: the memory stack is down")
     return ("held", f"Correct · all {len(state)} controls at their designed setting", "")
 
 
@@ -301,9 +310,9 @@ def _panel(title: str, inner: str, *, side: str = "", flush: bool = False) -> st
 # --------------------------------------------------------------------------------------------------
 # The landing page
 #
-# Three jobs in one screen: say what this is, show the eight tracks and what each one establishes,
+# Three jobs in one screen: say what this is, show the tracks and what each one establishes,
 # and put the learner in a challenge. So: no hero. The masthead, a three-line statement beside a
-# live readout of the lab, then the eight tracks as a table, then three named ways in.
+# live readout of the lab, then the tracks as a table, then three named ways in.
 #
 # Every number on it is counted rather than written down, and the environment line is a probe
 # reading rather than an assumption — a landing page that says "correct" while the lab is armed
@@ -417,7 +426,7 @@ def landing(
 
     tracks_section = (
         '<section class="sec">'
-        "<h2>The eight tracks</h2>"
+        "<h2>The tracks</h2>"
         '<p class="note">Each track makes one claim. The challenges inside it are the evidence '
         "for that claim, and they are meant to be read in order the first time.</p>"
         '<div class="scroller"><table class="index">'
@@ -481,7 +490,7 @@ def catalogue(
     out.append(
         '<div class="chead">'
         '<span class="eyebrow">Catalogue</span>'
-        f"<h1>{len(challenges)} challenges, eight tracks</h1>"
+        f"<h1>{len(challenges)} challenges, {len({c.track for c in challenges})} tracks</h1>"
         '<p class="summary">Every challenge in the range, in curriculum order. Nothing is locked. '
         'If you have not used this before, <a href="/guide">read how it works</a> first — it is '
         "four minutes and it explains the console.</p></div>"
@@ -495,7 +504,7 @@ def catalogue(
         out.append(footer("0 challenges"))
         return "".join(out)
 
-    # Eight tracks over four thousand pixels of rows. The nav is the only way to move between
+    # Nine tracks over five thousand pixels of rows. The nav is the only way to move between
     # them without a scrollbar, and it doubles as the page's own contents list.
     out.append(
         '<nav class="tracknav" aria-label="Tracks">'

@@ -12,8 +12,13 @@ So this script also enforces the rules the document must satisfy, and fails if a
   * no request or path parameter is named user_id, organization_id, role, author_id, or approved;
   * no response schema allows additional properties or an unbounded array.
 
+The memory service's document (openapi/supportpilot-memory-actions.*, track 9) is generated and held
+to the same rules, plus one: no request body may carry a field the server decides — identity, the
+write channel, a status, an approval. It is checked when the memory profile is running and skipped,
+with a line saying so, when it is not.
+
 Run: python scripts/export_openapi.py [--check]
-    --check verifies the committed file matches the running code without rewriting it.
+    --check verifies the committed files match the running code without rewriting them.
 """
 
 from __future__ import annotations
@@ -42,12 +47,33 @@ APPROVED_OPERATIONS = {
     "get_action_status",
 }
 
+# The memory service's action document (track 9): a second, separate registration, holding only the
+# four operations the model may call. History, confirmation, summaries, rule decisions and context
+# assembly are for an agent runtime and must never appear in it — a model that could confirm its own
+# memories or approve its own rules would make both controls meaningless.
+MEMORY_OUTPUT = REPO / "openapi" / "supportpilot-memory-actions.yaml"
+MEMORY_OUTPUT_JSON = REPO / "openapi" / "supportpilot-memory-actions.json"
+MEMORY_APPROVED_OPERATIONS = {"remember", "recall", "forget", "propose_rule"}
+
 # Names the server derives from verified identity. A parameter with one of these names would mean
 # the model could propose an identity (SP-PRD-001 section 6).
 FORBIDDEN_PARAMETER_NAMES = {
     "user_id", "organization_id", "org_id", "role", "roles",
     "author_id", "approved", "state", "actor_id", "tenant",
 }
+
+# For the memory document, also refused as a *request body* field. The API's gate checks parameters
+# only; the memory service's whole write-path lesson is that the body cannot say who wrote something
+# or whether it counts, so its gate checks the body too.
+MEMORY_FORBIDDEN_BODY_FIELDS = FORBIDDEN_PARAMETER_NAMES | {
+    "channel", "source", "status", "confirmed", "owner_sub", "user_sub", "decided_by",
+}
+
+MEMORY_EXTRACT = """
+import json
+from supportpilot_memory.main import create_app
+print(json.dumps(create_app().openapi()))
+"""
 
 EXTRACT = """
 import json
@@ -56,15 +82,15 @@ print(json.dumps(create_app().openapi()))
 """
 
 
-def generate() -> dict:
+def generate(service: str = "api", extract: str = EXTRACT) -> dict:
     proc = subprocess.run(
-        ["docker", "compose", "exec", "-T", "api", "python", "-c", EXTRACT],
+        ["docker", "compose", "exec", "-T", service, "python", "-c", extract],
         cwd=REPO, capture_output=True, text=True, timeout=120, encoding="utf-8",
     )
     line = next((l for l in proc.stdout.splitlines() if l.startswith("{")), None)
     if not line:
         raise SystemExit(
-            "could not generate the document; is the api service running?\n"
+            f"could not generate the document; is the {service} service running?\n"
             f"{(proc.stderr or proc.stdout)[:400]}"
         )
     return json.loads(line)
@@ -160,7 +186,9 @@ def inline_enum_refs(spec: dict) -> int:
     return inlined
 
 
-def audit(spec: dict) -> list[str]:
+def audit(spec: dict, approved: set[str] | None = None,
+          forbidden_body_fields: set[str] | None = None) -> list[str]:
+    approved = APPROVED_OPERATIONS if approved is None else approved
     findings: list[str] = []
     seen: set[str] = set()
 
@@ -175,7 +203,7 @@ def audit(spec: dict) -> list[str]:
                 continue
             seen.add(operation_id)
 
-            if operation_id not in APPROVED_OPERATIONS:
+            if operation_id not in approved:
                 findings.append(
                     f"{operation_id}: not in the approved operation list. Registering a new tool "
                     f"is a control-plane change and needs review before it reaches this document."
@@ -245,7 +273,28 @@ def audit(spec: dict) -> list[str]:
                     f"schema {schema_name}.{property_name}: unbounded array (needs maxItems)"
                 )
 
-    missing = APPROVED_OPERATIONS - seen
+    if forbidden_body_fields:
+        # Request bodies only: a response may well report a status. inline_enum_refs has already
+        # put every object body inline; a reference that survived is resolved here, not skipped.
+        schemas = spec.get("components", {}).get("schemas", {})
+        for path, operations in spec.get("paths", {}).items():
+            for method, operation in operations.items():
+                if not isinstance(operation, dict):
+                    continue
+                body = (operation.get("requestBody") or {}).get("content", {}).get(
+                    "application/json", {}).get("schema", {})
+                if "$ref" in body:
+                    body = schemas.get(body["$ref"].rsplit("/", 1)[-1], {})
+                if body and body.get("additionalProperties") is not False:
+                    findings.append(f"{method.upper()} {path}: request body accepts fields it does "
+                                    f"not declare (needs extra='forbid')")
+                for property_name in (body.get("properties") or {}):
+                    if property_name.lower() in forbidden_body_fields:
+                        findings.append(f"{method.upper()} {path}: request body field "
+                                        f"'{property_name}' is decided by the server and must not "
+                                        f"be accepted from the caller")
+
+    missing = approved - seen
     if missing:
         findings.append(f"approved operations missing from the document: {sorted(missing)}")
 
@@ -311,7 +360,7 @@ def main() -> int:
                 print("Regenerate it and review the diff before merging.")
                 return 1
         print(f"OK: action document matches the code. Operations: {', '.join(operations)}")
-        return 0
+        return check_memory_document()
 
     OUTPUT.parent.mkdir(exist_ok=True)
     OUTPUT.write_text(rendered, encoding="utf-8")
@@ -319,6 +368,67 @@ def main() -> int:
     print(f"Wrote {OUTPUT.relative_to(REPO)}       (for review and diffs)")
     print(f"Wrote {OUTPUT_JSON.relative_to(REPO)}  (paste this into Onyx)")
     print(f"Registered operations: {', '.join(operations)}")
+    return write_memory_document()
+
+
+def _memory_running() -> bool:
+    proc = subprocess.run(["docker", "compose", "ps", "--status", "running", "--services"],
+                          cwd=REPO, capture_output=True, text=True, timeout=60, encoding="utf-8")
+    return "memory" in proc.stdout.split()
+
+
+def _memory_spec() -> tuple[dict, list[str]]:
+    spec = generate("memory", MEMORY_EXTRACT)
+    inline_enum_refs(spec)
+    return spec, audit(spec, MEMORY_APPROVED_OPERATIONS, MEMORY_FORBIDDEN_BODY_FIELDS)
+
+
+def _memory_operations(spec: dict) -> list[str]:
+    return sorted(op.get("operationId") for path in spec.get("paths", {}).values()
+                  for method, op in path.items() if method in {"get", "post", "put", "patch", "delete"})
+
+
+def _memory_yaml(spec: dict) -> str:
+    return to_yaml(spec).replace(
+        "# SupportPilot actions — the operations Onyx may register.",
+        "# SupportPilot memory actions — the four memory operations Onyx may register (track 9).", 1)
+
+
+def check_memory_document() -> int:
+    # Skipped when the memory profile is down, for the reason the API check is skipped when the API
+    # is down — but said out loud, so a skip is never mistaken for a pass.
+    if not _memory_running():
+        print("SKIP: memory action document not checked — the memory profile is not running.")
+        return 0
+    spec, findings = _memory_spec()
+    if findings:
+        print("Memory action document rejected:\n")
+        for finding in findings:
+            print(f"  - {finding}")
+        return 1
+    for path, expected in ((MEMORY_OUTPUT, _memory_yaml(spec)), (MEMORY_OUTPUT_JSON, to_json(spec))):
+        if not path.exists() or path.read_text(encoding="utf-8") != expected:
+            print(f"{path.relative_to(REPO)} is out of date with the running memory service.")
+            return 1
+    print(f"OK: memory action document matches the code. Operations: "
+          f"{', '.join(_memory_operations(spec))}")
+    return 0
+
+
+def write_memory_document() -> int:
+    if not _memory_running():
+        print("Memory profile not running; memory action document not regenerated.")
+        return 0
+    spec, findings = _memory_spec()
+    if findings:
+        print("Memory action document rejected:\n")
+        for finding in findings:
+            print(f"  - {finding}")
+        return 1
+    MEMORY_OUTPUT.write_text(_memory_yaml(spec), encoding="utf-8")
+    MEMORY_OUTPUT_JSON.write_text(to_json(spec), encoding="utf-8")
+    print(f"Wrote {MEMORY_OUTPUT_JSON.relative_to(REPO)}  (the second action to paste into Onyx)")
+    print(f"Memory operations: {', '.join(_memory_operations(spec))}")
     return 0
 
 

@@ -9,7 +9,7 @@ challenge needs a command, the Range runs it.
 A second rule shapes the service itself. To arm a challenge the Range must be able to drop FORCE on
 a table, change how the API connects, stop a container. That is more authority than anything else in
 this repository holds, and a service that can do all of it is exactly the control-plane violation
-the lab spends eight tracks teaching people to find. So it is bounded the way the lab would demand
+the lab spends every track teaching people to find. So it is bounded the way the lab would demand
 of anything else:
 
   * it refuses to start anywhere but `local`, and that refusal is a test;
@@ -100,7 +100,8 @@ def startup() -> None:
     # later. A service whose whole job is arming controls should be the first to report that it left
     # some armed, not the last.
     try:
-        armed = [mid for mid, value in registry.state().items() if value != registry.CORRECT]
+        armed = [mid for mid, value in registry.state().items()
+                 if value not in (registry.CORRECT, registry.ABSENT)]
     except Exception:  # noqa: BLE001
         logger.exception("could not probe the environment on startup")
         return
@@ -172,7 +173,7 @@ def _lab_state() -> dict[str, str] | None:
 
     Every page that shows the environment reads it here, on every render. Nothing is cached and
     nothing is remembered: a page that says "correct" because that is what it was told last time
-    is the exact failure this course spends eight tracks teaching people to find.
+    is the exact failure this course spends every track teaching people to find.
     """
     try:
         return registry.state()

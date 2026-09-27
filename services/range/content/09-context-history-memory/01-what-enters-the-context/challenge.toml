@@ -1,0 +1,69 @@
+id = "9.1-what-enters-the-context"
+track = 9
+number = "9.1"
+title = "What enters the context"
+points = 30
+
+summary = """
+A tool returned a credential. The runtime wrote it into history, and history is replayed into the \
+next context. There was one place it could have been stopped."""
+
+objective = """
+Run the tool-result observation with the filter holding, then with it off. Give the \
+credential-shaped value that reaches alice's context block."""
+
+skip_test = """
+where, between a tool call and the model's next turn, a secret inside a tool result is stopped — \
+and what your system does with it if nothing stops it."""
+
+purpose = """
+You follow one tool result from the moment it is returned to the moment the model reads it again: \
+written into history by the runtime, stored, and replayed into the next context block. The skill is \
+finding the single point on that path where a secret can be stopped — at write — and seeing, in the \
+block the service actually logged, what the model receives when that point is switched off."""
+
+agent_link = """
+Keeping credentials out of stored data is ordinary data-loss prevention. What an agent changes is \
+the path: tool output flows into history and back into context automatically, with no person \
+reading it in between, and every later turn sends it to the model again — together with whatever \
+the model is able to send it on to. The Slack AI and EchoLeak incidents are this path with an \
+attacker at the far end."""
+
+hints = [
+  "Before you arm anything: what does the tool turn look like in the context block, and who changed it?",
+  "The credential was in the tool result either way. Where, exactly, did it stop the first time?",
+  "Once you restore the filter, is the credential you already stored gone from alice's history?",
+]
+
+[[control]]
+mutation = "memory.write.secret_filter_off"
+label = "Stop redacting credentials from what memory stores"
+detail = "A setting in memory-db, read on every write. Nothing about the tool or the model changes."
+
+[[observation]]
+observation = "memory.context.after_tool_result"
+label = "A tool result reaches alice's context"
+detail = "The runtime stores a deploy-log result in a new session, builds the next context for it, and this shows the block the service logged."
+
+[flag]
+kind = "value"
+label = "the credential-shaped value in alice's context"
+observation = "memory.context.after_tool_result"
+field = "secret_shaped"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/history.py"
+lines = [106, 132]
+highlight = [111, 114]
+caption = "The write. The redaction happens here, before the turn is stored — never on the way out"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/secrets_filter.py"
+lines = [1, 19]
+highlight = [8, 18]
+caption = "Why a turn is redacted but a memory record is refused"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/context.py"
+lines = [155, 178]
+caption = "Where the stored turn goes next: into every context block for that session"

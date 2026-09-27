@@ -194,3 +194,59 @@ BEGIN
   RAISE NOTICE 'PASS: sp_range_role is bounded to EXECUTE on reviewed functions';
 END
 $$;
+
+-- ------------------------------------------------------------------------------------------------
+-- sp_memory_lookup_role (0029): one grant, and the job fails if it ever holds a second.
+--
+-- The memory service asks this database one question — who is this subject, in which organisation,
+-- with which role — through a function it may call and a schema it may enter. A table grant here
+-- would mean the memory layer could read business data directly, which is the thing the whole
+-- memory design is arranged to avoid.
+-- ------------------------------------------------------------------------------------------------
+DO $$
+DECLARE
+  offenders text;
+  n integer;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sp_memory_lookup_role') THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role does not exist';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sp_memory_lookup_role'
+             AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication)) THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role holds an elevated attribute';
+  END IF;
+
+  SELECT count(*) INTO n FROM pg_class c
+  WHERE pg_get_userbyid(c.relowner) = 'sp_memory_lookup_role';
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role owns % relation(s)', n;
+  END IF;
+
+  SELECT string_agg(table_schema || '.' || table_name || ':' || privilege_type, ', ') INTO offenders
+  FROM information_schema.table_privileges
+  WHERE grantee = 'sp_memory_lookup_role';
+  IF offenders IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role holds table privileges: %', offenders;
+  END IF;
+
+  -- Direct routine grants, not ones inherited through PUBLIC: exactly one, and it is the lookup.
+  SELECT string_agg(routine_schema || '.' || routine_name, ', ') INTO offenders
+  FROM information_schema.routine_privileges
+  WHERE grantee = 'sp_memory_lookup_role'
+    AND NOT (routine_schema = 'app' AND routine_name = 'resolve_subject');
+  IF offenders IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role may call more than resolve_subject: %', offenders;
+  END IF;
+
+  IF NOT has_function_privilege('sp_memory_lookup_role', 'app.resolve_subject(text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role cannot call app.resolve_subject';
+  END IF;
+
+  IF has_schema_privilege('sp_memory_lookup_role', 'app', 'CREATE') THEN
+    RAISE EXCEPTION 'FAIL: sp_memory_lookup_role may CREATE in schema app';
+  END IF;
+
+  RAISE NOTICE 'PASS: sp_memory_lookup_role is bounded to app.resolve_subject';
+END
+$$;

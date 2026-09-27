@@ -1,0 +1,67 @@
+id = "9.2-everything-looks-the-same"
+track = 9
+number = "9.2"
+title = "Everything looks the same"
+points = 25
+
+summary = """
+The same context block, with and without the labels that say where each line came from. One line \
+is an instruction a tool returned. Find it — and then say why finding it is not the control."""
+
+objective = """
+Read alice's context block labelled, then unlabelled. Say which line came from a tool result, how \
+you knew, and why a provenance label on its own does not stop a model from acting on that line."""
+
+skip_test = """
+the difference between marking untrusted text and constraining what the agent can do after reading \
+it — and which of the two your system is relying on."""
+
+purpose = """
+You read one context block twice: with every item labelled with its source, and with the labels \
+removed. The skill is locating untrusted text inside a block the model treats as one undifferentiated \
+input, and then being precise about what the label buys: an audit trail, a review aid and defence \
+in depth — not a control, because the model is free to follow a labelled instruction."""
+
+agent_link = """
+Entirely agent-specific. A model reads its context as one sequence of tokens with no channel \
+separating instructions from data; a label is more tokens in the same sequence. Everything this \
+lab teaches about authority living outside the model — tracks 4 and 6 — is the answer to the \
+question this challenge makes you ask."""
+
+hints = [
+  "Unlabelled, which line would you have guessed came from a tool? What did you base the guess on?",
+  "Labelled, what stops the model from doing what that line says?",
+  "If the label is not what protects alice, what in this lab does?",
+]
+
+[[control]]
+mutation = "memory.context.provenance_off"
+label = "Stop labelling where each line of context came from"
+detail = "The same content, the same order, the same items. Only the labels go."
+
+[[observation]]
+observation = "memory.context.alice_lines"
+label = "alice's context, as the model reads it"
+detail = "The runtime builds alice's context for a reply on TKT-1001; this is the rendered block, line by line."
+
+[[observation]]
+observation = "memory.context.alice_items"
+label = "The same block, item by item, with its source"
+detail = "What the service recorded about each line, whether or not the block showed it."
+
+[flag]
+kind = "written"
+label = "which line came from a tool, and why a label is not a control on its own"
+rubric = ["tool", "label", "authori"]
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/context.py"
+lines = [1, 30]
+highlight = [9, 20]
+caption = "The four controls at context assembly, and which of them the label is"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/context.py"
+lines = [124, 178]
+highlight = [128, 130]
+caption = "Every line gets a label — unless the setting says not to"

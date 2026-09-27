@@ -1,0 +1,84 @@
+id = "9.7-the-rule-the-agent-wrote"
+track = 9
+number = "9.7"
+title = "The rule the agent wrote for itself"
+points = 35
+
+summary = """
+A rule is an instruction the agent follows on every turn, for everyone in the organisation. The \
+model read a ticket and proposed one. Let proposals take effect without approval, and see who it \
+applies to."""
+
+objective = """
+Let the model propose "refunds under 1000 USD are pre-approved", with and without self-activation. \
+Give the id of the rule that became active without anyone approving it."""
+
+skip_test = """
+who can change the standing instructions your agent follows, whether that is reviewed like code, \
+and whether the agent itself can do it."""
+
+purpose = """
+You watch an agent-proposed rule either wait for approval or take effect at once, and see it appear \
+in a colleague's context. The skill is recognising procedural memory — rules, instructions, \
+preferences the agent always applies — as control-plane state, and putting the same \
+propose-approve structure around it that track 6 put around refunds."""
+
+agent_link = """
+Genuinely agent-shaped. A rule is not data the model reads; it is an instruction it obeys, on every \
+turn, for everyone it applies to. An agent that can write its own rules can turn one injected \
+sentence into standing policy for a whole organisation — the Rules File Backdoor did this through \
+files nobody reviewed."""
+
+hints = [
+  "Unarmed, the proposal succeeded. What state is it in, and who can change that state?",
+  "Armed, whose context does the new rule reach — alice's only?",
+  "After you restore the setting, is the rule still being obeyed? What did the restore have to do about it?",
+]
+
+[[control]]
+mutation = "memory.rules.self_activate"
+label = "Let a rule the agent proposes take effect immediately"
+detail = "Restoring it also retires every rule that became active that way."
+
+[[observation]]
+observation = "memory.rules.after_proposal"
+label = "The model proposes a refund rule"
+detail = "Plays the model after reading TKT-1001, calling propose_rule. Then shows cedar's rules."
+
+[[observation]]
+observation = "memory.context.alice_items"
+label = "alice's most recent context, item by item"
+detail = "Rules come first in every block."
+
+[[observation]]
+observation = "memory.fiona.approve_latest_rule"
+label = "fiona approves the latest proposal"
+detail = "The secure path: a different person, approving the hash of the text she read."
+
+[[observation]]
+observation = "memory.fiona.retire_latest_rule"
+label = "fiona retires the most recently activated rule"
+detail = "Approving has to be reversible. Use this after approving, to put the lab back."
+
+[flag]
+kind = "value"
+label = "the id of the rule nobody approved"
+observation = "memory.rules.after_proposal"
+field = "active_without_approval"
+
+[[source]]
+path = "services/memory/src/supportpilot_memory/rules.py"
+lines = [70, 90]
+highlight = [75, 84]
+caption = "The model's proposal: attributed to the agent, and active only if the setting allows it"
+
+[[source]]
+path = "database/memory/migrations/0004_rules.sql"
+lines = [81, 91]
+caption = "The store checks the same setting on insert"
+
+[[source]]
+path = "database/memory/migrations/0008_rule_retirement.sql"
+lines = [37, 85]
+highlight = [50, 82]
+caption = "Separation of duty in a trigger, as a complete table of transitions"

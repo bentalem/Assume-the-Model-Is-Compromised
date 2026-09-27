@@ -29,6 +29,10 @@ because it is the service most worth reviewing. Two more come up under the same 
 only to bound it: the `probe`, which makes the API requests the Range cannot, and the `docker-proxy`,
 which is the only way it can restart a container.
 
+Track 9 adds a memory stack under a third profile, `memory` — five containers on two more networks,
+beside the core rather than inside it. It is drawn separately [below](#the-memory-stack-track-9),
+because the core diagram does not change when it is running.
+
 ```mermaid
 flowchart LR
     users(["support agent<br/>approver"])
@@ -101,6 +105,79 @@ schema as `sp_migrator_role` and exits before the API starts.
 | **PostgreSQL** | — | `data` | Accept a connection from Onyx or the public network |
 | **Approval portal** | no credential | `edge`, `app` | Modify a payload after approval |
 | **Worker** | `sp_worker_role` | `data` | Read business data, or take instructions from a model |
+
+---
+
+## The memory stack (track 9)
+
+A memory layer beside the agent — history, long-term memory, rules, and the context block an agent
+runtime gives the model — deployed the way organisations deploy one, next to the agent and not
+inside its business service. It is its own trust boundary, and it changes nothing in the core.
+
+```mermaid
+flowchart LR
+    subgraph APP["app · internal"]
+        onyx["Onyx / agent runtime"]
+        mem["memory service<br/>no published port"]
+        probe["probe<br/>(plays the runtime)"]
+    end
+
+    subgraph MEMDATA["memory_data · internal"]
+        mdb[("memory-db<br/>row-level security")]
+        qd[("Qdrant<br/>scoped tokens")]
+        emb["embeddings<br/>offline"]
+        init["memory-init<br/>one-shot"]
+    end
+
+    subgraph DATA["data · internal"]
+        pg[("core PostgreSQL")]
+    end
+
+    subgraph RMEM["range_memory · internal"]
+        range["The Range"]
+    end
+
+    onyx -->|"user's token"| mem
+    probe -->|"seeded user's token"| mem
+    mem -->|"mem_service_role"| mdb
+    mem -->|"a token per collection"| qd
+    mem --> emb
+    mem -->|"sp_memory_lookup_role:<br/>app.resolve_subject only"| pg
+    init -->|"bootstrap, API key"| mdb
+    init --> qd
+    range -->|"mem_range_role:<br/>range_mem functions only"| mdb
+    range -->|"read-only tokens"| qd
+
+    classDef box fill:#eef2f7,stroke:#5b7fa6,stroke-width:1.5px,color:#152028
+    class onyx,mem,probe,mdb,qd,emb,init,pg,range box
+    style APP fill:none,stroke:#4a7ab5,stroke-width:2px
+    style MEMDATA fill:none,stroke:#3f8f6b,stroke-width:2px
+    style DATA fill:none,stroke:#3f8f6b,stroke-width:2px
+    style RMEM fill:none,stroke:#c2703d,stroke-width:2px
+```
+
+memory-db and Qdrant sit on two networks each — `memory_data` for the service and `memory-init`,
+`range_memory` for the Range — which the diagram draws once to stay readable.
+
+### Where the boundary is
+
+| Question | Answer | Enforced by |
+|---|---|---|
+| Who is the caller? | The verified token's subject — audience `supportpilot-memory`, and a token without it is refused | `tokens.py`, `V-26` |
+| Which organisation, which roles? | Asked of the core database on every request, through a role that can call `app.resolve_subject` and nothing else. Never cached, never from the request | migration `0029`, `V-25` |
+| Whose rows? | memory-db row-level security, forced, with context set transaction-locally — the core's rule six, applied again | memory-db `0001`–`0010`, `V-24` |
+| Whose vectors? | A Qdrant token per collection. Nobody at runtime holds the API key; `memory-init` alone does | bootstrap, `V-28` |
+| What can the model do? | Four operations — `remember`, `recall`, `forget`, `propose_rule` — in their own action document. No body may name a user, an organisation, a channel, a status or an approval | `export_openapi.py`, `V-30` |
+| What only a runtime or a person can do | Confirm a memory, decide or retire a rule, read history, assemble context — none of them in the action document | the routes, `include_in_schema=False` |
+
+Two differences from the memory products organisations usually plug in are deliberate. Those take
+the user as a `user_id` parameter under one application-wide key; this takes identity only from the
+user's token. And the vector store only *proposes*: every candidate is re-read from memory-db under
+row-level security before it is returned, so a vector search that returned the wrong tenant's point
+would still return nothing — the lab's rule four, two layers, in a new store.
+
+memory-db is the source of truth; the vectors follow it through an outbox applied after commit.
+`supportpilot-memory-reconcile` compares the two and names every disagreement (`V-29`).
 
 ---
 
@@ -296,6 +373,21 @@ Note what `propose_refund` does *not* take: no identity, no approval flag, and n
 The destination is derived server-side at execution time, so the model cannot choose where money goes
 even in the request it is fully permitted to make.
 
+With the memory stack running, a second action document adds four more, reviewed by the same gate
+and registered separately:
+
+| Tool | Reads | Effect |
+|---|---|---|
+| `recall` | the caller's own confirmed memories, paged | — |
+| `remember` | — | stores a memory, **unconfirmed**: nothing uses it until the user confirms it |
+| `forget` | — | removes a memory and everything derived from it, in both stores |
+| `propose_rule` | — | creates a proposal; **nothing obeys it** until someone else approves the exact text |
+
+`remember` and `propose_rule` take the text, `recall` a query and a cursor, `forget` the memory's id —
+and none of them a user, an organisation, a channel, a status or an approval. The two writes that
+matter most have the same shape as `propose_refund`: the model may propose; a person,
+on a route the model does not have, decides.
+
 ---
 
 ## The test data
@@ -343,12 +435,14 @@ when it stops working.
 
 | Suite | What it proves | How to run |
 |---|---|---|
-| `verify_local.py` | 21 environment checks, `V-01` to `V-21` | `python scripts/verify_local.py` |
+| `verify_local.py` | 31 environment checks, `V-01` to `V-31` — the Range's and the memory stack's skip when their profile is down | `python scripts/verify_local.py` |
 | `abuse_suite.py` | injection and abuse cases, `TS7-nn` | `python scripts/abuse_suite.py` |
 | `action_suite.py` | approval and execution cases, `TS8-nn` | `python scripts/action_suite.py` |
-| `contract_suite.py` | every call built from the published tool document | `python scripts/contract_suite.py` |
+| `contract_suite.py` | every call built from the published tool documents | `python scripts/contract_suite.py` |
 | policy tests | the Rego rules, including every deny arm | `opa test policy/` |
 | API tests | token, policy client, pipeline, hashing, pagination | `pytest services/api` |
+| memory service | against its real stores: identity, write paths, both vector layouts, history, rules, context | `python scripts/memory_suite.py` |
+| memory unit tests | its audience, identity, the secret filter, rules, context assembly | `pytest services/memory` |
 
 `contract_suite.py` exists because of a real failure. One tool declared an array query parameter,
 Onyx serialised it one way, the API expected another, and a perfectly correct model request came back

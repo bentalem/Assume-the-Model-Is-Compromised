@@ -15,6 +15,10 @@ fixed test data, optional ones exercised, path templates substituted. If a param
 be expressed unambiguously by a client following the document, the call fails here rather than in
 somebody's chat window.
 
+The memory action document (`openapi/supportpilot-memory-actions.json`, track 9) is walked the same
+way when the memory profile is running, against the base URL that document declares. `remember` runs
+first and its id feeds `forget`, so the suite removes the memory it wrote.
+
 Run: python scripts/contract_suite.py
 """
 
@@ -31,6 +35,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DOCUMENT = REPO / "openapi" / "supportpilot-actions.json"
+MEMORY_DOCUMENT = REPO / "openapi" / "supportpilot-memory-actions.json"
 KEYCLOAK = "https://localhost:8443"
 REALM = "supportpilot"
 
@@ -50,11 +55,14 @@ SAMPLES: dict[str, object] = {
     "cursor": None,
     "include_items": True,
     "include_shipment": True,
+    "memory_id": None,          # resolved at run time from the `remember` response
+    "content": "contract suite memory: prefers email over phone",
+    "text": "contract suite proposal: greet the customer by name",
 }
 
 # Operations that change state. Exercised for *schema acceptance* only — a 4xx that is not
 # invalid_request still proves the client could express the call.
-WRITE_OPERATIONS = {"add_internal_note", "propose_refund"}
+WRITE_OPERATIONS = {"add_internal_note", "propose_refund", "remember", "forget", "propose_rule"}
 
 results: list[tuple[str, str, str]] = []
 
@@ -81,7 +89,7 @@ _PROBE = """
 import json, os, httpx
 try:
     r = httpx.request(
-        os.environ["M"], "http://api:8000" + os.environ["P"],
+        os.environ["M"], os.environ["U"] + os.environ["P"],
         headers=json.loads(os.environ["H"]),
         json=json.loads(os.environ["B"]) if os.environ.get("B") else None,
         timeout=25,
@@ -92,10 +100,11 @@ except Exception as exc:
 """
 
 
-def call(method: str, path: str, token: str, body: dict | None = None) -> dict:
+def call(method: str, path: str, token: str, body: dict | None = None,
+         base: str = "http://api:8000") -> dict:
     proc = subprocess.run(
         ["docker", "compose", "exec", "-T",
-         "-e", f"M={method.upper()}", "-e", f"P={path}",
+         "-e", f"M={method.upper()}", "-e", f"U={base}", "-e", f"P={path}",
          "-e", f"H={json.dumps({'Authorization': f'Bearer {token}'})}",
          "-e", f"B={json.dumps(body) if body else ''}",
          "approval-portal", "python", "-c", _PROBE],
@@ -107,7 +116,8 @@ def call(method: str, path: str, token: str, body: dict | None = None) -> dict:
     return json.loads(line)
 
 
-def build_request(path_template: str, operation: dict) -> tuple[str, dict | None, list[str]]:
+def build_request(path_template: str, operation: dict,
+                  document_path: Path | None = None) -> tuple[str, dict | None, list[str]]:
     """Build a call from the document alone, the way any client following it would.
 
     Returns the path, an optional body, and the names of parameters this suite could not fill —
@@ -145,7 +155,7 @@ def build_request(path_template: str, operation: dict) -> tuple[str, dict | None
         schema = (
             request_body.get("content", {}).get("application/json", {}).get("schema", {})
         )
-        body = sample_body(schema)
+        body = sample_body(schema, document_path)
 
     full = path + ("?" + urllib.parse.urlencode(query) if query else "")
     return full, body, unfillable
@@ -173,14 +183,14 @@ def resolve(spec: dict, schemas: dict) -> dict:
     return spec or {}
 
 
-def sample_body(schema: dict, components: dict | None = None) -> dict:
+def sample_body(schema: dict, document_path: Path | None = None) -> dict:
     """A minimal body satisfying every declared required field.
 
     Raises if a required field cannot be filled — an unfillable required field means a client
     following the document could not construct the call, which is the finding this suite exists to
     surface. Silently omitting it would hide exactly that.
     """
-    document = json.loads(DOCUMENT.read_text(encoding="utf-8"))
+    document = json.loads((document_path or DOCUMENT).read_text(encoding="utf-8"))
     schemas = document.get("components", {}).get("schemas", {})
     schema = resolve(schema, schemas)
 
@@ -207,17 +217,16 @@ def sample_body(schema: dict, components: dict | None = None) -> dict:
     return body
 
 
-def main() -> int:
-    if not DOCUMENT.exists():
-        raise SystemExit(f"{RED}{DOCUMENT.name} missing; run scripts/export_openapi.py{RESET}")
+def memory_running() -> bool:
+    proc = subprocess.run(["docker", "compose", "ps", "--status", "running", "--services"],
+                          cwd=REPO, capture_output=True, text=True, timeout=60, encoding="utf-8")
+    return "memory" in proc.stdout.split()
 
-    document = json.loads(DOCUMENT.read_text(encoding="utf-8"))
-    alice = token_for("alice")
 
-    print()
-    print(f"{BOLD}Contract suite — every tool called from the action document{RESET}")
-    print("-" * 78)
-
+def walk(document_path: Path, token: str) -> None:
+    document = json.loads(document_path.read_text(encoding="utf-8"))
+    # The base URL is the one the document declares, as it is for any client that reads it.
+    base = document.get("servers", [{}])[0].get("url", "http://api:8000")
     for path_template, item in document.get("paths", {}).items():
         for method, operation in item.items():
             if method not in ("get", "post", "put", "patch", "delete"):
@@ -225,7 +234,7 @@ def main() -> int:
             operation_id = operation.get("operationId", f"{method} {path_template}")
 
             try:
-                path, body, unfillable = build_request(path_template, operation)
+                path, body, unfillable = build_request(path_template, operation, document_path)
             except Exception as exc:
                 results.append((operation_id, "FAIL", f"could not build a request: {exc}"))
                 print(f"  {operation_id:20} {RED}FAIL{RESET}  could not build a request: {exc}")
@@ -237,8 +246,10 @@ def main() -> int:
                       f"{', '.join(unfillable)}")
                 continue
 
-            response = call(method, path, alice, body)
+            response = call(method, path, token, body, base)
             status = response["status"]
+            if operation_id == "remember" and status == 201:
+                SAMPLES["memory_id"] = json.loads(response["body"]).get("memory_id")
 
             # The property under test is expressibility, not authorization: a client following the
             # document must be able to *form* the call. invalid_request means it could not.
@@ -255,6 +266,24 @@ def main() -> int:
                 note = "" if operation_id not in WRITE_OPERATIONS else " (write: schema accepted)"
                 results.append((operation_id, "PASS", f"HTTP {status}{note}"))
                 print(f"  {operation_id:20} {GREEN}PASS{RESET}  HTTP {status}{note}")
+
+
+def main() -> int:
+    if not DOCUMENT.exists():
+        raise SystemExit(f"{RED}{DOCUMENT.name} missing; run scripts/export_openapi.py{RESET}")
+
+    alice = token_for("alice")
+
+    print()
+    print(f"{BOLD}Contract suite — every tool called from the action document{RESET}")
+    print("-" * 78)
+    walk(DOCUMENT, alice)
+    if MEMORY_DOCUMENT.exists() and memory_running():
+        print(f"  {GREY}memory action document{RESET}")
+        walk(MEMORY_DOCUMENT, alice)
+    else:
+        results.append(("memory document", "SKIP", "memory profile not running"))
+        print(f"  {'memory document':20} {YELLOW}SKIP{RESET}  memory profile not running")
 
     print("-" * 78)
     passed = sum(1 for _, r, _ in results if r == "PASS")

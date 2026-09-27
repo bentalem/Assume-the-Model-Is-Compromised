@@ -20,6 +20,7 @@ API_PASSWORD="$(read_secret "$API_PASSWORD_FILE")"
 WORKER_PASSWORD="$(read_secret "$WORKER_PASSWORD_FILE")"
 AUDITOR_PASSWORD="$(read_secret "$AUDITOR_PASSWORD_FILE")"
 RANGE_PASSWORD="$(read_secret "$RANGE_PASSWORD_FILE")"
+MEMORY_LOOKUP_PASSWORD="$(read_secret "$MEMORY_LOOKUP_PASSWORD_FILE")"
 
 export PGHOST="$DATABASE_HOST"
 export PGPORT="$DATABASE_PORT"
@@ -53,6 +54,7 @@ else
        -v worker_password="$WORKER_PASSWORD" \
        -v auditor_password="$AUDITOR_PASSWORD" \
        -v range_password="$RANGE_PASSWORD" \
+       -v memory_lookup_password="$MEMORY_LOOKUP_PASSWORD" \
        -f /migrations/0001_roles_and_schema.sql
   psql -v ON_ERROR_STOP=1 -c "INSERT INTO app.schema_migrations (version) VALUES ('0001_roles_and_schema')"
 fi
@@ -81,6 +83,7 @@ for file in /migrations/*.sql; do
        -v worker_password="$WORKER_PASSWORD" \
        -v auditor_password="$AUDITOR_PASSWORD" \
        -v range_password="$RANGE_PASSWORD" \
+       -v memory_lookup_password="$MEMORY_LOOKUP_PASSWORD" \
        -f "$file"
   applied_count=$((applied_count + 1))
 done

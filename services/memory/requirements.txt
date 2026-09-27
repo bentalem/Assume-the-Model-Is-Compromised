@@ -1,0 +1,10 @@
+# Pinned runtime dependencies — the same set as the API, deliberately: the memory service adds no
+# package. Qdrant is reached over its REST API with httpx rather than through qdrant-client, and the
+# embedding model runs in its own container, so nothing new has to be vendored. Vendored as wheels under vendor/wheels and installed with
+# --no-index, so a build is reproducible and does not depend on an index being reachable.
+fastapi==0.115.6
+uvicorn==0.34.0
+pydantic==2.10.4
+psycopg[binary,pool]==3.2.3
+httpx==0.28.1
+python-jose[cryptography]==3.3.0

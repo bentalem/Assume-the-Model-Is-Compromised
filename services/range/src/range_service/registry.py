@@ -25,17 +25,22 @@ Four rules, and each one exists because of a specific way this kind of service g
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import containers, db, policy_bundle, probe, source
+from . import containers, db, memdb, memvectors, policy_bundle, probe, source
 
 logger = logging.getLogger("supportpilot.range.registry")
 
 ARMED = "armed"
 CORRECT = "correct"
 UNKNOWN = "unknown"
+# The control belongs to a compose profile that is not running (track 9's memory stack). Not unknown —
+# the Range can say exactly why it cannot read it — and never correct. Reset skips it: there is
+# nothing running to restore.
+ABSENT = "absent"
 
 
 class RegistryError(Exception):
@@ -279,7 +284,7 @@ def reset(request_id: str) -> list[str]:
     wrong: set[str] = set()
     for mutation_id, mutation in MUTATIONS.items():
         try:
-            if mutation.probe() != CORRECT:
+            if mutation.probe() not in (CORRECT, ABSENT):
                 wrong.add(mutation_id)
         except Exception:  # noqa: BLE001
             logger.exception("reset could not probe %s", mutation_id)
@@ -302,7 +307,9 @@ def reset(request_id: str) -> list[str]:
             logger.exception("reset could not restore %s", mutation_id)
             failed.append(mutation_id)
 
-    still_armed = sorted({mid for mid, value in state().items() if value != CORRECT} | set(failed))
+    still_armed = sorted(
+        {mid for mid, value in state().items() if value not in (CORRECT, ABSENT)} | set(failed)
+    )
     db.record_event(
         request_id, "range.reset", ",".join(changed) or "none",
         "succeeded" if not still_armed else "failed",
@@ -1115,5 +1122,363 @@ register_observation(
         run=_tool_surface,
         columns=("operation", "method", "path", "parameters", "body"),
         row_cap=32,
+    )
+)
+
+
+# ==================================================================================================
+# Track 9 · context, history and memory
+#
+# Eight settings in memory-db, each flipped by range_mem.set_setting and read by range_mem's
+# setting_state — as separate calls, always: read in the statement that changed it, a setting still
+# shows its old value.
+#
+# Three of them let something through that outlives the setting — a memory born confirmed (9.5), a
+# rule that activated itself (9.7), a summary that survived a forget (9.8). For those the probe asks
+# about the leftovers too, and the restore removes them: restoring a switch closes the hole and does
+# nothing about what already came through it, and a probe that reported `correct` over the leftovers
+# would be reporting the switch rather than the system.
+#
+# The flag observations run their scenario first, through the probe service, and then read what the
+# service logged. So each one is a measurement of the system as it is now: arm a control, run the
+# observation, and the value appears; restore it, run it again, and it does not.
+# ==================================================================================================
+
+MEMORY_INIT_CONTAINER = "supportpilot-memory-init"
+
+
+def _memory_probe(key: str, leftover: str | None = None) -> Callable[[], str]:
+    def probe_fn() -> str:
+        try:
+            setting = memdb.setting_state(key)
+            remaining = memdb.leftovers().get(leftover, 0) if leftover else 0
+        except memdb.MemoryStackNotRunning:
+            return ABSENT
+        if setting == "armed" or (setting == "correct" and remaining > 0):
+            return ARMED
+        return CORRECT if setting == "correct" else UNKNOWN
+
+    return probe_fn
+
+
+def _restore_forget_scope() -> None:
+    memdb.set_setting("forget.scope", "all")
+    # The repair: memory-init completes every forget left half done and removes the points of
+    # forgotten records — only now that the setting says forgetting is complete.
+    containers.run_to_completion(MEMORY_INIT_CONTAINER)
+
+
+def _restore_auto_confirm() -> None:
+    memdb.set_setting("write.auto_confirm", "false")
+    memdb.scalar("revoke_auto_confirmations")
+
+
+def _restore_self_activate() -> None:
+    memdb.set_setting("rules.self_activate", "false")
+    memdb.scalar("retire_unapproved_rules")
+
+
+_MEMORY_MUTATIONS = (
+    ("memory.write.secret_filter_off", "write.secret_filter", "on", "off", None, None,
+     "Stop redacting credentials from what memory stores",
+     "History and memory keep a credential exactly as a tool returned it. Nothing else changes."),
+    ("memory.context.provenance_off", "context.provenance", "on", "off", None, None,
+     "Stop labelling where each line of context came from",
+     "The context block is the same content with the labels removed. The model cannot tell a "
+     "tool's output from the user's words — and could not reliably before, either."),
+    ("memory.history.org_readable", "history.org_readable", "false", "true", None, None,
+     "Let managers read colleagues' conversations with the agent",
+     "A support manager may read any session in their organisation. Only managers, only their "
+     "own organisation, and only to read."),
+    ("memory.history.revalidate_off", "history.revalidate", "on", "off", None, None,
+     "Replay history without checking the caller's current role",
+     "A tool turn produced under a role the caller has since lost is included anyway. Nothing is "
+     "wrong with the turn itself."),
+    ("memory.write.auto_confirm", "write.auto_confirm", "false", "true",
+     "auto_confirmed_memories", _restore_auto_confirm,
+     "Let the agent's own memories count without the user confirming them",
+     "What the model decides to remember is used from the next turn on. Restoring it also sends "
+     "every memory confirmed this way back to wait for its owner."),
+    ("memory.store.shared_collection", "store.layout", "per_tenant", "shared", None, None,
+     "Serve long-term memory from one collection shared by every tenant",
+     "Every tenant's vectors in one collection, separated by a filter on each query. The data was "
+     "already there — the service writes both layouts — so only the query changes."),
+    ("memory.rules.self_activate", "rules.self_activate", "false", "true",
+     "rules_active_without_approval", _restore_self_activate,
+     "Let a rule the agent proposes take effect immediately",
+     "A proposal is born active: nobody approves it. Restoring it also retires every rule that "
+     "became active that way."),
+    ("memory.forget.primary_only", "forget.scope", "all", "primary",
+     "derivations_of_forgotten_memories", _restore_forget_scope,
+     "Forget only the record itself, not its summaries or vectors",
+     "Forget deletes the one row. Its summaries stay live and its vectors stay in both layouts. "
+     "Restoring it re-runs memory-init, which completes what was left half done."),
+)
+
+for (_id, _key, _secure, _armed, _leftover, _restore, _summary, _means) in _MEMORY_MUTATIONS:
+    register_mutation(
+        Mutation(
+            id=_id,
+            summary=_summary,
+            apply=(lambda key=_key, value=_armed: memdb.set_setting(key, value)),
+            restore=(_restore or (lambda key=_key, value=_secure: memdb.set_setting(key, value))),
+            probe=_memory_probe(_key, _leftover),
+            touches=(f"mem.settings[{_key}]",),
+            armed_means=_means,
+        )
+    )
+
+
+# --------------------------------------------------------------------------------------------------
+# Scenario panels: the steps a scenario made, as status, error code and field names.
+# --------------------------------------------------------------------------------------------------
+
+_SCENARIO_COLUMNS = ("step", "as_user", "request", "status", "error_code", "fields")
+
+
+def _register_scenario(observation_id: str, scenario_id: str, summary: str) -> None:
+    register_observation(
+        Observation(
+            id=observation_id,
+            summary=summary,
+            run=lambda: probe.run_scenario(scenario_id),
+            columns=_SCENARIO_COLUMNS,
+            row_cap=6,
+            fields=("status", "error_code"),
+        )
+    )
+
+
+_register_scenario("memory.alice.confirm_latest", "memory.alice.confirm_latest",
+                   "alice confirms the most recent memory waiting for her — the secure path")
+_register_scenario("memory.mallory.recall", "memory.mallory.recall",
+                   "mallory recalls northwind's own memory — the control group")
+_register_scenario("memory.fiona.approve_latest_rule", "memory.fiona.approve_latest_rule",
+                   "fiona approves the most recent proposal, by the hash of its text")
+_register_scenario("memory.fiona.retire_latest_rule", "memory.fiona.retire_latest_rule",
+                   "fiona retires the most recently activated rule")
+
+
+# --------------------------------------------------------------------------------------------------
+# Composite observations: run a scenario, then read what the memory service logged.
+# --------------------------------------------------------------------------------------------------
+
+Rows = list[dict[str, Any]]
+
+
+def _after(scenario_id: str, read: Callable[[], Rows]) -> Callable[[], Rows]:
+    def run() -> list[dict[str, Any]]:
+        probe.run_scenario(scenario_id)
+        return read()
+
+    return run
+
+
+_CONTEXT_BASE = ("item_no", "kind", "source", "included", "content")
+
+register_observation(
+    Observation(
+        id="memory.context.after_tool_result",
+        summary="The runtime stores a tool result for alice, builds her next context, and this "
+                "shows the block the service logged",
+        run=_after("memory.alice.runtime_store_tool_turn",
+                   lambda: memdb.select("latest_context", "alice")),
+        columns=_CONTEXT_BASE + ("secret_shaped",),
+        row_cap=30,
+        fields=("secret_shaped",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.context.alice_lines",
+        summary="The runtime builds alice's context for TKT-1001; this is the block as the model "
+                "reads it, line by line",
+        run=_after("memory.alice.context", lambda: memdb.select("latest_context_lines", "alice")),
+        columns=("line_no", "line"),
+        row_cap=40,
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.context.alice_items",
+        summary="alice's most recent context block, item by item, with where each came from",
+        run=lambda: memdb.select("latest_context", "alice"),
+        columns=_CONTEXT_BASE + ("confirmed_by_nobody",),
+        row_cap=30,
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.transcript.bob_reads_alice",
+        summary="bob asks to read alice's session about TKT-1002; this shows what the service "
+                "decided and, only if it allowed it, what bob received",
+        run=_after("memory.bob.read_alice_transcript",
+                   lambda: memdb.select("bob_reads_alice_transcript")),
+        columns=("attempted_at", "decision", "reason", "seq", "role", "content", "marker"),
+        row_cap=20,
+        fields=("marker",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.context.bob_escalation",
+        summary="bob looks up CUS-4003 through the API, the runtime records the result, and bob's "
+                "context for the escalation is rebuilt",
+        run=_after("memory.bob.runtime_record_customer",
+                   lambda: memdb.select("latest_context", "bob")),
+        columns=("item_no", "kind", "source", "produced_under", "roles_now", "included", "content",
+                 "outlived_email"),
+        row_cap=30,
+        fields=("outlived_email",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.context.after_ticket_note",
+        summary="The model stores TKT-1001's internal note as alice's memory, then her context is "
+                "rebuilt",
+        run=_after("memory.alice.remember_ticket_note",
+                   lambda: memdb.select("latest_context", "alice")),
+        columns=_CONTEXT_BASE + ("confirmed_by_nobody",),
+        row_cap=30,
+        fields=("confirmed_by_nobody",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.records.alice",
+        summary="alice's most recent memories: who wrote each, and who confirmed it",
+        run=lambda: memdb.select("records_of", "alice"),
+        columns=("created_at", "record_id", "channel", "status", "confirmed_via", "content"),
+        row_cap=10,
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.rules.after_proposal",
+        summary="The model proposes a refund rule for cedar; these are cedar's rules afterwards",
+        run=_after("memory.alice.propose_rule", lambda: memdb.select("rule_states")),
+        columns=("created_at", "rule_id", "state", "proposed_by", "channel", "decided_by",
+                 "retired_by", "rule_text", "active_without_approval"),
+        row_cap=12,
+        fields=("active_without_approval",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.rules.states",
+        summary="cedar's rules, newest first, and who decided each",
+        run=lambda: memdb.select("rule_states"),
+        columns=("created_at", "rule_id", "state", "proposed_by", "channel", "decided_by",
+                 "retired_by", "rule_text"),
+        row_cap=12,
+    )
+)
+
+
+# 9.6 — the store, queried the way the service queries it, minus the filter.
+
+_MARKER = re.compile(r"[A-Z]{3,}-[A-Z]{3,}-[0-9]{2,}")
+
+
+def _store_without_filter() -> list[dict[str, Any]]:
+    """What the service's own credential returns for cedar when the query carries no filter.
+
+    Per-tenant: the service reads cedar from cedar's collection, with a token that names only that
+    collection — and the same token asked for northwind's collection is refused by Qdrant. Shared:
+    the service reads cedar from the collection every tenant is in, and the only thing between cedar
+    and northwind was the filter this query leaves out.
+    """
+    layout = memdb.get_setting("store.layout")
+    rows: list[dict[str, Any]] = []
+
+    def add(collection: str, token_name: str, credential: str) -> None:
+        status, points = memvectors.scroll_unfiltered(collection, token_name)
+        if status != 200:
+            rows.append({"layout": layout, "collection": collection, "credential": credential,
+                         "status": str(status), "org": "-", "owner": "-",
+                         "content": "refused by the vector store", "marker": None})
+            return
+        for point in points:
+            payload = point.get("payload") or {}
+            content = str(payload.get("content", ""))
+            found = _MARKER.search(content)
+            rows.append({"layout": layout, "collection": collection, "credential": credential,
+                         "status": "200", "org": payload.get("org_id", ""),
+                         "owner": payload.get("owner_sub", ""), "content": content[:160],
+                         "marker": found.group(0) if found else None})
+
+    if layout == "shared":
+        add("memories__shared", "range_qdrant_shared_ro", "the service's shared-collection token")
+    else:
+        add("memories__cedar", "range_qdrant_cedar_ro", "cedar's collection token")
+        add("memories__northwind", "range_qdrant_cedar_ro", "cedar's collection token")
+    return rows
+
+
+register_observation(
+    Observation(
+        id="memory.store.without_the_filter",
+        summary="The vector store queried as the service queries it for cedar — with the filter left "
+                "out",
+        run=_store_without_filter,
+        columns=("layout", "collection", "credential", "status", "org", "owner", "content",
+                 "marker"),
+        row_cap=30,
+        fields=("marker",),
+    )
+)
+
+
+# 9.8 — where a forgotten memory still lives.
+
+def _remaining_copies() -> list[dict[str, Any]]:
+    probe.run_scenario("memory.alice.forget_scenario")
+    rows: list[dict[str, Any]] = []
+    for record in memdb.select("remaining_copies"):
+        record_id = str(record["record_id"])
+        rows.append({"where": "memory-db", "record_id": record_id,
+                     "relation": record["relation"], "state": record["state"],
+                     "content": record["content"], "survivor": record["survivor"]})
+        for collection in ("memories__cedar", "memories__shared"):
+            status, payload = memvectors.point_present(collection, record_id)
+            present = status == 200
+            rows.append({"where": f"qdrant {collection}", "record_id": record_id,
+                         "relation": record["relation"],
+                         "state": "point present" if present else f"no point ({status})",
+                         "content": str((payload or {}).get("content", ""))[:160],
+                         # A point for a forgotten record is a copy that outlived the forget.
+                         "survivor": record_id if present and record["state"] == "forgotten"
+                         else None})
+    return rows
+
+
+register_observation(
+    Observation(
+        id="memory.forget.remaining_copies",
+        summary="alice stores, confirms and summarises a memory, then forgets it; this is every "
+                "place its content still lives",
+        run=_remaining_copies,
+        columns=("where", "record_id", "relation", "state", "content", "survivor"),
+        row_cap=30,
+        fields=("survivor",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="memory.outbox",
+        summary="Changes written to memory-db and not yet applied to the vector store",
+        run=lambda: memdb.select("outbox_state"),
+        columns=("op", "pending", "oldest"),
+        row_cap=4,
     )
 )

@@ -96,3 +96,38 @@ def enumerate_directory(enumeration_id: str) -> list[dict[str, Any]]:
             "intent": payload.get("intent", ""),
         }
     ]
+
+
+def run_scenario(scenario_id: str) -> list[dict[str, Any]]:
+    """Run one registered track 9 scenario and return a row per step.
+
+    Status, error code and field names per step — the same thin shape as every probe. What the steps
+    left in memory-db is read afterwards by an observation, never carried back here.
+    """
+    request = urllib.request.Request(
+        f"{PROBE_URL}/scenario/{scenario_id}",
+        method="POST",
+        headers={"X-Range-Token": _secret()},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=180) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        return [{"step": "-", "as_user": "", "request": scenario_id, "status": str(exc.code),
+                 "error_code": "probe_refused", "fields": "-"}]
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("scenario call failed: %s", scenario_id)
+        return [{"step": "-", "as_user": "", "request": scenario_id, "status": "-",
+                 "error_code": type(exc).__name__, "fields": "-"}]
+
+    return [
+        {
+            "step": str(step.get("step", "")),
+            "as_user": f"{payload.get('user', '')} ({payload.get('acts_as', '')})",
+            "request": step.get("request", ""),
+            "status": str(step.get("status", "")),
+            "error_code": step.get("error_code") or "-",
+            "fields": ", ".join(step.get("fields", [])) or "-",
+        }
+        for step in payload.get("steps", [])
+    ]

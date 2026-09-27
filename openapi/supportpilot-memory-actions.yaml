@@ -1,0 +1,248 @@
+# SupportPilot memory actions — the four memory operations Onyx may register (track 9).
+#
+# GENERATED from the API routes by scripts/export_openapi.py. Do not edit by hand.
+# The diff of this file is the tool-schema review: a change here changes what the model
+# can call, which is a control-plane change (SP-OPS-001 section 10).
+#
+# Regenerate:  python scripts/export_openapi.py
+# Verify only: python scripts/export_openapi.py --check
+
+openapi: 3.1.0
+info:
+  title: SupportPilot Memory
+  description: What the SupportPilot agent may remember, recall, forget and propose as a rule, on behalf
+    of an authenticated support user. Every operation acts for the user in the verified token; none accepts
+    a user, an organisation, a role or a source from the caller.
+  version: 1.0.0
+servers:
+- url: http://memory:8000
+  description: SupportPilot memory on the internal application network
+paths:
+  /v1/memories:
+    post:
+      tags:
+      - memory
+      summary: Remember a fact or preference for the signed-in user
+      operationId: remember
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                content:
+                  type: string
+                  maxLength: 2000
+                  minLength: 1
+                  title: Content
+                  description: The fact or preference to remember, in one or two sentences.
+              additionalProperties: false
+              type: object
+              required:
+              - content
+              title: Remember
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Remembered'
+  /v1/memories/search:
+    get:
+      tags:
+      - memory
+      summary: Recall the signed-in user's confirmed memories relevant to a question
+      operationId: recall
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 300
+          description: What to look for, in plain words.
+          title: Q
+        description: What to look for, in plain words.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^[0-9]{1,2}$
+          - type: 'null'
+          description: Opaque cursor from a previous page.
+          title: Cursor
+        description: Opaque cursor from a previous page.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecallResult'
+  /v1/memories/{memory_id}:
+    delete:
+      tags:
+      - memory
+      summary: Forget one of the signed-in user's memories
+      description: 'Forgetting has to reach every copy, or it is only hiding.
+
+
+        With `forget.scope` at its secure value this removes the record, everything derived from it
+
+        (summaries of summaries included), and every one of their vectors in both layouts. Challenge
+
+        9.8 arms `primary`, which removes the primary record only — gone from the list, and still in
+
+        the vector store and in the summary made from it.'
+      operationId: forget
+      parameters:
+      - name: memory_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          title: Memory Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Forgotten'
+  /v1/rules/proposals:
+    post:
+      tags:
+      - memory
+      summary: Propose a rule for the agent to follow; it needs another person's approval
+      operationId: propose_rule
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                text:
+                  type: string
+                  maxLength: 500
+                  minLength: 3
+                  title: Text
+                  description: The rule, as one instruction the agent should follow.
+              additionalProperties: false
+              type: object
+              required:
+              - text
+              title: ProposeRule
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposed'
+components:
+  schemas:
+    Forgotten:
+      properties:
+        memory_id:
+          type: string
+          title: Memory Id
+        forgotten:
+          type: boolean
+          title: Forgotten
+      type: object
+      required:
+      - memory_id
+      - forgotten
+      title: Forgotten
+    Memory:
+      properties:
+        memory_id:
+          type: string
+          title: Memory Id
+        content:
+          type: string
+          title: Content
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - memory_id
+      - content
+      - created_at
+      title: Memory
+    ProposeRule:
+      properties:
+        text:
+          type: string
+          maxLength: 500
+          minLength: 3
+          title: Text
+          description: The rule, as one instruction the agent should follow.
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: ProposeRule
+    Proposed:
+      properties:
+        rule_id:
+          type: string
+          title: Rule Id
+        state:
+          type: string
+          title: State
+      type: object
+      required:
+      - rule_id
+      - state
+      title: Proposed
+    RecallResult:
+      properties:
+        results:
+          items:
+            $ref: '#/components/schemas/Memory'
+          type: array
+          maxItems: 10
+          title: Results
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+          description: Opaque cursor for the next page, or null.
+      type: object
+      required:
+      - results
+      title: RecallResult
+    Remember:
+      properties:
+        content:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Content
+          description: The fact or preference to remember, in one or two sentences.
+      additionalProperties: false
+      type: object
+      required:
+      - content
+      title: Remember
+    Remembered:
+      properties:
+        memory_id:
+          type: string
+          title: Memory Id
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - memory_id
+      - status
+      title: Remembered

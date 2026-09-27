@@ -42,9 +42,21 @@ networks:
   range_data:
     driver: bridge
     internal: true
+  # Track 9. The memory service and its stores, and nothing else. Internal: no route to the edge,
+  # and nothing on it is published to the host.
+  memory_data:
+    driver: bridge
+    internal: true
+  # The Range -> memory-db (functions only) and Qdrant (a read-only key only). Its own network for
+  # the reason range_data is: joining memory_data would let the Range reach the memory service.
+  range_memory:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres_data:
+  memory_db_data:
+  qdrant_data:
   # The policy bundle OPA actually loads. It is a volume rather than the repository directory
   # because challenge 3.3 arms a permissive policy, and a mutation that wrote to the working tree
   # could leave a crashed container's permissive authorization checked out on disk. The volume is
@@ -105,6 +117,9 @@ services:
       WORKER_PASSWORD_FILE: /run/secrets/worker_db_password
       AUDITOR_PASSWORD_FILE: /run/secrets/auditor_db_password
       RANGE_PASSWORD_FILE: /run/secrets/range_db_password
+      # Migration 0029 creates the one core role the memory service connects as. The role exists
+      # in every install; nothing connects as it unless the `memory` profile is up.
+      MEMORY_LOOKUP_PASSWORD_FILE: /run/secrets/memory_lookup_db_password
       SEED_LOCAL_DATA: ${SEED_LOCAL_DATA:-true}
     secrets:
       - postgres_bootstrap_password
@@ -113,6 +128,7 @@ services:
       - worker_db_password
       - auditor_db_password
       - range_db_password
+      - memory_lookup_db_password
     networks:
       - data
 
@@ -387,6 +403,8 @@ services:
   #
   #   * `edge`, `range_data` and `control`. NOT on `app` or `policy`, and NOT on `data` — the API
   #     is on `data`, so sharing it would have handed the Range a route to the API. V-17 proves it.
+  #     Track 9 adds `range_memory` (memory-db and Qdrant only), and NOT `memory_data`, where the
+  #     memory service and the embedding model are. V-27 proves that.
   #   * Its database role owns nothing and holds no privilege on any table (migration 0010).
   #   * It is absent from openapi/supportpilot-actions.*, so the model has no route that names it.
   #   * SUPPORTPILOT_ENV must be `local` or the process exits before it binds a port.
@@ -416,10 +434,23 @@ services:
       RANGE_REPO_DIR: /repo
       PROBE_URL: http://probe:8096
       PROBE_SHARED_SECRET_FILE: /run/secrets/probe_shared_secret
+      # Track 9. memory-db as mem_range_role (the range_mem functions and nothing else), and Qdrant
+      # with a read-only token per collection. Both only when the memory profile is up; without it
+      # the eight memory controls read `absent` and the rest of the Range is unchanged.
+      MEMORY_DB_HOST: memory-db
+      RANGE_MEMORY_DB_PASSWORD_FILE: /run/secrets/range_memory_db_password
+      QDRANT_URL: http://qdrant:6333
+      RANGE_QDRANT_TOKEN_DIR: /run/secrets
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     secrets:
       - range_db_password
       - probe_shared_secret
+      # Track 9 grants, named as grants: memory-db's Range role, and read on each vector collection.
+      # No write to the vector store, no API key, and no route to the memory service (V-27).
+      - range_memory_db_password
+      - range_qdrant_cedar_ro
+      - range_qdrant_northwind_ro
+      - range_qdrant_shared_ro
     volumes:
       # Stage 03 shows the lab's own source with its real path and line numbers, read at request
       # time so the material cannot drift from the system. Read-only, named one by one — mounting the
@@ -446,6 +477,7 @@ services:
       - edge
       - range_data
       - control
+      - range_memory
 
   # --------------------------------------------------------------------------------------------
   # The probe service — a fixed vocabulary of API requests, for the Range.
@@ -472,6 +504,8 @@ services:
     environment:
       SUPPORTPILOT_ENV: local
       SUPPORTPILOT_API_URL: http://api:8000
+      # Track 9's fixed scenarios. Reached on `app`, as the seeded users, like the API.
+      SUPPORTPILOT_MEMORY_URL: http://memory:8000
       KEYCLOAK_URL: ${KEYCLOAK_URL:-https://keycloak:8443}
       KEYCLOAK_REALM: supportpilot
       PROBE_SHARED_SECRET_FILE: /run/secrets/probe_shared_secret
@@ -514,6 +548,199 @@ services:
 # ------------------------------------------------------------------------------------------------
 # Secrets are files outside the repository tree. Each service mounts only its own (SP-DATA-001 §10).
 # ------------------------------------------------------------------------------------------------
+  # --------------------------------------------------------------------------------------------
+  # Track 9 — the memory stack. Profile-gated: a plain `docker compose up` is unchanged.
+  #
+  #   docker compose --profile memory up -d
+  #
+  # A memory layer beside the agent, the way organisations deploy one, and its own trust boundary.
+  # It changes nothing in the core: Keycloak, the API, the core database, OPA, the worker and the
+  # approval portal keep exactly their behaviour. Its one touch on the core is migration 0029, a
+  # role that may call app.resolve_subject and nothing else. See docs/architecture/.
+  # --------------------------------------------------------------------------------------------
+  memory-db:
+    image: *postgres-image
+    container_name: supportpilot-memory-db
+    profiles: ["memory"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: memory
+      POSTGRES_USER: memory_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/memory_db_bootstrap_password
+    secrets:
+      - memory_db_bootstrap_password
+    volumes:
+      - memory_db_data:/var/lib/postgresql/data
+    # Not published. Reachable from the memory service and memory-init, and from the Range for its
+    # functions — nothing else.
+    networks:
+      - memory_data
+      - range_memory
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memory_admin -d memory"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Long-term memory's vector store. Its API key is held by memory-init alone; every other component
+  # gets a JWT scoped to the collections it needs (bootstrap mints them). JWT access control is on,
+  # so a token for one tenant's collection gets 403 on another's — measured in this pinned version.
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: supportpilot-qdrant
+    profiles: ["memory"]
+    restart: unless-stopped
+    # Qdrant reads its API key only from an environment variable. The wrapper exports it from the
+    # mounted secret into Qdrant's own process, so it never appears in compose or `docker inspect`.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        export QDRANT__SERVICE__API_KEY="$$(cat /run/secrets/qdrant_admin_key)"
+        exec ./entrypoint.sh
+    environment:
+      QDRANT__SERVICE__JWT_RBAC: "true"
+      QDRANT__TELEMETRY_DISABLED: "true"
+    secrets:
+      - qdrant_admin_key
+    volumes:
+      - qdrant_data:/qdrant/storage
+    # Not published. memory_data for the memory service and memory-init; range_memory so the Range
+    # can read, with a read-only token per collection.
+    networks:
+      - memory_data
+      - range_memory
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # The embedding model, local and offline: fetched at build time at a pinned revision with every
+  # file hash-checked, and run with the hub disabled. No key, no egress, and memory_data only —
+  # nothing outside the memory stack can reach it.
+  embeddings:
+    build:
+      context: .
+      dockerfile: services/embeddings/Dockerfile
+    image: supportpilot/embeddings:local
+    container_name: supportpilot-embeddings
+    profiles: ["memory"]
+    restart: unless-stopped
+    networks:
+      - memory_data
+    healthcheck:
+      # TEI opens its port only once the model is loaded, so an open port means ready.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/80"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # One-shot, like `migrate`: roles, schema, row-level security, seeds, smoke tests. The only holder
+  # of memory-db's bootstrap credential.
+  memory-init:
+    build:
+      context: .
+      dockerfile: services/memory/Dockerfile
+    image: supportpilot/memory:local
+    container_name: supportpilot-memory-init
+    profiles: ["memory"]
+    restart: "no"
+    command: ["supportpilot-memory-init"]
+    depends_on:
+      memory-db:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      embeddings:
+        condition: service_healthy
+    environment:
+      MEMORY_DB_HOST: memory-db
+      MEMORY_DB_NAME: memory
+      MEMORY_DB_BOOTSTRAP_USER: memory_admin
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_ADMIN_KEY_FILE: /run/secrets/qdrant_admin_key
+      EMBEDDINGS_URL: http://embeddings:80
+      MEMORY_TENANTS: ${MEMORY_TENANTS:-11111111-1111-1111-1111-111111111111:cedar,22222222-2222-2222-2222-222222222222:northwind}
+      MEMORY_DB_BOOTSTRAP_SECRET_FILE: /run/secrets/memory_db_bootstrap_password
+      MEMORY_MIGRATOR_SECRET_FILE: /run/secrets/memory_migrator_db_password
+      MEMORY_SERVICE_SECRET_FILE: /run/secrets/memory_db_password
+      MEMORY_RANGE_SECRET_FILE: /run/secrets/range_memory_db_password
+      SEED_LOCAL_DATA: ${SEED_LOCAL_DATA:-true}
+    secrets:
+      - memory_db_bootstrap_password
+      - memory_migrator_db_password
+      - memory_db_password
+      - range_memory_db_password
+      # The only holder of Qdrant's API key outside Qdrant itself.
+      - qdrant_admin_key
+    networks:
+      - memory_data
+
+  memory:
+    <<: *python-base
+    image: supportpilot/memory:local
+    container_name: supportpilot-memory
+    profiles: ["memory"]
+    depends_on:
+      memory-db:
+        condition: service_healthy
+      memory-init:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_healthy
+      embeddings:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SUPPORTPILOT_ENV: local
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://keycloak:8443/realms/supportpilot}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-https://keycloak:8443/realms/supportpilot/protocol/openid-connect/certs}
+      # Its own audience. A token minted only for the API is refused here — challenge 1.2's lesson,
+      # applied to a second resource server.
+      MEMORY_AUDIENCE: supportpilot-memory
+      TOKEN_LEEWAY_SECONDS: ${TOKEN_LEEWAY_SECONDS:-30}
+      MEMORY_DB_HOST: memory-db
+      MEMORY_DB_NAME: memory
+      MEMORY_DB_USER: mem_service_role
+      MEMORY_DB_SECRET_FILE: /run/secrets/memory_db_password
+      # The core database, as the role that may call app.resolve_subject and nothing else.
+      CORE_DB_HOST: postgres
+      CORE_DB_NAME: ${DATABASE_NAME:-supportpilot}
+      CORE_DB_USER: sp_memory_lookup_role
+      CORE_DB_SECRET_FILE: /run/secrets/memory_lookup_db_password
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_JWT_DIR: /run/secrets
+      EMBEDDINGS_URL: http://embeddings:80
+      MEMORY_TENANTS: ${MEMORY_TENANTS:-11111111-1111-1111-1111-111111111111:cedar,22222222-2222-2222-2222-222222222222:northwind}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SSL_CERT_FILE: /etc/ssl/supportpilot/ca-bundle.crt
+    volumes:
+      - ./.secrets/tls:/etc/ssl/supportpilot:ro
+    secrets:
+      - memory_db_password
+      - memory_lookup_db_password
+      # A token per tenant collection, and one for the shared collection because the service
+      # dual-writes both layouts. Never the API key.
+      - qdrant_jwt_cedar
+      - qdrant_jwt_northwind
+      - qdrant_jwt_shared
+    # No published port. `app` is how the agent (and the probe, playing the runtime) reach it;
+    # `memory_data` is its own stores; `data` is the core database, for the principal lookup only.
+    networks:
+      - app
+      - memory_data
+      - data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
 secrets:
   postgres_bootstrap_password:
     file: ./.secrets/postgres_bootstrap_password
@@ -527,6 +754,33 @@ secrets:
     file: ./.secrets/auditor_db_password
   range_db_password:
     file: ./.secrets/range_db_password
+  # Track 9 — the memory stack. Only memory_lookup_db_password is used outside the `memory`
+  # profile, by the core migration job above.
+  memory_lookup_db_password:
+    file: ./.secrets/memory_lookup_db_password
+  memory_db_bootstrap_password:
+    file: ./.secrets/memory_db_bootstrap_password
+  memory_migrator_db_password:
+    file: ./.secrets/memory_migrator_db_password
+  memory_db_password:
+    file: ./.secrets/memory_db_password
+  range_memory_db_password:
+    file: ./.secrets/range_memory_db_password
+  qdrant_admin_key:
+    file: ./.secrets/qdrant_admin_key
+  qdrant_jwt_cedar:
+    file: ./.secrets/qdrant_jwt_cedar
+  qdrant_jwt_northwind:
+    file: ./.secrets/qdrant_jwt_northwind
+  qdrant_jwt_shared:
+    file: ./.secrets/qdrant_jwt_shared
+  # The Range's read-only view of the vector store: `r` on one collection each (track 9).
+  range_qdrant_cedar_ro:
+    file: ./.secrets/range_qdrant_cedar_ro
+  range_qdrant_northwind_ro:
+    file: ./.secrets/range_qdrant_northwind_ro
+  range_qdrant_shared_ro:
+    file: ./.secrets/range_qdrant_shared_ro
   probe_shared_secret:
     file: ./.secrets/probe_shared_secret
   keycloak_admin_password:
