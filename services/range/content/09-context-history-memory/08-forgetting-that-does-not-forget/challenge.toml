@@ -12,6 +12,14 @@ objective = """
 Store, summarise and forget one of alice's memories — with forgetting complete, and with it \
 removing the primary record only. Give the id of a copy that outlived the forget."""
 
+break_steps = [
+  "With complete forgetting enabled, run **Store, summarise, forget — then look everywhere**. It creates and confirms a new memory, makes a summary, then forgets the original.",
+  "Inspect `where`, `relation` and `state` for the source, summary and both Qdrant layouts.",
+  "Arm **Forget only the record itself, not its summaries or vectors** and run the observation again. This creates a different memory under the unsafe setting.",
+  "Find a surviving summary or vector point. Submit its ID from `survivor`. The outbox observation is optional and does not prove deletion by itself.",
+  "Restore the control. The Range also runs a repair job for copies left behind earlier. Repeat the observation to check the repaired state.",
+]
+
 skip_test = """
 how many copies of one remembered fact your agent's memory makes, and whether deleting it deletes \
 all of them."""

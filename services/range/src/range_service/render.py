@@ -802,6 +802,13 @@ def _stage_02(
         flush=True,
     )
 
+    procedure = (
+        '<div class="prose" aria-label="Steps to follow"><h3>Run it in this order</h3><ol>'
+        + "".join(f"<li>{md(step)}</li>" for step in challenge.break_steps)
+        + "</ol></div>"
+        if challenge.break_steps else ""
+    )
+
     flag = ""
     if challenge.flag:
         note = ""
@@ -844,6 +851,7 @@ def _stage_02(
         + banner
         + '<div class="body">'
         + f'<p class="objective"><b>Objective</b>{E(challenge.objective)}</p>'
+        + procedure
         + f'<div class="console">{left}{right}</div>'
         + "</div></section>"
     )

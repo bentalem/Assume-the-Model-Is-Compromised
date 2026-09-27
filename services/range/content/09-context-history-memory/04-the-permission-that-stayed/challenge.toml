@@ -13,6 +13,14 @@ Run bob's escalation while he is a manager. Then demote him and replay his histo
 re-checking permission. Give the value that reaches his context after he lost the role that \
 allowed him to see it."""
 
+break_steps = [
+  "Start with both controls in their normal state. Run **Bob's escalation: look up, record, rebuild** while he is still a manager. This saves a restricted tool result in his existing session.",
+  "Run **What the server believes about each person now**. Then arm **Demote Bob to a support agent** and confirm that his current role changed.",
+  "Run Bob's escalation again. Look for the old tool turn and check whether it was left out of the new context.",
+  "Keep Bob demoted. Arm **Replay history without checking the caller's current role**, then run Bob's escalation again. Compare `produced_under`, `roles_now`, `included` and `outlived_email`.",
+  "Submit the old value in `outlived_email`. Restore both controls after the comparison.",
+]
+
 skip_test = """
 whether anything in your agent's memory re-checks, at the moment of use, that the person it is \
 serving is still allowed to see what was stored while they were."""

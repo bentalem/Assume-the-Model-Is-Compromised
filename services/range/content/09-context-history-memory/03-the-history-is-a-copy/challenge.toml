@@ -12,6 +12,14 @@ objective = """
 Ask to read alice's session as bob, before and after managers are allowed to read colleagues' \
 transcripts. Give the phrase from alice's session that bob receives."""
 
+break_steps = [
+  "With the review setting disabled, run **Bob asks to read Alice's session**. Check `decision` and `reason`; no transcript content should be returned.",
+  "Arm **Let managers read colleagues' conversations with the agent**.",
+  "Run Bob's read again. Compare `decision`, `reason`, `role` and `content` with the earlier result.",
+  "Find the phrase in the `marker` field of the armed result and submit it as the flag.",
+  "Restore the setting and run Bob's read once more. Check that the colleague's transcript is no longer visible.",
+]
+
 skip_test = """
 who can read the conversations your agent has with people, who decided that, and whether it was \
 decided as a security question."""

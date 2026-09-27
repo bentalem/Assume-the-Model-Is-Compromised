@@ -12,6 +12,14 @@ objective = """
 Let the model store TKT-1001's internal note as alice's memory, with and without auto-confirmation. \
 Give the id of the memory that reaches alice's context without anyone confirming it."""
 
+break_steps = [
+  "With auto-confirmation disabled, run **The model saves TKT-1001's note; Alice's context is rebuilt**.",
+  "Run **Alice's memories: who wrote each, who confirmed it**. Find the new record and check its `channel`, `status` and `confirmed_via`.",
+  "Arm **Let the agent's own memories count without the user confirming them** and run the ticket-note observation again. This creates a new memory under the unsafe setting.",
+  "Compare both records and the new context. Submit the `confirmed_by_nobody` value from the armed result.",
+  "Restore the setting and check Alice's memory list again. You can then run **Alice confirms the latest memory waiting for her** to see the separate user-confirmation route.",
+]
+
 skip_test = """
 who decides what your agent remembers — the user, the model, or a setting — and what happens to an \
 instruction the model was tricked into saving."""

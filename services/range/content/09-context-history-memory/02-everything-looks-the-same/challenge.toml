@@ -12,6 +12,14 @@ objective = """
 Read alice's context block labelled, then unlabelled. Say which line came from a tool result, how \
 you knew, and why a provenance label on its own does not stop a model from acting on that line."""
 
+break_steps = [
+  "With source labels enabled, run **Alice's context, as the model reads it**. Read the rules, memories and history sections.",
+  "Run **The same block, item by item, with its source**. Match the tool-result item to the line you just read.",
+  "Arm **Stop labelling where each line of context came from**. Run the context-lines observation again, then the item-by-item observation.",
+  "Compare the unlabelled text with the structured item view. Which information disappeared from the text, and which details are still in the log?",
+  "Submit a short answer naming the **tool** line, what its **label** told you and why the agent's real **authority** still needs a separate check. Restore the labels.",
+]
+
 skip_test = """
 the difference between marking untrusted text and constraining what the agent can do after reading \
 it — and which of the two your system is relying on."""

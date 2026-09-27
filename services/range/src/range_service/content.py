@@ -110,6 +110,7 @@ class Challenge:
     sources: tuple[SourceRef, ...]
     flag: Flag | None
     hints: tuple[str, ...] = ()
+    break_steps: tuple[str, ...] = ()
     # What the learner is practising here, and how it connects to securing an agent. Separate from
     # `summary` (which sells the challenge) and `objective` (which says what to do): these two
     # answer "why am I doing this, and what has it got to do with agents" — including for the
@@ -258,9 +259,14 @@ def load_challenge(directory: Path) -> Challenge:
         sources=_parse_sources(data.get("source", []), where),
         flag=_parse_flag(data.get("flag"), where),
         hints=tuple(data.get("hints", ())),
+        break_steps=tuple(data.get("break_steps", ())),
         directory=directory,
     )
 
+    if not isinstance(data.get("break_steps", []), list) or len(challenge.break_steps) > 8 or any(
+        not isinstance(step, str) or not step.strip() for step in challenge.break_steps
+    ):
+        raise ContentError(f"{where}: break_steps must be at most eight non-empty strings")
     if len(challenge.hints) > 3:
         raise ContentError(f"{where}: at most three hints; a fourth is an answer wearing a question mark")
     return challenge

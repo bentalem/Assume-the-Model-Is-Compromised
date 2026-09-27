@@ -12,6 +12,14 @@ objective = """
 Run the tool-result observation with the filter holding, then with it off. Give the \
 credential-shaped value that reaches alice's context block."""
 
+break_steps = [
+  "With the secret filter enabled, run **A tool result reaches Alice's context**. The runtime creates a new session, stores the tool result and builds the next context.",
+  "Check the tool row's `content` and `secret_shaped` fields. Notice what was stored before you change anything.",
+  "Arm **Stop redacting credentials from what memory stores**. Run the same observation again; this run creates a new session with the filter off.",
+  "Compare the new result with the first one. Submit the credential-shaped value in the armed result as your flag.",
+  "Restore the filter. It protects future writes but does not erase an unsafe turn that was already stored.",
+]
+
 skip_test = """
 where, between a tool call and the model's next turn, a secret inside a tool result is stopped — \
 and what your system does with it if nothing stops it."""

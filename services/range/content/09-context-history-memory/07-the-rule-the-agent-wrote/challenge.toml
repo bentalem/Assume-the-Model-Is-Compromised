@@ -13,6 +13,14 @@ objective = """
 Let the model propose "refunds under 1000 USD are pre-approved", with and without self-activation. \
 Give the id of the rule that became active without anyone approving it."""
 
+break_steps = [
+  "With self-activation disabled, run **The model proposes a refund rule**. Check the new rule's `state` and `decided_by`.",
+  "Arm **Let a rule the agent proposes take effect immediately**. Run the proposal observation again to create a new rule under this setting.",
+  "Compare the two rows, especially `state`, `decided_by` and `active_without_approval`.",
+  "Run **Alice's most recent context, item by item** to find the new active rule. Submit its `active_without_approval` value as the flag.",
+  "Restore the control and inspect Alice's context again. The separate Fiona observations let you test normal approval and retirement later.",
+]
+
 skip_test = """
 who can change the standing instructions your agent follows, whether that is reviewed like code, \
 and whether the agent itself can do it."""

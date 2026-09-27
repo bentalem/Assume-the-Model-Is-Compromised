@@ -13,6 +13,14 @@ objective = """
 Query the store the way the service queries it for cedar, with the filter left out — first per \
 tenant, then shared. Give the northwind marker that a cedar query can reach."""
 
+break_steps = [
+  "With separate collections enabled, run **The store, queried for Cedar with the filter left out**. Compare Cedar's own collection with the attempt to open Northwind's using Cedar's token.",
+  "Run **Mallory recalls Northwind's own memory**. This is a normal request through the service by a Northwind user.",
+  "Arm **Serve long-term memory from one collection shared by every tenant**.",
+  "Run the direct-store observation again. Compare `collection`, `credential`, `status` and `org`. Find a Northwind row returned from the shared collection and submit its `marker`.",
+  "Restore the separate-collection layout. This observation intentionally skips the normal memory service's PostgreSQL permission check.",
+]
+
 skip_test = """
 whether tenant isolation in your vector store is enforced by the store and its credentials, or by a \
 filter your application must add to every query."""
