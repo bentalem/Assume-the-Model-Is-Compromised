@@ -54,17 +54,18 @@ few deliberate optical one-offs (1px and 2px nudges) and the em-relative padding
 
 Layout
 ------
-Everything hangs from one left edge: a single measure column, a hairline rule grid, and — on the
-challenge page — a fixed stage spine in the left margin carrying the 01/02/03 numerals and the live
-environment state. Nothing is centred, nothing is a rounded card by default, and state is expressed
-structurally: a panel whose environment is armed grows a thick amber margin rail and a hatched
-banner, so the condition of the lab is a property of the page's shape rather than a badge on it.
+Everything hangs from one left edge: a single measure column, a clear grid, and — on the challenge
+page — a fixed stage spine in the left margin carrying the 01/02/03 numerals and the live
+environment state. The visual layer now uses restrained depth, soft glass surfaces and small radii
+to make the lab feel like a modern security workspace without changing the information hierarchy.
+State is still expressed structurally: an armed panel grows a thick amber rail and a hatched banner,
+so the condition of the lab is visible before the learner reads a word.
 
-Two rules that are structural rather than decorative:
+Two rules are structural rather than decorative:
 
-  * Semantic colour is separate from the accent (above).
-  * Nothing animates in from invisible. A learner scrolling back must find the page as they left
-    it, and `prefers-reduced-motion` removes what little movement there is.
+  * Semantic colour stays separate from the accent (above).
+  * Motion explains interaction or state. It stays short and subtle, and
+    `prefers-reduced-motion` removes it.
 
 Every colour is defined on bare `:root` first, so the un-stamped state (a viewer on "system") is a
 complete palette rather than a half of one.
@@ -1405,4 +1406,520 @@ _CONSOLE = """
 }
 """
 
-STYLESHEET = _TOKENS + _BASE + _TABLES + _CHALLENGE + _CONSOLE
+
+
+_POLISH = """
+/* ================================================================== visual polish
+
+   The Range is still an instrument first. This layer adds depth, motion and a stronger visual
+   hierarchy without changing the lab's semantics, URLs, forms or offline behaviour. Everything
+   here is progressive decoration: no control depends on it. */
+
+:root {
+  --card-radius: 14px;
+  --control-radius: 9px;
+  --pill-radius: 999px;
+  --shadow-1: 0 1px 2px rgb(9 20 28 / .05), 0 8px 24px rgb(9 20 28 / .055);
+  --shadow-2: 0 3px 8px rgb(9 20 28 / .07), 0 18px 44px rgb(9 20 28 / .09);
+  --shadow-3: 0 10px 28px rgb(9 20 28 / .11), 0 32px 72px rgb(9 20 28 / .12);
+  --accent-glow: color-mix(in srgb, var(--accent) 17%, transparent);
+  --glass: color-mix(in srgb, var(--surface) 86%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+:root[data-theme="dark"] {
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .28), 0 10px 28px rgb(0 0 0 / .18);
+  --shadow-2: 0 4px 12px rgb(0 0 0 / .28), 0 22px 52px rgb(0 0 0 / .24);
+  --shadow-3: 0 14px 36px rgb(0 0 0 / .34), 0 38px 82px rgb(0 0 0 / .28);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --shadow-1: 0 1px 2px rgb(0 0 0 / .28), 0 10px 28px rgb(0 0 0 / .18);
+    --shadow-2: 0 4px 12px rgb(0 0 0 / .28), 0 22px 52px rgb(0 0 0 / .24);
+    --shadow-3: 0 14px 36px rgb(0 0 0 / .34), 0 38px 82px rgb(0 0 0 / .28);
+  }
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  min-height: 100vh;
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 8% -8%, color-mix(in srgb, var(--accent) 10%, transparent) 0 18rem, transparent 36rem),
+    radial-gradient(circle at 94% 4%, color-mix(in srgb, #58a6d8 8%, transparent) 0 14rem, transparent 32rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--ground) 96%, var(--surface)) 0, var(--ground) 28rem);
+  background-attachment: fixed;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .32;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--rule) 30%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--rule) 30%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, #000 0, transparent 54rem);
+}
+
+.wrap { position: relative; }
+
+/* Masthead becomes a quiet glass rail. */
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin-inline: calc(var(--s-4) * -1);
+  padding: 12px var(--s-4);
+  min-height: 60px;
+  border-bottom-color: color-mix(in srgb, var(--rule-2) 70%, transparent);
+  background: color-mix(in srgb, var(--ground) 80%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--surface) 50%, transparent);
+}
+.masthead .mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 760;
+}
+.masthead .mark::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7dd3fc));
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 22px var(--accent-glow);
+  transform: rotate(45deg);
+}
+.masthead nav { gap: 6px; }
+.masthead nav a {
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease;
+}
+.masthead nav a:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--rule));
+  background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+  transform: translateY(-1px);
+}
+.masthead nav a[aria-current="page"] {
+  color: var(--ink);
+  border-color: var(--rule);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-1);
+}
+#themeswitch {
+  min-height: 31px;
+  border-radius: var(--pill-radius);
+  padding-inline: 10px;
+  background: var(--glass);
+  transition: transform .16s ease, border-color .16s ease, color .16s ease, background .16s ease;
+}
+#themeswitch:hover { transform: translateY(-1px); background: var(--surface); }
+
+/* Live state strip. */
+.strip {
+  border-radius: 0 0 var(--card-radius) var(--card-radius);
+  border-color: color-mix(in srgb, var(--rule-2) 72%, transparent);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.strip .dot { box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 10%, transparent); }
+.strip.armed .dot, .stage[data-state="armed"] .strip .dot { animation: range-state-pulse 1.8s ease-out infinite; }
+
+/* Landing page. */
+.lede {
+  position: relative;
+  overflow: hidden;
+  margin-top: var(--s-5);
+  padding: clamp(24px, 4vw, 48px);
+  gap: clamp(28px, 5vw, 64px);
+  border: 1px solid color-mix(in srgb, var(--rule-2) 72%, transparent);
+  border-radius: calc(var(--card-radius) + 4px);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 72%, transparent));
+  box-shadow: var(--shadow-2);
+}
+.lede::before {
+  content: "";
+  position: absolute;
+  width: 28rem;
+  height: 28rem;
+  right: -10rem;
+  top: -18rem;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--accent-glow), transparent 66%);
+  filter: blur(8px);
+  animation: range-float 10s ease-in-out infinite alternate;
+}
+.lede > * { position: relative; z-index: 1; }
+.lede h1 {
+  max-width: 17ch;
+  font-size: clamp(2.15rem, 5vw, 3.9rem);
+  line-height: 1.02;
+  letter-spacing: -.04em;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lede h1 {
+    color: transparent;
+    background: linear-gradient(115deg, var(--ink) 10%, var(--accent) 72%, color-mix(in srgb, var(--accent) 55%, #7dd3fc));
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
+.lede .standfirst { font-size: clamp(1.08rem, 2vw, 1.32rem); }
+.readout {
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  border-color: color-mix(in srgb, var(--rule-2) 75%, transparent);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-1);
+}
+.readout .row {
+  transition: background .16s ease, transform .16s ease;
+}
+.readout .row:hover { background: var(--surface-2); }
+.readout .v { font-size: 1.45rem; }
+
+/* Buttons and fields feel like controls, not bare HTML. */
+button, .btn, input[type="text"] {
+  border-radius: var(--control-radius);
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease,
+              color .14s ease, background-color .14s ease;
+}
+button:hover:not(:disabled), .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-1); }
+button:active:not(:disabled), .btn:active { transform: translateY(0); box-shadow: none; }
+.btn.primary {
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.btn.primary:hover {
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Route cards. */
+.routes {
+  gap: var(--s-3);
+  border: 0;
+}
+.route {
+  position: relative;
+  overflow: hidden;
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--card-radius);
+  background: var(--glass);
+  box-shadow: var(--shadow-1);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+.route:last-child { border-right: 1px solid var(--rule); }
+.route:not(:first-child) { padding-left: var(--s-4); }
+.route:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--rule));
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+.route::after {
+  content: "";
+  position: absolute;
+  inset: auto -25% -72% 35%;
+  height: 100%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--accent-glow), transparent 66%);
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+.route:hover::after { opacity: .65; }
+.route a.go { position: relative; z-index: 1; }
+.route a.go .arrow { display: inline-block; transition: transform .18s ease, color .18s ease; }
+.route:hover a.go .arrow { transform: translateX(5px); color: var(--accent); }
+.routes.flat .route { padding-bottom: var(--s-4); }
+
+/* Tables and track navigation. */
+.sec > .scroller, .trackblock > .scroller {
+  border: 1px solid var(--rule);
+  border-radius: var(--card-radius);
+  background: var(--glass);
+  box-shadow: var(--shadow-1);
+  overflow: auto;
+}
+.sec > .scroller .index, .trackblock > .scroller .index { padding-inline: var(--s-3); }
+.index th:first-child, .index td:first-child { padding-left: var(--s-3); }
+.index th:last-child, .index td:last-child { padding-right: var(--s-3); }
+.index tbody tr {
+  transition: background .14s ease, box-shadow .14s ease;
+}
+.index tbody tr:hover, .index tbody tr:focus-within {
+  background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.bar .track {
+  height: 7px;
+  border-radius: var(--pill-radius);
+  border-color: var(--rule-2);
+}
+.bar .track i {
+  border-radius: inherit;
+  transition: width .35s cubic-bezier(.2,.8,.2,1), background .2s ease;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.tracknav {
+  gap: 8px;
+  padding: var(--s-3) 0;
+  border-top: 0;
+}
+.tracknav a {
+  padding: 7px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--pill-radius);
+  background: var(--glass);
+  box-shadow: var(--shadow-1);
+  transition: transform .14s ease, border-color .14s ease, color .14s ease, background .14s ease;
+}
+.tracknav a:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--rule));
+  background: var(--surface);
+}
+.band {
+  top: 60px;
+  z-index: 4;
+  padding: var(--s-3) var(--s-3) var(--s-2);
+  margin-inline: calc(var(--s-3) * -1);
+  border-bottom-color: color-mix(in srgb, var(--ink) 72%, transparent);
+  background: color-mix(in srgb, var(--ground) 86%, transparent);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+/* Challenge heading. */
+.chead {
+  position: relative;
+  overflow: hidden;
+  margin-top: var(--s-5);
+  padding: clamp(24px, 4vw, 42px);
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--card-radius) + 2px);
+  background: linear-gradient(145deg, var(--glass-strong), color-mix(in srgb, var(--surface-2) 70%, transparent));
+  box-shadow: var(--shadow-2);
+}
+.chead::after {
+  content: "";
+  position: absolute;
+  inset: -60% -15% auto auto;
+  width: 20rem;
+  height: 20rem;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--accent-glow), transparent 68%);
+}
+.chead > * { position: relative; z-index: 1; }
+.chead h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); max-width: 28ch; }
+.chead .facts span {
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--pill-radius);
+  background: var(--glass);
+}
+
+/* Stage navigation. */
+.spine ol {
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--card-radius);
+  background: var(--glass);
+  box-shadow: var(--shadow-1);
+}
+.spine a {
+  margin: 0;
+  padding: 11px 12px;
+  border-left: 3px solid transparent;
+  transition: background .14s ease, color .14s ease, border-color .14s ease, transform .14s ease;
+}
+.spine a:hover { background: var(--surface-2); transform: translateX(2px); }
+.spine a[aria-current="true"] {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Stage cards. */
+.stage {
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  border-color: var(--rule);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease;
+}
+.stage:hover {
+  border-color: color-mix(in srgb, var(--rule-2) 82%, var(--accent));
+  box-shadow: var(--shadow-2);
+}
+.stage > header {
+  padding-block: var(--s-4);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-2) 96%, transparent), color-mix(in srgb, var(--surface) 88%, transparent));
+}
+.stage:target {
+  animation: range-target 1.05s ease-out 1;
+}
+.tabs {
+  gap: 6px;
+  padding: 9px var(--s-4);
+  border-bottom-color: var(--rule);
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+}
+.tabs a {
+  margin: 0;
+  border-radius: var(--control-radius);
+  border-bottom-width: 1px;
+  transition: color .14s ease, background .14s ease, border-color .14s ease, transform .14s ease;
+}
+.tabs a:not([aria-current]):hover { transform: translateY(-1px); }
+.tabs a[aria-current="page"] {
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--rule));
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+/* Console rows. */
+.panel {
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-1);
+}
+.control {
+  transition: background .14s ease, transform .14s ease;
+}
+.control:hover {
+  background: color-mix(in srgb, var(--accent-soft) 34%, var(--surface));
+}
+.control:hover .label { color: var(--accent); }
+.term {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--console-accent) 7%, transparent);
+}
+.term::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .22;
+  background: linear-gradient(180deg, transparent 0 48%, color-mix(in srgb, var(--console-accent) 8%, transparent) 50%, transparent 52%);
+  background-size: 100% 6px;
+}
+.term .out:not(.idle), .flagnote { animation: range-result .28s ease-out 1; }
+
+/* Source and hint cards. */
+.src {
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-1);
+}
+.src tr.hit td { animation: range-highlight .55s ease-out 1; }
+.hint {
+  overflow: hidden;
+  border-radius: var(--control-radius);
+  transition: border-color .14s ease, box-shadow .14s ease, background .14s ease;
+}
+.hint:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--control-edge)); box-shadow: var(--shadow-1); }
+.hint[open] .inner { animation: range-reveal .18s ease-out 1; }
+
+/* Footer becomes a quiet end-cap. */
+.foot {
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--card-radius);
+  background: var(--glass);
+  box-shadow: var(--shadow-1);
+}
+
+/* Small motion only where it explains state or interaction. */
+@keyframes range-float {
+  from { transform: translate3d(0, 0, 0) scale(1); opacity: .7; }
+  to   { transform: translate3d(-28px, 24px, 0) scale(1.08); opacity: 1; }
+}
+@keyframes range-state-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 32%, transparent); }
+  70%  { box-shadow: 0 0 0 9px color-mix(in srgb, currentColor 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+}
+@keyframes range-result {
+  from { transform: translateY(5px); opacity: .55; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes range-reveal {
+  from { transform: translateY(-4px); opacity: .5; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes range-highlight {
+  0%   { box-shadow: inset 4px 0 0 var(--console-armed), inset 0 0 28px color-mix(in srgb, var(--console-armed) 14%, transparent); }
+  100% { box-shadow: inset 3px 0 0 var(--console-armed), inset 0 0 0 transparent; }
+}
+@keyframes range-target {
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow), var(--shadow-1); }
+  35%  { box-shadow: 0 0 0 8px var(--accent-glow), var(--shadow-2); }
+  100% { box-shadow: 0 0 0 0 transparent, var(--shadow-1); }
+}
+
+@media (max-width: 980px) {
+  .masthead { margin-inline: calc(var(--s-3) * -1); padding-inline: var(--s-3); }
+  .spine ol { border-radius: var(--control-radius); }
+  .spine a { border-left: 0; }
+  .spine a:hover { transform: translateY(-1px); }
+  .band { top: 58px; }
+}
+@media (max-width: 760px) {
+  .lede { padding: var(--s-5); border-radius: var(--card-radius); }
+  .route, .route:not(:first-child) { padding: var(--s-4); }
+  .routes { gap: var(--s-2); }
+}
+@media (max-width: 560px) {
+  .masthead .lab, .masthead .sep { display: none; }
+  .masthead { gap: var(--s-2); }
+  .masthead nav { margin-left: auto; }
+  .masthead nav a { padding: 7px 8px; }
+  .lede, .chead { padding: var(--s-4); margin-top: var(--s-3); }
+  .lede h1 { font-size: 2.2rem; }
+  .chead .facts { gap: 6px; }
+  .sec > .scroller, .trackblock > .scroller { border-radius: var(--control-radius); }
+}
+
+/* Accessibility always wins over motion. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .lede::before, .strip.armed .dot, .stage[data-state="armed"] .strip .dot,
+  .stage:target, .term .out:not(.idle), .flagnote, .src tr.hit td, .hint[open] .inner {
+    animation: none !important;
+  }
+  *, *::before, *::after { transition-duration: .001ms !important; }
+}
+
+/* Keep the printable lesson plain. */
+@media print {
+  body { background: #fff !important; }
+  body::before, .lede::before, .chead::after { display: none !important; }
+  .masthead, .lede, .readout, .route, .sec > .scroller, .trackblock > .scroller,
+  .chead, .stage, .spine ol, .panel, .src, .hint, .foot {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+}
+"""
+
+
+STYLESHEET = _TOKENS + _BASE + _TABLES + _CHALLENGE + _CONSOLE + _POLISH
