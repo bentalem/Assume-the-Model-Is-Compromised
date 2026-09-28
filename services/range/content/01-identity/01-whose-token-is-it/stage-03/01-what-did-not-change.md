@@ -20,6 +20,8 @@ Under passthrough, a successful injection reaches **what that one user already h
 
 Under a service account it reaches **the union of every user's permissions** — because that is what the credential holds, because that is what it has to hold.
 
+Under down-scoped delegation (D, challenges 1.5 to 1.8) it reaches less than even passthrough: only what alice may do **and** the agent was registered for **and** the task in front of it needs — and the trail still records that it was the agent.
+
 > Same model. Same prompt. Same tools. Same policy. Same database. **One header value**, and the difference between "one agent's access, misused" and "every tenant's data".
 
 That is why this is challenge 1.1 rather than a footnote. Nothing else you do changes the size of the damage by as much.

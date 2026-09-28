@@ -5,8 +5,9 @@ title = "Whose token is it"
 points = 35
 
 objective = """
-Ask the same two questions under each identity architecture. Give the status code the service \
-account gets for the other tenant's order once it is configured the way a service account has to be."""
+Ask the same two questions under two of the four identity architectures — the user's own token, \
+and the agent's own service account. Give the status code the service account gets for the other \
+tenant's order once it is configured the way a service account has to be."""
 
 summary = """
 The first question to ask about any agent, and it decides more than anything else you do \
@@ -28,7 +29,8 @@ agent_link = """
 This one is squarely about agents. A tool call has to carry some credential, and the choice between
 the signed-in user's token and the agent's own account decides whether a successful injection
 reaches one user's records or every tenant's — nothing else you build afterwards changes that
-number by as much. The same choice decides attribution: the audit row names the subject loaded from
+number by as much. A fourth answer, a token narrowed to the task that also names the agent, shrinks
+it further still; that is 1.5 to 1.8. The same choice decides attribution: the audit row names the subject loaded from
 the token on the call, so one shared credential makes "whose request was this?" have one answer
 forever."""
 

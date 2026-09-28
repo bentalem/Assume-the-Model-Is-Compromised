@@ -1,8 +1,8 @@
 # The fourth architecture
 
-Challenge 1.1 compared three answers to one question: what goes in the `Authorization` header when an agent calls a tool. Passthrough (C) won that comparison, because the agent can never reach more than the signed-in user already could.
+Challenge 1.1 laid out four answers to one question — what goes in the `Authorization` header when an agent calls a tool — and ran two of them. Passthrough (C) beat the service account (A), because the agent can never reach more than the signed-in user already could.
 
-That is the best of the three. It is not good.
+That makes C the best of the classic three. It is not good, and this challenge is the fourth answer.
 
 ## The problem with passthrough
 
