@@ -29,6 +29,9 @@ If step 10 fails, step 11 never happens — no effect without evidence.
 
 - **Base path** `/v1`. All responses `application/json`.
 - **Auth** `Authorization: Bearer <user access token>` on every endpoint. No API key, no service token.
+  The token is either the user's own, from Keycloak (never carrying `act`), or a delegated one from
+  the delegation broker: the same user as `sub`, the acting agent as `act`, a narrow `scope`, ES256,
+  five minutes at most (track 1, 1.5 – 1.8). Each is verified only against the issuer it names.
 - **Correlation** `X-Request-Id` accepted and echoed; generated if absent; recorded on every audit row.
 - **Pagination** cursor-based: `limit` (default 20, max 50) and `cursor`. Never offset over a
   tenant-filtered set.

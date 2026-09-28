@@ -28,11 +28,11 @@ _INSERT = """
 INSERT INTO app.audit_events (
     request_id, trace_id, actor_type, actor_id, organization_id,
     action, resource_type, resource_id, decision, reason,
-    policy_version, payload_hash, result_reference
+    policy_version, payload_hash, result_reference, agent_id
 ) VALUES (
     %(request_id)s, %(trace_id)s, %(actor_type)s, %(actor_id)s, %(organization_id)s,
     %(action)s, %(resource_type)s, %(resource_id)s, %(decision)s, %(reason)s,
-    %(policy_version)s, %(payload_hash)s, %(result_reference)s
+    %(policy_version)s, %(payload_hash)s, %(result_reference)s, %(agent_id)s
 )
 """
 
@@ -52,6 +52,8 @@ class AuditEvent:
     policy_version: str | None = None
     payload_hash: str | None = None
     result_reference: str | None = None
+    #: The agent acting for the human, when there is one (0030). `actor_id` stays the human.
+    agent_id: str | None = None
 
     def as_params(self) -> dict[str, Any]:
         return {
@@ -68,6 +70,7 @@ class AuditEvent:
             "policy_version": self.policy_version,
             "payload_hash": self.payload_hash,
             "result_reference": self.result_reference,
+            "agent_id": self.agent_id,
         }
 
 

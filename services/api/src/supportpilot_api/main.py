@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .audit.writer import AuditWriter
-from .auth.tokens import JwksCache, TokenVerifier
+from .auth.tokens import ACTOR_REQUIRED, IssuerRegistry, JwksCache, TokenVerifier
 from .config import Settings, load_settings
 from .db import Database
 from .errors import ApiError
@@ -38,7 +38,7 @@ logger = logging.getLogger("supportpilot")
 class Services:
     settings: Settings
     database: Database
-    verifier: TokenVerifier
+    verifier: IssuerRegistry
     policy: PolicyClient
     memberships: MembershipRepository
     orders: OrderRepository
@@ -49,15 +49,40 @@ class Services:
     pipeline: Pipeline
 
 
+def _verifiers(settings: Settings) -> list[TokenVerifier]:
+    """Every issuer this API trusts, each with its own rules.
+
+    Keycloak: the user's own token, as it always was — and never an `act` claim. The broker, when it
+    is configured: a delegated token only — `act` required, ES256 only, five minutes at most. Adding
+    an issuer here is a privilege grant, and docs/architecture says so.
+    """
+    verifiers = [
+        TokenVerifier(
+            issuer=settings.issuer,
+            audience=settings.audience,
+            jwks=JwksCache(settings.jwks_url),
+            leeway_seconds=settings.token_leeway_seconds,
+        )
+    ]
+    if settings.broker_issuer and settings.broker_jwks_url:
+        verifiers.append(
+            TokenVerifier(
+                issuer=settings.broker_issuer,
+                audience=settings.audience,
+                jwks=JwksCache(settings.broker_jwks_url),
+                leeway_seconds=settings.token_leeway_seconds,
+                allowed_algorithms=frozenset({"ES256"}),
+                actor=ACTOR_REQUIRED,
+                max_lifetime_seconds=settings.broker_token_max_lifetime_seconds,
+            )
+        )
+    return verifiers
+
+
 def build_services(settings: Settings) -> Services:
     database = Database(settings.dsn)
     policy = PolicyClient(settings.opa_url, timeout_ms=settings.opa_timeout_ms)
-    verifier = TokenVerifier(
-        issuer=settings.issuer,
-        audience=settings.audience,
-        jwks=JwksCache(settings.jwks_url),
-        leeway_seconds=settings.token_leeway_seconds,
-    )
+    verifier = IssuerRegistry(_verifiers(settings))
     audit = AuditWriter(database)
     return Services(
         settings=settings,

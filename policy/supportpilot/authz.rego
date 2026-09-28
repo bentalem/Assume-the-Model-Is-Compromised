@@ -8,7 +8,7 @@ package supportpilot.authz
 
 import rego.v1
 
-policy_version := "2026-09-07.1"
+policy_version := "2026-09-28.1"
 
 # Liveness probe target. Carries no authorization meaning.
 health := {"status": "ok", "policy_version": policy_version}
@@ -22,7 +22,7 @@ health := {"status": "ok", "policy_version": policy_version}
 default decision := {
 	"allow": false,
 	"reason": "default_deny",
-	"policy_version": "2026-09-07.1",
+	"policy_version": "2026-09-28.1",
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -62,17 +62,61 @@ ticket_fields := [
 	"customer_ref", "created_at", "updated_at", "messages",
 ]
 
+# Every allow in this file is built by allow_with, which makes it the one place a delegated token's
+# limits can apply to all of them at once. A request with no `delegation` is exactly as before.
 allow_with(reason, obligations) := {
 	"allow": true,
 	"reason": reason,
 	"policy_version": policy_version,
 	"obligations": obligations,
-}
+} if delegation_permits
+
+allow_with(_, _) := deny(delegation_denial) if not delegation_permits
 
 deny(reason) := {
 	"allow": false,
 	"reason": reason,
 	"policy_version": policy_version,
+}
+
+# ------------------------------------------------------------------------------------------------
+# Delegation (track 1, challenges 1.5 - 1.8)
+#
+# A delegated token names the user (`sub`) and the agent acting for them (`act`), and carries a
+# scope. The API passes those as `input.delegation` only for such a token; the subject, roles and
+# resource are still built server-side, exactly as for anyone else.
+#
+# A scope is a limit, never a grant. It can turn an allow into a deny and nothing else: every deny
+# arm below is untouched by it, so a delegated request refused by tenant or role is refused for that
+# reason. The effective permission is the user's roles and the token's scope, both at once.
+#
+# data.scopes, not data.supportpilot.scopes, for the reason given at refund_limits below.
+# ------------------------------------------------------------------------------------------------
+required_scope := data.scopes.actions[input.action]
+
+scope_granted if required_scope in input.delegation.scopes
+
+# The agent ceiling at the resource server. The broker refuses to mint these scopes too, but the
+# rule is enforced where the data is, so a broker that minted one anyway would still be refused.
+never_delegable if required_scope in data.scopes.never_delegable
+
+delegation_permits if not input.delegation
+
+delegation_permits if {
+	input.delegation
+	not never_delegable
+	scope_granted
+}
+
+delegation_denial := "agent_cannot_approve" if {
+	input.delegation
+	never_delegable
+}
+
+delegation_denial := "scope_not_granted" if {
+	input.delegation
+	not never_delegable
+	not scope_granted
 }
 
 # ------------------------------------------------------------------------------------------------

@@ -52,6 +52,9 @@ class Authorization:
     subject: Subject
     resource: ResourceContext
     decision: Decision
+    #: The delegation chain as the audit trail records it, or None for a user's own token. The
+    #: human is still the actor; this names the agent beside them.
+    agent_id: str | None = None
 
     @property
     def organization_id(self) -> str:
@@ -67,6 +70,23 @@ class Authorization:
         if allowed is None:
             return record
         return {key: value for key, value in record.items() if key in allowed}
+
+
+def _delegation_argument(token: VerifiedToken) -> dict[str, Any]:
+    """What the policy is told about a delegated token; nothing at all for a user's own.
+
+    Everything here comes from the verified token. The subject, roles and resource are still built
+    from the database above; this adds a limit on top of them, never a source of them.
+    """
+    if not token.is_delegated:
+        return {}
+    return {
+        "delegation": {
+            "actor": token.actor_chain[-1],
+            "chain": list(token.actor_chain),
+            "scopes": sorted(token.scopes),
+        }
+    }
 
 
 class Pipeline:
@@ -91,12 +111,14 @@ class Pipeline:
         as well evidenced as a permitted one (SP-PRD-001 FR-06).
         """
         actor_id = subject.user_id if subject else token.subject
+        agent_id = token.agent_id
 
         def deny(reason: str, organization_id: str | None) -> None:
             self._safe_audit(
                 AuditEvent(
                     request_id=request_id,
                     actor_id=actor_id,
+                    agent_id=agent_id,
                     organization_id=organization_id,
                     action=action,
                     resource_type=resource_type,
@@ -131,6 +153,9 @@ class Pipeline:
                 "occurred_at": datetime.now(UTC).isoformat(),
                 "network_zone": "internal",
             },
+            # Passed only for a delegated token, so a user's own token reaches the policy client
+            # through exactly the call it always made.
+            **_delegation_argument(token),
         )
 
         if not decision.allow:
@@ -138,6 +163,7 @@ class Pipeline:
                 AuditEvent(
                     request_id=request_id,
                     actor_id=actor_id,
+                    agent_id=agent_id,
                     organization_id=resource.organization_id,
                     action=action,
                     resource_type=resource.type,
@@ -151,7 +177,9 @@ class Pipeline:
             # "not found" would hide it, and reporting a denial as an outage would invite a retry.
             raise unavailable() if decision.unavailable else not_found()
 
-        return Authorization(subject=subject, resource=resource, decision=decision)
+        return Authorization(
+            subject=subject, resource=resource, decision=decision, agent_id=agent_id
+        )
 
     def record_success(
         self,
@@ -165,6 +193,7 @@ class Pipeline:
             AuditEvent(
                 request_id=request_id,
                 actor_id=auth.subject.user_id,
+                agent_id=auth.agent_id,
                 organization_id=auth.organization_id,
                 action=action,
                 resource_type=auth.resource.type,

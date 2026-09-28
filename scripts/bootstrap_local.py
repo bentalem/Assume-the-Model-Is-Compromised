@@ -46,6 +46,11 @@ SECRET_NAMES = [
     "qdrant_admin_key",
     "probe_shared_secret",
     "keycloak_admin_password",
+    # Track 1, 1.5 - 1.8: the delegation broker. One credential per agent profile, mounted to the
+    # broker and the probe only. Generated for every install, like the memory secrets, so a compose
+    # file that names them never fails on a missing file.
+    "broker_profile_status_helper",
+    "broker_profile_refund_assistant",
 ]
 
 
@@ -170,6 +175,33 @@ def mint_qdrant_tokens() -> None:
         detail(f"{name} (minted)")
 
 
+def ensure_broker_signing_key() -> None:
+    """The delegation broker's ES256 signing key (track 1, 1.5 - 1.8).
+
+    Mounted to the broker and nothing else: the API verifies its tokens with the public half, which
+    the broker publishes. Generated once and kept, because a new key invalidates every token the
+    broker has minted — harmless here, where they live five minutes, and worth knowing anyway.
+    """
+    path = SECRETS_DIR / "broker_signing_key"
+    if path.exists() and path.read_text(encoding="utf-8").strip():
+        detail("broker_signing_key (exists)")
+        return
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+    except ImportError as exc:
+        raise SystemExit(
+            f"{RED}the broker's signing key needs the cryptography package:{RESET}\n"
+            f"{GREY}pip install cryptography{RESET}"
+        ) from exc
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    path.write_bytes(pem)
+    detail("broker_signing_key (generated)")
+
+
 def ensure_tls() -> None:
     """Keycloak cannot start without its certificate.
 
@@ -288,6 +320,7 @@ def main() -> int:
         raise SystemExit(f"{RED}docker is not on PATH{RESET}")
 
     generate_secrets()
+    ensure_broker_signing_key()
     mint_qdrant_tokens()
     ensure_tls()
 

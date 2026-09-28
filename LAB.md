@@ -138,16 +138,17 @@ Learning your way around the system, rather than installing it, is
 
 | Command | What it proves |
 |---|---|
-| `python scripts/verify_local.py` | 31 environment checks, `V-01` to `V-31` — `V-17` to `V-21` need A5, `V-22` to `V-31` need A6, and each skips without it |
+| `python scripts/verify_local.py` | 38 environment checks, `V-01` to `V-38` — `V-17` to `V-21` need A5, `V-22` to `V-31` need A6, `V-32` to `V-38` need A7, and each skips without it |
 | `python scripts/abuse_suite.py` | injection and abuse cases — two need Part B and skip without it |
 | `python scripts/action_suite.py` | approval and execution: no self-approval, no double execution |
-| `python scripts/contract_suite.py` | every call built from the published tool document |
+| `python scripts/contract_suite.py` | every call built from the published tool document — and, with A7, from each broker profile's document, through the broker |
 | `python scripts/backup_restore_drill.py drill` | a backup is restored and re-verified |
 | `python scripts/range_suite.py` | the Range: every arm restores, the console reports the true state, reset restores, no flag is free — needs A5; track 9's checks need A6 too |
 | `python scripts/memory_suite.py` | the memory service against its real stores: identity, the write paths, both vector layouts, history, rules, context — needs A6 |
 | `opa test policy/` | the policy rules, including every deny arm |
 | `pytest services/api` | token verification, policy client, pipeline, hashing, pagination |
 | `pytest services/memory` | the memory service's own logic: its audience, identity, the secret filter, rules and context assembly |
+| `pytest services/broker` | the delegation broker: the operation table against the action document, profile ceilings, minting, exchange and re-exchange rules, the gateway |
 
 `contract_suite.py` exists because of a real failure. One tool declared an array query parameter,
 Onyx serialised it one way, the API expected another, and a perfectly correct model request came back
@@ -157,7 +158,7 @@ as an error — while 219 tests passed throughout, because every one of them bui
 
 ## A5 · The Range
 
-The Range is where you practise. It is a web app that comes with the lab: 39 challenges in nine
+The Range is where you practise. It is a web app that comes with the lab: 43 challenges in nine
 tracks, each one explaining a control, letting you break it in the running system, and then showing
 you the lab's own source for why it behaved the way it did. **Everything is done with buttons in the
 browser.** No challenge needs a terminal.
@@ -220,7 +221,8 @@ applies any new migrations:
 docker compose --profile range up -d --build
 ```
 
-Add `--profile memory` if you run A6. Then reload the page with `Ctrl+F5`.
+Add `--profile memory` if you run A6 and `--profile delegation` if you run A7. Then reload the page
+with `Ctrl+F5`.
 
 `docker-proxy` reads its allowlist once, at start, from a mounted file — a rebuild does not restart
 it. If a pull changed `infrastructure/local/docker-proxy/haproxy.cfg`, recreate it:
@@ -258,11 +260,47 @@ document, registered in B10. History, confirmation and context assembly are for 
 not for the model. Onyx keeps its own conversation history and does not write to this one, so in the
 Range the runtime is played by the probe service.
 
-## A7 · Starting over
+## A7 · The delegation broker (track 1, 1.5 – 1.8)
+
+The fourth identity architecture: **down-scoped delegation**. Instead of carrying the user's whole
+token (passthrough), an agent gets a token that names the user *and* the agent, and carries only what
+the call needs. Challenges 1.5 to 1.8 need it. It is profile-gated, so a plain `docker compose up`
+never starts it:
+
+```bash
+docker compose --profile delegation up -d --build
+```
+
+| Container | Job |
+|---|---|
+| `broker` | An RFC 8693 token-exchange endpoint and an agent gateway, `http://broker:8097`, on `app` only and not published. Verifies the user's Keycloak token, works out the one scope an operation needs from `policy/supportpilot/scopes.json`, checks it against the agent profile's ceiling, and mints a token for the API: `sub` the user, `act` the agent, five minutes at most (60 seconds per gateway call). Holds a signing key and nothing else — no database credential, no user password. |
+| `broker-settings-init` | One-shot: hands the `broker_settings` volume to the Range's user. The broker reads three lab switches from it on every request; missing or malformed means every switch secure. |
+
+The agents it knows are **profiles**, in `infrastructure/local/broker/profiles.json`: `status-helper`
+(orders:read) and `refund-assistant` (orders:read, refunds:propose, actions:read). A profile's ceiling
+is set by an administrator, never by the model, and no profile may hold `refunds:approve` — the broker
+refuses to start if one does, and the policy refuses a delegated approval anyway.
+
+The API trusts the broker as a **second issuer**, with rules of its own: a broker token must carry
+`act`, must be ES256, and may live five minutes at most; a Keycloak token must not carry `act`.
+Trusting an issuer is a privilege grant — `docs/architecture/README.md` records this one. Keycloak is
+not upgraded: supported token exchange needs 26.2 or later, and delegation with `act` is not
+supported even there, so the broker does the exchange itself.
+
+With it running, `verify_local.py` also runs `V-32` to `V-38`: the broker unpublished and its signing
+key mounted to it alone; the API refusing a broker token that is malformed for its issuer; minted
+tokens short-lived and naming both parties; no agent above its ceiling and no re-exchange that
+widens; a delegated call outside its scope refused, and recorded with the agent; no agent able to
+approve; each profile's action document holding only operations inside its ceiling.
+
+`bootstrap_local.py` generates the broker's signing key and one credential per profile. If you
+installed before this existed, run it once more — it adds what is missing and keeps everything else.
+
+## A8 · Starting over
 
 ```bash
 python scripts/bootstrap_local.py --reset       # back to a known state, database rebuilt
-docker compose --profile range --profile memory down -v   # stop everything and destroy the volumes
+docker compose --profile range --profile memory --profile delegation down -v   # stop everything, destroy the volumes
 ```
 
 To put the controls back without losing anything, use **Reset the lab** in the Range instead.
@@ -474,6 +512,16 @@ Keep it a separate action. Its review is separate too: `export_openapi.py --chec
 same rules as the first, plus one — no request body may carry a field the server decides, such as the
 write channel or a status.
 
+### A delegation profile (track 1, optional)
+
+If you run A7 and want a real model to use architecture D, register an action from one profile's
+document instead of the main one: **`openapi/profiles/status-helper.json`** or
+**`openapi/profiles/refund-assistant.json`**, passthrough on, no custom headers. Its `servers` entry
+is the broker (`http://broker:8097/<profile>`), and it offers only the operations inside that
+profile's ceiling. Onyx passes the user's token as before; the broker exchanges it for a narrow one on
+every call, and the audit trail names the agent beside the user. No challenge depends on this — the
+Range plays the agent — but it is how you see a model working under D.
+
 ## B11 · Attach it to an agent (manual)
 
 Registering an action does not make any agent use it. This is the step people forget.
@@ -575,6 +623,8 @@ trail recorded `allowed`, twice. That gap is the most valuable thing Part B can 
 | The `range` container exits at start, `SUPPORTPILOT_ENV` in its log | It runs only in a local lab, by design. Do not change the variable to get past it. |
 | `memory-init` exits 1 | Its log names the step. A smoke-test FAIL means a memory-db grant or policy is wrong — fix the migration, never the test. A password error means the volume outlived a regenerated `.secrets/`: `docker compose --profile memory down -v`, then up again. |
 | Track 9's controls read **absent** | The memory stack is not up. `docker compose --profile memory up -d`. |
+| Challenges 1.5 – 1.8 read **absent**, or their observations say the broker refused or is unreachable | The broker is not up. `docker compose --profile delegation up -d`. |
+| `broker` exits 78 | It refused its configuration: the log names what. A missing signing key or profile credential means `.secrets/` predates the broker — run `python scripts/bootstrap_local.py` once more. A profile naming an unknown scope or `refunds:approve` is refused on purpose. |
 | 9.8's restore reports it failed | `docker-proxy` is running an older allowlist without `memory-init`. Recreate it (A5, after you update). |
 | `V-29` names records and layouts | memory-db and the vector store disagree. If 9.8 is armed, that is the finding; otherwise restore it in the Range, which re-runs `memory-init` to repair them. |
 | Everything is confusing | `python scripts/bootstrap_local.py --reset`. |
@@ -631,7 +681,8 @@ When something surprising happens and you want to know what actually occurred:
 ```
 README.md                 the article
 LAB.md                    this file
-compose.yaml              eight networks, sixteen services — three gated on `range`, five on `memory`
+compose.yaml              eight networks, eighteen services — three gated on `range`, five on `memory`,
+                          one on `delegation`, and one small init shared by `range` and `delegation`
 services/
   api/                    auth · policy · tools · repositories · audit
   worker/                 jobs · adapters · idempotency
@@ -639,15 +690,18 @@ services/
   range/                  The Range — the practice app; every challenge is under content/
   probe/                  the fixed list of requests the Range may ask for, and track 9's scenarios
   memory/                 the memory service and memory-init (track 9)
+  broker/                 the delegation broker: gateway and RFC 8693 exchange (track 1, 1.5 – 1.8)
   embeddings/             the pinned, offline embedding model
 database/
   migrations/             schema, roles, grants, RLS — owned by sp_migrator_role
   seeds/                  the two tenants and the injection corpus
   memory/                 memory-db's migrations, seeds and smoke tests — applied by memory-init
-policy/supportpilot/      authz.rego + limits.json
+policy/supportpilot/      authz.rego + limits.json + scopes.json (the scope each action needs)
 policy/tests/             the policy tests
-openapi/                  the registered action sets — paste the .json files into Onyx
-infrastructure/local/     Keycloak realm, Onyx overlay, agent instructions, Docker-socket proxy
+openapi/                  the registered action sets — paste the .json files into Onyx;
+                          profiles/ holds one per delegation-broker profile
+infrastructure/local/     Keycloak realm, Onyx overlay, agent instructions, Docker-socket proxy,
+                          broker profiles
 scripts/                  bootstrap, verify, the suites, the learning modules
 docs/
   architecture/           how it fits together, with diagrams

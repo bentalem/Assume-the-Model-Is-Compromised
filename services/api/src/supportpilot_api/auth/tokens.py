@@ -10,11 +10,17 @@ Trust rules that shape this module:
 * Role and organization claims in the token are a hint at most. Memberships are loaded from the
   database on every request, so a revoked membership takes effect immediately even while an issued
   token still carries the role (`TS1-10`).
+* Two issuers are trusted, each with its own rules, and a token is verified only against the issuer
+  it names (`IssuerRegistry`). Keycloak's tokens name a user and never carry `act`. The delegation
+  broker's tokens name a user *and* the agent acting for them, and always carry `act`. Every issuer
+  an API trusts is a key to it, which is why the second one is narrower than the first rather than
+  equal to it.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -35,10 +41,27 @@ ALLOWED_ALGORITHMS = frozenset({"RS256", "RS384", "RS512", "ES256", "ES384"})
 _JWKS_CACHE_SECONDS = 300
 _JWKS_MIN_REFETCH_SECONDS = 10
 
+# An agent name in `act.sub`: a registered profile name, never free text. Bounded so the chain can
+# be written to the audit trail and a log line as it is.
+_ACTOR_NAME = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+# Delegation hops a token may carry. The lab's longest chain is two.
+_MAX_ACTOR_DEPTH = 4
+
+# What a token says about `act`. Keycloak's must not carry it; the broker's must.
+ACTOR_FORBIDDEN = "forbidden"
+ACTOR_REQUIRED = "required"
+
 
 @dataclass(frozen=True)
 class VerifiedToken:
-    """The result of verification. Carries identity only — no authority."""
+    """The result of verification.
+
+    Carries identity, and for a delegated token a *limit* on authority — never authority itself.
+    `subject` is the user. `actor_chain` is empty for a user's own token; for a delegated one it is
+    the agents acting for that user, in delegation order: the first is the agent the user delegated
+    to, the last is the one making this call. `scopes` is what the token was narrowed to; the policy
+    reads it only when `actor_chain` is non-empty, and roles still come from the database.
+    """
 
     subject: str
     token_id: str | None
@@ -46,10 +69,20 @@ class VerifiedToken:
     expires_at: int | None
     authentication_level: str
     scopes: frozenset[str]
+    actor_chain: tuple[str, ...] = ()
 
     @property
     def is_mfa(self) -> bool:
         return self.authentication_level == "mfa"
+
+    @property
+    def is_delegated(self) -> bool:
+        return bool(self.actor_chain)
+
+    @property
+    def agent_id(self) -> str | None:
+        """The chain as the audit trail records it, or None for a user's own token."""
+        return " > ".join(self.actor_chain) if self.actor_chain else None
 
 
 class JwksCache:
@@ -110,11 +143,25 @@ class TokenVerifier:
         audience: str,
         jwks: JwksCache,
         leeway_seconds: int = 30,
+        allowed_algorithms: frozenset[str] = ALLOWED_ALGORITHMS,
+        actor: str = ACTOR_FORBIDDEN,
+        max_lifetime_seconds: int | None = None,
     ) -> None:
+        if not allowed_algorithms <= ALLOWED_ALGORITHMS:
+            raise ValueError("an issuer may only narrow the algorithm allowlist, never widen it")
+        if actor not in (ACTOR_FORBIDDEN, ACTOR_REQUIRED):
+            raise ValueError(f"unknown actor rule {actor!r}")
         self._issuer = issuer
         self._audience = audience
         self._jwks = jwks
         self._leeway = leeway_seconds
+        self._algorithms = allowed_algorithms
+        self._actor = actor
+        self._max_lifetime = max_lifetime_seconds
+
+    @property
+    def issuer(self) -> str:
+        return self._issuer
 
     def verify(self, raw_token: str) -> VerifiedToken:
         """Verify a bearer token or raise 401. Never returns a partially-checked result."""
@@ -127,7 +174,7 @@ class TokenVerifier:
             raise unauthenticated() from None
 
         algorithm = header.get("alg")
-        if algorithm not in ALLOWED_ALGORITHMS:
+        if algorithm not in self._algorithms:
             # Covers alg=none and any attempt to downgrade to a symmetric algorithm (`TS1-03`).
             logger.info("token_rejected", extra={"reason": "algorithm_not_allowed"})
             raise unauthenticated()
@@ -180,6 +227,25 @@ class TokenVerifier:
             logger.info("token_rejected", extra={"reason": "wrong_token_type"})
             raise unauthenticated()
 
+        # Who is acting. A user's own token names nobody else; a delegated token must name the
+        # agent, and a malformed `act` is a refusal rather than a token treated as the user's own.
+        if self._actor == ACTOR_FORBIDDEN:
+            if "act" in claims:
+                logger.info("token_rejected", extra={"reason": "unexpected_actor"})
+                raise unauthenticated()
+            actor_chain: tuple[str, ...] = ()
+        else:
+            actor_chain = _actor_chain(claims.get("act"))
+            if not actor_chain:
+                logger.info("token_rejected", extra={"reason": "actor_missing_or_malformed"})
+                raise unauthenticated()
+
+        # A short-lived issuer's tokens are refused if they claim a longer life than it may mint,
+        # whatever `exp` says: a token that outlives its task is authority left lying around.
+        if self._max_lifetime is not None and not _short_lived(claims, self._max_lifetime):
+            logger.info("token_rejected", extra={"reason": "lifetime_or_jti_invalid"})
+            raise unauthenticated()
+
         return VerifiedToken(
             subject=subject,
             token_id=claims.get("jti"),
@@ -187,7 +253,65 @@ class TokenVerifier:
             expires_at=claims.get("exp"),
             authentication_level=_authentication_level(claims),
             scopes=frozenset(str(claims.get("scope", "")).split()),
+            actor_chain=actor_chain,
         )
+
+
+class IssuerRegistry:
+    """Verify a token against the one issuer it names, and only that one.
+
+    The issuer is read from the unverified token before any key is fetched, and it chooses the
+    verifier — its key set, its algorithms, its rules about `act`. It decides nothing else: the
+    chosen verifier checks `iss` again against the signature it verifies, so a token that names one
+    issuer and is signed by the other fails there. An issuer that is not registered is refused on
+    the same path as every other refusal.
+    """
+
+    def __init__(self, verifiers: list[TokenVerifier]) -> None:
+        self._by_issuer = {verifier.issuer: verifier for verifier in verifiers}
+        if len(self._by_issuer) != len(verifiers):
+            raise ValueError("two verifiers registered for one issuer")
+
+    def verify(self, raw_token: str) -> VerifiedToken:
+        if not raw_token or raw_token.count(".") != 2:
+            raise unauthenticated()
+        try:
+            claims = jwt.get_unverified_claims(raw_token)
+        except JWTError:
+            raise unauthenticated() from None
+        issuer = claims.get("iss") if isinstance(claims, dict) else None
+        verifier = self._by_issuer.get(issuer) if isinstance(issuer, str) else None
+        if verifier is None:
+            logger.info("token_rejected", extra={"reason": "unknown_issuer"})
+            raise unauthenticated()
+        return verifier.verify(raw_token)
+
+
+def _short_lived(claims: dict[str, Any], max_lifetime: int) -> bool:
+    issued, expires = claims.get("iat"), claims.get("exp")
+    if not claims.get("jti") or not isinstance(issued, int) or not isinstance(expires, int):
+        return False
+    return 0 < expires - issued <= max_lifetime
+
+
+def _actor_chain(act: Any) -> tuple[str, ...]:
+    """Unwrap RFC 8693 `act`, which nests: the outermost is the agent acting now.
+
+    Returned in delegation order, innermost first, so the chain reads from the user outwards.
+    Anything malformed — not an object, a missing or free-text name, too deep — yields an empty
+    tuple, which the caller refuses.
+    """
+    names: list[str] = []
+    current = act
+    while current is not None:
+        if not isinstance(current, dict) or len(names) >= _MAX_ACTOR_DEPTH:
+            return ()
+        name = current.get("sub")
+        if not isinstance(name, str) or not _ACTOR_NAME.match(name):
+            return ()
+        names.append(name)
+        current = current.get("act")
+    return tuple(reversed(names))
 
 
 def _authentication_level(claims: dict[str, Any]) -> str:

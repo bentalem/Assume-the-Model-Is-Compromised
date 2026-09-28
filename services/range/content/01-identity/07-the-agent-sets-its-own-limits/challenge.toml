@@ -1,0 +1,99 @@
+id = "1.7-the-agent-sets-its-own-limits"
+track = 1
+number = "1.7"
+title = "The agent sets its own limits"
+points = 40
+
+summary = """
+Three limits make up a delegated permission, and three different parties set them. Let the agent \
+set the third one and it sets it to everything."""
+
+objective = """
+A compromised status-helper asks the broker for customers:read — a scope its profile does not \
+include. Run it with the broker enforcing the profile's ceiling, then arm the setting that bounds a \
+requested scope only by what the user may do, and run it again. Give the value the read reveals, \
+and say which of the three limits was still holding when the agent got its way."""
+
+skip_test = """
+who decides the scope of an agent's token, and what is left when the agent's own request is the \
+thing deciding it."""
+
+purpose = """
+You take the formula effective permission = user ∩ agent ceiling ∩ task apart one term at a time, \
+and watch what happens when the middle term stops being consulted. The skill is identifying, for \
+any delegation design, which party sets each term — a database, an administrator, trusted code — and \
+spotting the design where the agent's own request has quietly become one of them. You also see the \
+term that survives: the user's roles, from the database, still shaping the answer."""
+
+agent_link = """
+Auto-approving requested scopes is an ordinary consent-design shortcut. What an agent changes is who \
+is asking: a process steerable by text it read a moment ago. An injected agent requests everything \
+its user can reach, and a design that grants what is requested — bounded only by the user — turns \
+the narrowing into decoration. The agent may propose a scope; trusted services decide it."""
+
+hints = [
+  "Unarmed, the broker refuses. Which of the three limits refused it — the user's, the agent's, or the task's?",
+  "Armed, the broker mints customers:read. What still stops the agent from getting a customer's email?",
+  "In the formula user ∩ ceiling ∩ task, which term did the switch turn into 'whatever was asked for'?",
+]
+
+break_steps = [
+  "Run **The broker's three switches** and check `ceiling.user_only` reads `secure`.",
+  "Run **a compromised status-helper asks the broker for customers:read**. Note the status and the error code: which component answered?",
+  "Arm **Bound an agent's requested scope only by the user**. Run the switches again.",
+  "Run the request again. Read the token column, then **The last token the probe obtained**: what scope was minted?",
+  "Run **Who the audit trail says acted** and read the reason on the customer read. Which rule shaped the answer?",
+  "Submit the value the read reveals. Then restore the control — until you do, any agent gets any scope alice has, except approval.",
+]
+
+[[control]]
+mutation = "delegation.ceiling.user_only"
+label = "Bound an agent's requested scope only by the user"
+detail = "A real configuration: \"agent-requested scopes, auto-approved\". Approval stays never-delegable."
+
+[[observation]]
+observation = "delegation.settings"
+label = "The broker's three switches"
+detail = "As the broker reads them, on every request."
+
+[[observation]]
+observation = "delegation.status_helper.exchange_customers"
+label = "a compromised status-helper asks the broker for customers:read"
+detail = "It authenticates as status-helper and asks for more than its task. If it gets a token, it reads a customer with it."
+
+[[observation]]
+observation = "delegation.claims.last_minted"
+label = "The last token the probe obtained"
+detail = "Only present when the broker minted one."
+
+[[observation]]
+observation = "delegation.audit"
+label = "Who the audit trail says acted"
+detail = "Read the reason column on the customer read."
+
+[flag]
+kind = "value"
+label = "the value the read reveals once the agent's request sets its own scope"
+observation = "delegation.status_helper.exchange_customers"
+field = "revealed"
+
+[[source]]
+path = "services/broker/src/delegation_broker/exchange.py"
+lines = [91, 99]
+highlight = [93, 97]
+anchor = 'allowed = scopes.delegable if settings["ceiling.user_only"] else client.ceiling'
+caption = "Which set a requested scope must fit inside. Secure: the profile's ceiling. Armed: every scope there is"
+
+[[source]]
+path = "services/broker/src/delegation_broker/exchange.py"
+lines = [84, 89]
+highlight = [88, 89]
+anchor = "if requested & scopes.never_delegable:"
+caption = "The one limit no switch reaches: approval is never minted"
+
+[[source]]
+path = "services/broker/src/delegation_broker/trusted.py"
+lines = [86, 100]
+highlight = [90, 100]
+anchor = "forbidden = ceiling & scopes.never_delegable"
+caption = "Where a ceiling comes from: a reviewed file, checked when the broker starts"

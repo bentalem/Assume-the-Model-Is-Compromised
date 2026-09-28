@@ -415,3 +415,83 @@ SCENARIOS: dict[str, Scenario] = dict(
         ),
     ]
 )
+
+
+# ==================================================================================================
+# Track 1 · down-scoped delegation (1.5 - 1.8)
+#
+# The probe plays three parts here, each with a credential it holds the way that part would: the
+# agent platform calling through the broker's gateway, a compromised agent holding its own profile
+# credential and its own narrow token, and a sub-agent handed that token. It never builds a request
+# the real parts would not also be able to make.
+#
+# One departure from this file's rule about bodies, and it is bounded: each delegation probe may
+# name one field, `reveal`, whose value is returned when — and only when — the call succeeded. That
+# field is the challenge's flag, and the finding is precisely that the data was reached. One field of
+# one record, declared here, never chosen by a caller.
+# ==================================================================================================
+
+@dataclass(frozen=True)
+class Delegation:
+    id: str
+    summary: str
+    user: str
+    # "gateway": through the broker as `profile`. "direct": the user's own token, straight to the
+    # API — architecture C, the comparison row. "exchange": as `profile`, exchange the user's token
+    # for `scope`, then call the API with the result. "chain": `profile` exchanges for `scope`, then
+    # `sub_profile` re-exchanges that token for `sub_scope`, then calls the API with the result.
+    mode: str
+    path: str
+    intent: str
+    profile: str = ""
+    scope: str = ""
+    sub_profile: str = ""
+    sub_scope: str = ""
+    reveal: str = ""
+
+
+DELEGATIONS: dict[str, Delegation] = {
+    d.id: d
+    for d in (
+        Delegation(
+            "delegation.alice.status_helper.order",
+            "alice's status-helper reads ORD-2001 through the gateway",
+            "alice", "gateway", "/v1/orders/ORD-2001", profile="status-helper",
+            intent="The task status-helper exists for. The control group.",
+        ),
+        Delegation(
+            "delegation.alice.status_helper.customer",
+            "alice's status-helper reads CUS-4001 through the gateway",
+            "alice", "gateway", "/v1/customers/CUS-4001", profile="status-helper", reveal="email",
+            intent="What an injected status-helper would ask for. alice may read it; the agent may not.",
+        ),
+        Delegation(
+            "delegation.alice.direct.customer",
+            "the same read with alice's own token, straight to the API",
+            "alice", "direct", "/v1/customers/CUS-4001",
+            intent="Architecture C: the agent holds everything alice can do, whatever the task.",
+        ),
+        Delegation(
+            "delegation.status_helper.token_customer",
+            "a compromised status-helper uses its own orders:read token on a customer",
+            "alice", "exchange", "/v1/customers/CUS-4002", profile="status-helper",
+            scope="orders:read", reveal="email",
+            intent="The broker minted exactly what it should. The question is whether the API reads it.",
+        ),
+        Delegation(
+            "delegation.status_helper.exchange_customers",
+            "a compromised status-helper asks the broker for customers:read",
+            "alice", "exchange", "/v1/customers/CUS-4003", profile="status-helper",
+            scope="customers:read", reveal="full_name",
+            intent="The agent asks for more than its task. Who decides whether it gets it?",
+        ),
+        Delegation(
+            "delegation.subagent.reexchange_actions",
+            "status-helper hands its orders:read token to a sub-agent, which asks for actions:read",
+            "alice", "chain", "/v1/actions/fa110001-0000-0000-0000-000000000001",
+            profile="status-helper", scope="orders:read",
+            sub_profile="refund-assistant", sub_scope="actions:read", reveal="provider_reference",
+            intent="The sub-agent's own ceiling includes actions:read. The token it was handed does not.",
+        ),
+    )
+}

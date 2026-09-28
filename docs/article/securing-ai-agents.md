@@ -73,13 +73,14 @@ here came from removing something and being surprised by what still worked.
 
 This is the first question to ask about any agent, and it constrains everything that comes after it.
 When the agent calls a tool, something goes in the `Authorization` header. There are three
-possibilities.
+common possibilities, and a fourth worth reaching for.
 
 | Architecture | In the header | If the model is steered |
 |---|---|---|
 | **A** Service account | the agent's own credential | reaches the union of everyone's permissions |
 | **B** Service account plus claimed user | the agent's credential, user id as a parameter | the same — but it **looks** like per-user access control |
 | **C** Passthrough | the signed-in user's own token | reaches what that one user already had |
+| **D** Down-scoped delegation | a token naming the user **and** the agent, narrowed to the task | reaches only what the user, the agent and the task all allow |
 
 Architecture A is extremely common, and usually not from carelessness — it is the easy path, and
 sometimes the only one a platform supports. But notice the arithmetic: **one credential answering
@@ -89,6 +90,11 @@ version of it.
 B is the more dangerous one, because it looks safe. The tool takes a `user_id`, so logs show
 per-user access and reviews pass. But the model produces that parameter, and anything the model
 produces is attacker-influenced.
+
+D is C made narrower. The token still carries the user, names the agent acting for them, and holds
+only what this call needs, for minutes — so a steered agent reaches the intersection, and the audit
+trail can still tell the person from the agent. It is only as good as the service that reads the
+scope, and as the rule that decides it: the agent may ask for a scope; trusted code decides.
 
 > **Identity comes only from a verified token. If a tool argument contains `user_id`,
 > `organization_id`, `role` or `approved`, that field should not exist.**

@@ -37,7 +37,7 @@ import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 
-from .registry import ENUMERATIONS, PROBES, SCENARIOS, TAMPERED, WRONG_AUDIENCE
+from .registry import DELEGATIONS, ENUMERATIONS, PROBES, SCENARIOS, TAMPERED, WRONG_AUDIENCE
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -48,6 +48,8 @@ logger = logging.getLogger("supportpilot.probe")
 API_URL = os.environ.get("SUPPORTPILOT_API_URL", "http://api:8000")
 # Track 9. Reached only by the fixed scenarios in registry.SCENARIOS.
 MEMORY_URL = os.environ.get("SUPPORTPILOT_MEMORY_URL", "http://memory:8000")
+# Track 1, 1.5 - 1.8. Reached only by the fixed entries in registry.DELEGATIONS.
+BROKER_URL = os.environ.get("BROKER_URL", "http://broker:8097")
 KEYCLOAK = os.environ.get("KEYCLOAK_URL", "https://keycloak:8443")
 REALM = os.environ.get("KEYCLOAK_REALM", "supportpilot")
 CLIENT = os.environ.get("KEYCLOAK_CLIENT", "supportpilot-test-harness")
@@ -590,3 +592,169 @@ def run_scenario(scenario_id: str, request: Request,
 
     return JSONResponse({"scenario": scenario.id, "user": scenario.user,
                          "acts_as": scenario.acts_as, "intent": scenario.intent, "steps": steps})
+
+
+# --------------------------------------------------------------------------------------------------
+# Delegation, for track 1's second half (1.5 - 1.8).
+#
+# The probe holds each agent profile's credential, mounted the way an agent platform would hold it,
+# and plays the platform, a compromised agent, and a sub-agent. What it reports is the same thin
+# shape as every probe — status, error code — plus two things the lesson needs: how the token that
+# reached the API was made, and the one declared `reveal` field when the call succeeded.
+#
+# The claims of the last token the probe itself obtained are kept in memory for one observation to
+# read back: names and values of claims, never the token string. A process restart forgets them.
+# --------------------------------------------------------------------------------------------------
+
+_EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange"
+_TOKEN_TYPE_ACCESS = "urn:ietf:params:oauth:token-type:access_token"
+_last_minted: dict[str, str] = {}
+
+
+def _profile_secret(profile: str) -> str:
+    path = f"/run/secrets/broker_profile_{profile.replace('-', '_')}"
+    with open(path, encoding="utf-8") as handle:
+        return handle.read().strip()
+
+
+def _claims(token: str) -> dict:
+    """Decode a token's claims for display. Not verification: the API and the broker do that."""
+    try:
+        return json.loads(_b64url_decode(token.split(".")[1]))
+    except (ValueError, IndexError):
+        return {}
+
+
+def _lifetime(claims: dict) -> str:
+    try:
+        return str(int(claims.get("exp", 0)) - int(claims.get("iat", 0)))
+    except (TypeError, ValueError):
+        return ""
+
+
+def _exchange(profile: str, subject_token: str, scope: str) -> tuple[int, dict]:
+    response = httpx.post(
+        f"{BROKER_URL}/oauth/token",
+        data={"grant_type": _EXCHANGE_GRANT, "subject_token": subject_token,
+              "subject_token_type": _TOKEN_TYPE_ACCESS, "scope": scope},
+        auth=(profile, _profile_secret(profile)),
+        timeout=20,
+    )
+    try:
+        return response.status_code, response.json()
+    except json.JSONDecodeError:
+        return response.status_code, {}
+
+
+def _remember(via: str, claims: dict) -> None:
+    _last_minted.clear()
+    _last_minted.update({
+        "via": via,
+        "iss": str(claims.get("iss", "")),
+        "sub": str(claims.get("sub", "")),
+        "act": json.dumps(claims["act"], separators=(",", ":")) if "act" in claims else "(none)",
+        "aud": str(claims.get("aud", "")),
+        "scope": str(claims.get("scope", "")),
+        "expires_in": _lifetime(claims),
+    })
+
+
+def _describe(claims: dict) -> str:
+    act = claims.get("act") or {}
+    return f"minted: act={act.get('sub', '?')}; scope={claims.get('scope', '')}"
+
+
+@app.post("/delegation/{delegation_id}", include_in_schema=False)
+def run_delegation(delegation_id: str, request: Request,
+                   x_range_token: str = Header(default="")) -> JSONResponse:
+    if not secrets.compare_digest(x_range_token, _secret):
+        logger.warning("rejected delegation request with a bad token from %s", request.client)
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+    entry = DELEGATIONS.get(delegation_id)
+    if entry is None:
+        return JSONResponse({"error": "unknown_probe", "probe": delegation_id}, status_code=404)
+
+    row = {"probe": entry.id, "user": entry.user, "request": f"GET {entry.path}", "via": entry.mode,
+           "intent": entry.intent, "token": "", "status": 0, "error_code": "", "revealed": ""}
+    try:
+        user_token = _token_for(entry.user)
+        user_claims = _claims(user_token)
+        if entry.mode == "gateway":
+            response = httpx.get(f"{BROKER_URL}/{entry.profile}{entry.path}",
+                                 headers={"Authorization": f"Bearer {user_token}"}, timeout=30)
+            header = response.headers.get("x-delegation", "")
+            if header == "passthrough":
+                row["token"] = f"passthrough: the user's own token, no act"
+                _remember("gateway, passthrough", user_claims)
+            elif header.startswith("minted"):
+                parts = dict(p.strip().split("=", 1) for p in header.split(";")[1:] if "=" in p)
+                shown = {"iss": BROKER_URL, "sub": user_claims.get("sub", ""),
+                         "act": {"sub": parts.get("actor", "")}, "aud": "supportpilot-api",
+                         "scope": parts.get("scope", ""), "iat": 0,
+                         "exp": int(parts.get("expires_in", "0") or 0)}
+                row["token"] = _describe(shown)
+                _remember("gateway", shown)
+            else:
+                row["token"] = "none: refused by the broker before minting"
+        elif entry.mode == "direct":
+            response = httpx.get(f"{API_URL}{entry.path}",
+                                 headers={"Authorization": f"Bearer {user_token}"}, timeout=30)
+            row["token"] = "the user's own token, no act"
+        else:
+            code, body = _exchange(entry.profile, user_token, entry.scope)
+            if code != 200:
+                return _refused_exchange(row, code, body, f"{entry.profile} asked for {entry.scope}")
+            token = body["access_token"]
+            _remember(f"exchange as {entry.profile}", _claims(token))
+            if entry.mode == "chain":
+                code, body = _exchange(entry.sub_profile, token, entry.sub_scope)
+                if code != 200:
+                    return _refused_exchange(
+                        row, code, body, f"{entry.sub_profile} re-exchanged {entry.profile}'s "
+                        f"token for {entry.sub_scope}")
+                token = body["access_token"]
+                _remember(f"re-exchange as {entry.sub_profile}", _claims(token))
+            row["token"] = _describe(_claims(token))
+            response = httpx.get(f"{API_URL}{entry.path}",
+                                 headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    except Exception as exc:  # noqa: BLE001 — reported, never guessed at
+        logger.exception("delegation probe failed: %s", delegation_id)
+        return JSONResponse({**row, "error_code": f"failed: {type(exc).__name__}"}, status_code=502)
+
+    try:
+        body = response.json()
+    except json.JSONDecodeError:
+        body = {}
+    error = body.get("error", {}) if isinstance(body, dict) else {}
+    row["status"] = response.status_code
+    row["error_code"] = error.get("code", "") if isinstance(error, dict) else ""
+    if 200 <= response.status_code < 300 and entry.reveal and isinstance(body, dict):
+        value = body.get(entry.reveal)
+        row["revealed"] = "" if value is None else str(value)[:120]
+    return JSONResponse(row)
+
+
+def _refused_exchange(row: dict, code: int, body: dict, what: str) -> JSONResponse:
+    """The broker refused to mint. Nothing reached the API, and the row says so."""
+    return JSONResponse({**row, "status": code,
+                         "error_code": body.get("error_description") or body.get("error", ""),
+                         "token": f"none: the broker refused. {what}"})
+
+
+@app.get("/delegation-claims", include_in_schema=False)
+def last_minted(x_range_token: str = Header(default="")) -> JSONResponse:
+    if not secrets.compare_digest(x_range_token, _secret):
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+    return JSONResponse({"claims": dict(_last_minted)})
+
+
+@app.get("/delegation-health", include_in_schema=False)
+def broker_health(x_range_token: str = Header(default="")) -> JSONResponse:
+    """Whether the broker answers. The Range cannot reach it; the probe can."""
+    if not secrets.compare_digest(x_range_token, _secret):
+        return JSONResponse({"error": "unauthorised"}, status_code=401)
+    try:
+        running = httpx.get(f"{BROKER_URL}/healthz", timeout=5).status_code == 200
+    except httpx.HTTPError:
+        running = False
+    return JSONResponse({"broker": "running" if running else "not running"})

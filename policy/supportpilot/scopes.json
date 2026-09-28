@@ -1,0 +1,16 @@
+{
+  "scopes": {
+    "_comment": "The one table that says which delegated scope each API action needs (track 1, challenges 1.5-1.8). The policy reads it to decide whether a delegated token covers the action; the broker reads the same file, mounted read-only, to decide what to mint. Scope is decided here, in reviewed data, never by a tool argument or anything a model writes. An action missing from this table needs a scope nobody can hold, so a delegated request for it is refused.",
+    "actions": {
+      "order.read": "orders:read",
+      "customer.search": "customers:read",
+      "customer.read": "customers:read",
+      "ticket.read": "tickets:read",
+      "note.create": "notes:write",
+      "refund.propose": "refunds:propose",
+      "refund.approve": "refunds:approve",
+      "action.read": "actions:read"
+    },
+    "never_delegable": ["refunds:approve"]
+  }
+}

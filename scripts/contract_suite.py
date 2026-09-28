@@ -16,7 +16,11 @@ be expressed unambiguously by a client following the document, the call fails he
 somebody's chat window.
 
 The memory action document (`openapi/supportpilot-memory-actions.json`, track 9) is walked the same
-way when the memory profile is running, against the base URL that document declares. `remember` runs
+way when the memory profile is running, against the base URL that document declares. So is each
+delegation-broker profile's document (`openapi/profiles/`, track 1 1.5 - 1.8) when the broker is up:
+every call goes through the broker, which mints a token for it — and a refusal by the broker there
+is a failure, because a profile document offering an operation its ceiling refuses is a document
+that lies to the model about what it can do. `remember` runs
 first and its id feeds `forget`, so the suite removes the memory it wrote.
 
 Run: python scripts/contract_suite.py
@@ -35,6 +39,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DOCUMENT = REPO / "openapi" / "supportpilot-actions.json"
+PROFILE_DOCUMENTS = REPO / "openapi" / "profiles"
 MEMORY_DOCUMENT = REPO / "openapi" / "supportpilot-memory-actions.json"
 KEYCLOAK = "https://localhost:8443"
 REALM = "supportpilot"
@@ -223,7 +228,13 @@ def memory_running() -> bool:
     return "memory" in proc.stdout.split()
 
 
-def walk(document_path: Path, token: str) -> None:
+def broker_running() -> bool:
+    proc = subprocess.run(["docker", "compose", "ps", "--status", "running", "--services"],
+                          cwd=REPO, capture_output=True, text=True, timeout=60, encoding="utf-8")
+    return "broker" in proc.stdout.split()
+
+
+def walk(document_path: Path, token: str, through_broker: bool = False) -> None:
     document = json.loads(document_path.read_text(encoding="utf-8"))
     # The base URL is the one the document declares, as it is for any client that reads it.
     base = document.get("servers", [{}])[0].get("url", "http://api:8000")
@@ -262,6 +273,11 @@ def walk(document_path: Path, token: str) -> None:
             elif status == 0:
                 results.append((operation_id, "FAIL", response["body"][:120]))
                 print(f"  {operation_id:20} {RED}FAIL{RESET}  {response['body'][:80]}")
+            elif through_broker and status in (401, 403):
+                results.append((operation_id, "FAIL", f"the broker refused it: HTTP {status}"))
+                print(f"  {operation_id:20} {RED}FAIL{RESET}  HTTP {status} from the broker")
+                print(f"  {'':20}       {RED}the profile document offers an operation its ceiling "
+                      f"refuses{RESET}")
             else:
                 note = "" if operation_id not in WRITE_OPERATIONS else " (write: schema accepted)"
                 results.append((operation_id, "PASS", f"HTTP {status}{note}"))
@@ -284,6 +300,14 @@ def main() -> int:
     else:
         results.append(("memory document", "SKIP", "memory profile not running"))
         print(f"  {'memory document':20} {YELLOW}SKIP{RESET}  memory profile not running")
+    profiles = sorted(PROFILE_DOCUMENTS.glob("*.json")) if PROFILE_DOCUMENTS.is_dir() else []
+    if profiles and broker_running():
+        for document in profiles:
+            print(f"  {GREY}profile document: {document.stem}, through the broker{RESET}")
+            walk(document, alice, through_broker=True)
+    else:
+        results.append(("profile documents", "SKIP", "delegation profile not running"))
+        print(f"  {'profile documents':20} {YELLOW}SKIP{RESET}  delegation profile not running")
 
     print("-" * 78)
     passed = sum(1 for _, r, _ in results if r == "PASS")

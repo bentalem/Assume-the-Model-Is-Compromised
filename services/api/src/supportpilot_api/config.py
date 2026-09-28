@@ -61,6 +61,14 @@ class Settings:
 
     log_level: str = "INFO"
 
+    #: The delegation broker (track 1, 1.5 - 1.8): a second trusted issuer, narrower than the first.
+    #: Both or neither. Neither means the API trusts Keycloak alone, exactly as before the broker.
+    broker_issuer: str | None = None
+    broker_jwks_url: str | None = None
+    #: The longest life a broker token may claim. The broker mints 300 seconds at most; the API
+    #: holds it to that rather than trusting the claim.
+    broker_token_max_lifetime_seconds: int = 300
+
     @property
     def dsn(self) -> str:
         # application_name makes every connection identifiable in pg_stat_activity
@@ -80,6 +88,10 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    broker_issuer = os.environ.get("BROKER_ISSUER") or None
+    broker_jwks_url = os.environ.get("BROKER_JWKS_URL") or None
+    if (broker_issuer is None) != (broker_jwks_url is None):
+        raise ConfigError("BROKER_ISSUER and BROKER_JWKS_URL are set together or not at all")
     return Settings(
         environment=os.environ.get("SUPPORTPILOT_ENV", "local"),
         issuer=_require("KEYCLOAK_ISSUER"),
@@ -95,4 +107,6 @@ def load_settings() -> Settings:
         db_password=_read_secret_file("API_DATABASE_SECRET_FILE"),
         public_base_url=os.environ.get("SUPPORTPILOT_PUBLIC_BASE_URL", "http://api:8000"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
+        broker_issuer=broker_issuer,
+        broker_jwks_url=broker_jwks_url,
     )

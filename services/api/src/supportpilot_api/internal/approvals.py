@@ -177,6 +177,9 @@ def post_decision(
             organization_id=action["organization_id"],
             roles=auth.subject.roles_in(action["organization_id"]),
             policy_version=auth.decision.policy_version or "unknown",
+            # The policy refuses every delegated approval, so this is None in practice. Passed
+            # anyway: if that rule were ever lost, the row would still say an agent approved.
+            agent_id=auth.agent_id,
         )
     except SelfApprovalRefused:
         # The database trigger caught it. Policy should have refused first, so reaching here means

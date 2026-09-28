@@ -154,6 +154,7 @@ class ActionRepository:
         roles: list[str],
         policy_version: str | None,
         expiry: timedelta = DEFAULT_EXPIRY,
+        agent_id: str | None = None,
     ) -> ProposedAction:
         """Record a proposal and move it to PENDING_APPROVAL, with evidence, in one transaction.
 
@@ -195,6 +196,7 @@ class ActionRepository:
                 AuditEvent(
                     request_id=request_id,
                     actor_id=user_id,
+                    agent_id=agent_id,
                     organization_id=organization_id,
                     action=f"{action_type}.propose",
                     resource_type=resource_type,
@@ -265,6 +267,7 @@ class ActionRepository:
         organization_id: str,
         roles: list[str],
         policy_version: str,
+        agent_id: str | None = None,
     ) -> datetime:
         """Record an approval or rejection, and move the action, in one transaction.
 
@@ -312,6 +315,7 @@ class ActionRepository:
                 AuditEvent(
                     request_id=request_id,
                     actor_id=approver_id,
+                    agent_id=agent_id,
                     organization_id=organization_id,
                     action="refund.approve" if decision == "approved" else "refund.reject",
                     resource_type="action_request",

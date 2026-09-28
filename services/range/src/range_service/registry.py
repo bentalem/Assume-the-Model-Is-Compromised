@@ -30,7 +30,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import containers, db, memdb, memvectors, policy_bundle, probe, source
+from . import broker_settings, containers, db, memdb, memvectors, policy_bundle, probe, source
 
 logger = logging.getLogger("supportpilot.range.registry")
 
@@ -453,10 +453,16 @@ register_observation(
 # ==================================================================================================
 
 def _probe_payload() -> str:
-    rows = db.select("payload_binding")
+    """Armed exactly when the Range has changed a payload and not yet put it back (0032).
+
+    Read from the Range's own record of what it changed, never inferred from an amount. The earlier
+    probe called any newest pending refund that was not 45.00 armed, and reset then "restored" a
+    genuine proposal to 45.00 without its hash.
+    """
+    rows = db.select("payload_tamper_state")
     if not rows:
         return UNKNOWN
-    return CORRECT if rows[0]["matches_proposal"].startswith("yes") else ARMED
+    return ARMED if rows[0]["state"] == "armed" else CORRECT
 
 
 register_mutation(
@@ -953,7 +959,7 @@ register_observation(
             for name in (*policy_bundle.VARIANTS, *policy_bundle.BROKEN)
         ],
         columns=("variant", "state"),
-        row_cap=4,
+        row_cap=5,
         fields=("state",),
     )
 )
@@ -1480,5 +1486,143 @@ register_observation(
         run=lambda: memdb.select("outbox_state"),
         columns=("op", "pending", "oldest"),
         row_cap=4,
+    )
+)
+
+
+# ==================================================================================================
+# Track 1 · down-scoped delegation (1.5 - 1.8)
+#
+# Four controls, and the four ways architecture D is lost in practice:
+#
+#   1.5  delegation.broker.passthrough  the broker forwards the user's own token "so it just works"
+#   1.6  policy.scope_check.remove      the broker mints a perfectly narrow token; the API stops
+#                                       reading its scope
+#   1.7  delegation.ceiling.user_only   an agent's requested scope is bounded by the user rather than
+#                                       by the agent's ceiling: agent-requested scopes, auto-approved
+#   1.8  delegation.chain.widen         re-exchanging a delegated token recomputes scope from the new
+#                                       agent's ceiling, so the chain can grow
+#
+# Three are broker settings (broker_settings.py) and one is the policy family above, so each armed
+# state is a configuration a real deployment might ship or a real condition removed from the live
+# policy. Nothing here is a code path written to be wrong.
+#
+# The flags are real seeded values — two customer emails, a restricted customer's name, a provider
+# reference — that the delegation probes return only when their call succeeded. Unarmed, every one of
+# those calls is refused, by the broker or by the API, so the value is not in the result at all.
+# ==================================================================================================
+
+def _broker_switch(name: str, summary: str, armed_means: str, mutation_id: str) -> Mutation:
+    return Mutation(
+        id=mutation_id,
+        summary=summary,
+        apply=lambda: broker_settings.set_switch(name, True),
+        restore=lambda: broker_settings.set_switch(name, False),
+        probe=lambda: broker_settings.state(name),
+        touches=("broker_settings",),
+        armed_means=armed_means,
+    )
+
+
+register_mutation(_broker_switch(
+    "broker.passthrough",
+    "Make the broker forward the user's own token instead of minting one",
+    "The gateway still exists and still takes a profile in the path. It forwards alice's whole "
+    "token to the API, so the agent can do anything alice can, and the audit row names alice alone.",
+    "delegation.broker.passthrough",
+))
+
+register_mutation(
+    Mutation(
+        id="policy.scope_check.remove",
+        summary="Remove the scope check for delegated tokens from the live policy",
+        apply=lambda: _arm_permissive_policy("scope"),
+        restore=_restore_real_policy,
+        probe=lambda: policy_bundle.state("scope"),
+        touches=("supportpilot-opa",),
+        armed_means=(
+            "The broker is untouched and still mints an orders:read token. The policy no longer "
+            "asks whether the token's scope covers the action, so the API reads the scope and "
+            "ignores it."
+        ),
+    )
+)
+
+register_mutation(_broker_switch(
+    "ceiling.user_only",
+    "Let an agent obtain any scope the user could, whatever its profile allows",
+    "An agent that asks the broker for a scope gets it unless it is refunds:approve. The profile's "
+    "ceiling is still written down and no longer consulted; only the API's role check is left.",
+    "delegation.ceiling.user_only",
+))
+
+register_mutation(_broker_switch(
+    "chain.widen",
+    "Let a re-exchanged token take its scope from the new agent's ceiling",
+    "A sub-agent handed a narrow token can exchange it for anything its own profile allows. `act` "
+    "still nests, so the trail still shows the chain; the chain just grew on the way.",
+    "delegation.chain.widen",
+))
+
+_DELEGATION_COLUMNS = ("request", "token", "status", "error_code", "revealed", "intent")
+
+
+def _register_delegation(observation_id: str, summary: str) -> None:
+    register_observation(
+        Observation(
+            id=observation_id,
+            summary=summary,
+            run=lambda: probe.run_delegation(observation_id),
+            columns=_DELEGATION_COLUMNS,
+            row_cap=1,
+            fields=("revealed", "status", "error_code"),
+        )
+    )
+
+
+_register_delegation("delegation.alice.status_helper.order",
+                     "alice's status-helper reads her order through the broker: the control group")
+_register_delegation("delegation.alice.status_helper.customer",
+                     "alice's status-helper reads a customer through the broker")
+_register_delegation("delegation.alice.direct.customer",
+                     "the same customer read with alice's own token: architecture C")
+_register_delegation("delegation.status_helper.token_customer",
+                     "a compromised status-helper uses its own orders:read token on a customer")
+_register_delegation("delegation.status_helper.exchange_customers",
+                     "a compromised status-helper asks the broker for customers:read")
+_register_delegation("delegation.subagent.reexchange_actions",
+                     "a sub-agent re-exchanges status-helper's token for a scope it was not given")
+
+register_observation(
+    Observation(
+        id="delegation.claims.last_minted",
+        summary="The claims of the last token the probe obtained: names and values, never the token",
+        run=probe.last_minted,
+        columns=("claim", "value"),
+        row_cap=7,
+        fields=("value",),
+    )
+)
+
+register_observation(
+    Observation(
+        id="delegation.audit",
+        summary="The last decisions about orders, customers and actions, with the agent column",
+        run=lambda: db.select("delegated_decisions"),
+        columns=("at", "person", "agent", "action", "resource", "decision", "reason",
+                 "policy_version"),
+        row_cap=12,
+        fields=("agent", "reason"),
+    )
+)
+
+register_observation(
+    Observation(
+        id="delegation.settings",
+        summary="The broker's three switches, as the broker reads them",
+        run=broker_settings.rows,
+        columns=("switch", "value", "broker"),
+        row_cap=3,
+        fields=("value",),
     )
 )

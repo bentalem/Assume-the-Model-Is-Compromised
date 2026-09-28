@@ -60,6 +60,7 @@ class NoteRepository:
         roles: list[str],
         policy_version: str | None,
         resource_id: str,
+        agent_id: str | None = None,
     ) -> CreatedNote:
         """Create a note and its audit event in one transaction.
 
@@ -97,6 +98,7 @@ class NoteRepository:
                 AuditEvent(
                     request_id=request_id,
                     actor_id=user_id,
+                    agent_id=agent_id,
                     organization_id=organization_id,
                     action="note.create",
                     resource_type="ticket",

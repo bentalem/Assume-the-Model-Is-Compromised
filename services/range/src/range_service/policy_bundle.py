@@ -34,6 +34,10 @@ are not two ways of saying the same thing:
 
 That asymmetry is a property of this architecture rather than a scenario written for the lesson, and
 `range_suite.py` asserts both outcomes rather than repeating these two paragraphs.
+
+**A third variant, for challenge 1.6.** `scope` removes the condition that a delegated token's scope
+covers the action. The broker keeps minting a perfectly narrow token; the resource server stops
+reading it. Same family, same transform: one condition removed from one arm, and its deny arm with it.
 """
 
 from __future__ import annotations
@@ -91,10 +95,30 @@ _CONFLICT_RULE = (
 _REAL_PACKAGE = "package supportpilot.authz\n"
 _MOVED_PACKAGE = "package supportpilot.authz_moved\n"
 
-# variant -> (the condition removed from the allow arm, the deny arm that goes with it)
+# The scope condition, for challenge 1.6. Every allow in the policy is built by allow_with, and
+# allow_with allows a delegated request only while delegation_permits holds, so removing one line
+# here removes the scope check from every action at once: "the resource server stopped reading
+# the scope". The ceiling on approval is a separate condition and stays; 1.6 is about the scope.
+_SCOPE_ARM = (
+    "delegation_permits if {\n"
+    "\tinput.delegation\n"
+    "\tnot never_delegable\n"
+    "\tscope_granted\n"
+    "}"
+)
+_DENY_SCOPE = (
+    'delegation_denial := "scope_not_granted" if {\n'
+    "\tinput.delegation\n"
+    "\tnot never_delegable\n"
+    "\tnot scope_granted\n"
+    "}"
+)
+
+# variant -> (the arm edited, the condition removed from it, the deny arm that goes with it)
 VARIANTS = {
-    "tenant": ("\tin_tenant\n", _DENY_TENANT),
-    "role": ("\tany_role(read_roles)\n", _DENY_ROLE),
+    "tenant": (_ALLOW_ARM, "\tin_tenant\n", _DENY_TENANT),
+    "role": (_ALLOW_ARM, "\tany_role(read_roles)\n", _DENY_ROLE),
+    "scope": (_SCOPE_ARM, "\tscope_granted\n", _DENY_SCOPE),
 }
 
 
@@ -127,13 +151,14 @@ def permissive_text(variant: str) -> str:
         return _broken_text(variant)
     if variant not in VARIANTS:
         raise PolicyBundleError(f"unknown variant {variant!r}")
-    condition, deny_arm = VARIANTS[variant]
+    arm, condition, deny_arm = VARIANTS[variant]
     source = _source_text()
 
-    if _ALLOW_ARM not in source:
+    if arm not in source:
         raise PolicyBundleError(
-            "the order.read allow arm is not where this transform expects it; the policy has been "
-            "edited and this mutation must be updated rather than arming something else"
+            f"the arm the {variant} variant edits is not where this transform expects it; the "
+            "policy has been edited and this mutation must be updated rather than arming "
+            "something else"
         )
     # Checked against the arm itself, but removed together with the blank line that follows it.
     # Those are different strings: if the arm is ever followed by one newline instead of two, the
@@ -142,12 +167,12 @@ def permissive_text(variant: str) -> str:
     removable = deny_arm + "\n\n"
     if removable not in source:
         raise PolicyBundleError(
-            f"the {variant} deny arm for order.read is not where this transform expects it, or is "
+            f"the {variant} deny arm is not where this transform expects it, or is "
             "no longer followed by a blank line; the policy has been edited and this mutation must "
             "be updated rather than arming half of itself"
         )
 
-    out = source.replace(_ALLOW_ARM, _ALLOW_ARM.replace(condition, ""), 1)
+    out = source.replace(arm, arm.replace(condition, ""), 1)
     out = out.replace(removable, "", 1)
 
     if out == source:
@@ -167,7 +192,7 @@ def arm(variant: str) -> None:
     if variant in BROKEN:
         logger.warning("armed: OPA's bundle has been made %s and can no longer answer", variant)
     else:
-        logger.warning("armed: the %s check has been removed from order.read in OPA's bundle", variant)
+        logger.warning("armed: the %s check has been removed from OPA's bundle", variant)
 
 
 def restore() -> None:

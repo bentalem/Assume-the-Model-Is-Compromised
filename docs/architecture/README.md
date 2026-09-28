@@ -33,6 +33,11 @@ Track 9 adds a memory stack under a third profile, `memory` — five containers 
 beside the core rather than inside it. It is drawn separately [below](#the-memory-stack-track-9),
 because the core diagram does not change when it is running.
 
+Track 1's second half adds a **delegation broker** under a fourth profile, `delegation` — one service
+on `app`, and a second token issuer the API trusts. It is drawn separately too,
+[below](#delegation-architecture-d-track-1-15--18): Onyx keeps calling the API with the user's own
+token, and nothing in the core diagram changes.
+
 ```mermaid
 flowchart LR
     users(["support agent<br/>approver"])
@@ -178,6 +183,73 @@ would still return nothing — the lab's rule four, two layers, in a new store.
 
 memory-db is the source of truth; the vectors follow it through an outbox applied after commit.
 `supportpilot-memory-reconcile` compares the two and names every disagreement (`V-29`).
+
+---
+
+## Delegation: architecture D (track 1, 1.5 – 1.8)
+
+Passthrough (architecture C) gives an agent the user's whole token, whatever the task. The broker is
+architecture D: a token that names the user **and** the agent, and carries only what the call needs.
+
+```mermaid
+flowchart LR
+    onyx["Onyx<br/>(passthrough, unchanged)"]
+    agent["an agent registered<br/>with a profile document"]
+    broker["broker<br/>gateway · RFC 8693 exchange<br/>signing key"]
+    kc["Keycloak"]
+    api["SupportPilot API<br/>two trusted issuers"]
+    opa["OPA<br/>scope rule"]
+
+    onyx -->|"user's token"| api
+    agent -->|"user's token"| broker
+    broker -->|"verifies it against"| kc
+    broker -->|"minted: sub=user · act=agent<br/>scope=one operation · 60 s"| api
+    api -->|"fetches the broker's public key"| broker
+    api -->|"input.delegation"| opa
+
+    classDef box fill:#eef2f7,stroke:#5b7fa6,stroke-width:1.5px,color:#152028
+    class onyx,agent,broker,kc,api,opa box
+```
+
+### What decides what
+
+```
+effective permission  =  what the user may do  ∩  the agent's ceiling  ∩  what this task needs
+                          database (roles)         profiles.json            scopes.json, per operation
+```
+
+| Question | Answered by | Where |
+|---|---|---|
+| Is this a user's own token or a delegated one? | The issuer it names, chosen before any key is fetched. Keycloak's must not carry `act`; the broker's must, ES256 only, five minutes at most, with a `jti` | `auth/tokens.py` (`IssuerRegistry`), `V-33`, `V-34` |
+| What may the agent obtain? | The profile's ceiling, set by an administrator — never the agent's request | `services/broker/`, `infrastructure/local/broker/profiles.json`, `V-35` |
+| What does this operation need? | `policy/supportpilot/scopes.json`, read by the broker *and* by OPA, so they cannot disagree | the gateway; `scope_granted` in `authz.rego` |
+| Does the token cover the action? | The policy, at the resource server. A scope is a limit, never a grant: every allow passes through `allow_with`, which allows a delegated request only inside its scope. Deny arms are untouched, and roles still come from the database | `authz.rego`, `V-36` |
+| Can an agent approve? | Never. No profile may hold `refunds:approve`; the broker will not mint it; the policy answers `agent_cannot_approve` even to a token that carried it | `V-37` |
+| Who acted? | The human stays the actor; `agent_id` records the delegation chain beside them (migration `0030`) | `audit/writer.py`, `V-36` |
+
+### The privilege grants this adds
+
+A new issuer, a new tool route and a new outbound destination are privilege grants, so they are named
+as such:
+
+- **The API trusts a second issuer.** Every issuer an API trusts is a key to it, which is why the
+  broker's rules are narrower than Keycloak's rather than equal to them. Its signing key is mounted to
+  the broker alone (`V-32`).
+- **The broker verifies tokens for the API's audience.** It is the API's gateway, as gateways are. A
+  token for the API is therefore accepted by two services — acceptable only because the broker can
+  produce nothing wider than the token it was given.
+- **Two new action documents**, `openapi/profiles/<profile>.json`, derived from the main one and
+  offering only operations inside each ceiling (`V-38`). Registering one in Onyx is optional (LAB B10).
+- **The Range may write three broker switches**, on the `broker_settings` volume. The broker reads
+  them on every request; missing or malformed means every switch secure; and no switch can make it
+  mint a scope outside the table or `refunds:approve`.
+
+### What it must never do
+
+| Component | Must never |
+|---|---|
+| **broker** | Hold a database credential or a user password; mint `refunds:approve`; take a scope from a request body or a model argument; outlive the token it was given |
+| **The model** | Choose its own scope. The model proposes; trusted code decides |
 
 ---
 
@@ -435,7 +507,7 @@ when it stops working.
 
 | Suite | What it proves | How to run |
 |---|---|---|
-| `verify_local.py` | 31 environment checks, `V-01` to `V-31` — the Range's and the memory stack's skip when their profile is down | `python scripts/verify_local.py` |
+| `verify_local.py` | 38 environment checks, `V-01` to `V-38` — the Range's, the memory stack's and the broker's skip when their profile is down | `python scripts/verify_local.py` |
 | `abuse_suite.py` | injection and abuse cases, `TS7-nn` | `python scripts/abuse_suite.py` |
 | `action_suite.py` | approval and execution cases, `TS8-nn` | `python scripts/action_suite.py` |
 | `contract_suite.py` | every call built from the published tool documents | `python scripts/contract_suite.py` |
@@ -443,6 +515,7 @@ when it stops working.
 | API tests | token, policy client, pipeline, hashing, pagination | `pytest services/api` |
 | memory service | against its real stores: identity, write paths, both vector layouts, history, rules, context | `python scripts/memory_suite.py` |
 | memory unit tests | its audience, identity, the secret filter, rules, context assembly | `pytest services/memory` |
+| broker tests | the operation table against the action document, ceilings, minting, exchange and re-exchange, the gateway | `pytest services/broker` |
 
 `contract_suite.py` exists because of a real failure. One tool declared an array query parameter,
 Onyx serialised it one way, the API expected another, and a perfectly correct model request came back

@@ -131,3 +131,67 @@ def run_scenario(scenario_id: str) -> list[dict[str, Any]]:
         }
         for step in payload.get("steps", [])
     ]
+
+
+# --------------------------------------------------------------------------------------------------
+# Track 1, 1.5 - 1.8: delegation. The Range cannot reach the broker; the probe can, and it holds the
+# profile credentials an agent would. Same rule as every probe: a fixed id, a thin row.
+# --------------------------------------------------------------------------------------------------
+
+def _get(path: str, timeout: int = 15) -> dict[str, Any]:
+    request = urllib.request.Request(f"{PROBE_URL}{path}", headers={"X-Range-Token": _secret()})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def broker_running() -> bool:
+    """Whether the broker answers, asked of the probe. Not knowing is reported as not running."""
+    try:
+        return _get("/delegation-health").get("broker") == "running"
+    except Exception:  # noqa: BLE001
+        logger.warning("could not ask the probe whether the broker is running")
+        return False
+
+
+def run_delegation(delegation_id: str) -> list[dict[str, Any]]:
+    """Run one registered delegation probe and return its single row."""
+    request = urllib.request.Request(
+        f"{PROBE_URL}/delegation/{delegation_id}",
+        method="POST",
+        headers={"X-Range-Token": _secret()},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        try:
+            payload = json.load(exc)
+        except Exception:  # noqa: BLE001
+            payload = {"status": exc.code, "error_code": "probe_refused"}
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("delegation call failed: %s", delegation_id)
+        return [{"request": delegation_id, "token": "", "status": "-",
+                 "error_code": type(exc).__name__, "revealed": "",
+                 "intent": "the probe service could not be reached"}]
+    return [
+        {
+            "request": payload.get("request", delegation_id),
+            "token": payload.get("token", ""),
+            "status": str(payload.get("status", "")),
+            "error_code": payload.get("error_code") or "-",
+            "revealed": payload.get("revealed", ""),
+            "intent": payload.get("intent", ""),
+        }
+    ]
+
+
+def last_minted() -> list[dict[str, Any]]:
+    """The claims of the last token the probe obtained — names and values, never the token."""
+    try:
+        claims = _get("/delegation-claims").get("claims", {})
+    except Exception as exc:  # noqa: BLE001
+        return [{"claim": "-", "value": f"unreachable: {type(exc).__name__}"}]
+    if not claims:
+        return [{"claim": "-", "value": "no token obtained yet: run a delegation observation first"}]
+    order = ("via", "iss", "sub", "act", "aud", "scope", "expires_in")
+    return [{"claim": name, "value": claims.get(name, "")} for name in order]

@@ -192,6 +192,7 @@ def propose_refund(
             organization_id=auth.organization_id,
             roles=auth.subject.roles_in(auth.organization_id),
             policy_version=auth.decision.policy_version,
+            agent_id=auth.agent_id,
         )
     except ActionNotApprovable:
         raise business_rule() from None

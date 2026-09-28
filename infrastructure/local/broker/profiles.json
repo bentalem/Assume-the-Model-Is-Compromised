@@ -1,0 +1,15 @@
+{
+  "_comment": "Agent profiles for the delegation broker (track 1, 1.5 - 1.8). A profile is how an agent is registered: its name and its ceiling, set by an administrator and never by the model. Changing a ceiling is a privilege grant: review it as one, and update docs/architecture in the same change. The broker refuses to start if a ceiling names an unknown scope or refunds:approve. Each profile's credential is .secrets/broker_profile_<name with underscores>, mounted to the broker and the probe only.",
+  "profiles": [
+    {
+      "name": "status-helper",
+      "description": "Answers 'where is my order?'. Reads orders and nothing else.",
+      "ceiling": ["orders:read"]
+    },
+    {
+      "name": "refund-assistant",
+      "description": "Prepares a refund for a human to approve. Never approves one.",
+      "ceiling": ["orders:read", "refunds:propose", "actions:read"]
+    }
+  ]
+}

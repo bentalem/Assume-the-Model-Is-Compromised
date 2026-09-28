@@ -133,6 +133,7 @@ def add_internal_note(
             roles=auth.subject.roles_in(auth.organization_id),
             policy_version=auth.decision.policy_version,
             resource_id=ticket_number,
+            agent_id=auth.agent_id,
         )
     except StaleTicketError:
         raise conflict() from None

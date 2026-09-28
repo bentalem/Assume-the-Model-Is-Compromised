@@ -1,0 +1,102 @@
+id = "1.6-a-scope-nobody-checks"
+track = 1
+number = "1.6"
+title = "A scope nobody checks"
+points = 40
+
+summary = """
+The broker mints a perfectly narrow token. The token is right. The question is whether anything \
+reads it — and until this track was built, nothing in this API did."""
+
+objective = """
+A compromised status-helper holds a token it was legitimately given: alice's, narrowed to \
+orders:read. It uses that token directly against the API to read a customer. Run it with the policy \
+secure, then remove the scope condition from the live policy and run it again. Give the value the \
+read reveals once the scope is no longer checked, and name the component that was doing the \
+refusing."""
+
+skip_test = """
+where a token's scope is enforced, and why a correctly narrowed token proves nothing about a \
+resource server that never reads the scope."""
+
+purpose = """
+You separate two things a delegation design is often credited with at once: minting a narrow token, \
+and enforcing it. The broker behaves identically in both runs — same token, same claims, same five \
+minutes — and only the resource server changes. The skill is asking, of any scoped credential, which \
+component reads the scope and what happens when it does not, and recognising the mirror of 1.4: a \
+claim the API does not act on changes nothing, and a scope the API does not act on narrows nothing."""
+
+agent_link = """
+Checking a scope at the resource server is ordinary OAuth, and forgetting to is an ordinary bug. \
+What an agent changes is the gap between minting and use: the agent holds the token and chooses \
+every call it makes with it, so a gateway that narrows what it forwards does nothing about the \
+calls the agent makes directly. Only the service that holds the data sees every use of the token, \
+so only it can enforce the scope on all of them."""
+
+hints = [
+  "Unarmed, the read is refused. Which component refused it: the broker, or the API — and how can you tell from the audit trail?",
+  "Armed, run the last-token observation again. Did anything about the token change?",
+  "Before this track existed, the API parsed the token's scope into a field. What read that field?",
+]
+
+break_steps = [
+  "Run **Which policy the engine is loading** and check every variant reads `correct`.",
+  "Run **a compromised status-helper uses its orders:read token on a customer**. Note the token column and the status.",
+  "Run **The last token the probe obtained** and **Who the audit trail says acted**. Find the refusal and its reason.",
+  "Arm **Remove the scope check from the live policy**. Run the bundle observation again: `scope` should read `armed`.",
+  "Run the customer read again, then the last-token observation. Compare the token with the one before arming.",
+  "Read the new audit row: the decision, the reason, and the policy version it carries.",
+  "Submit the value the read reveals. Then restore the control — until you do, the API ignores every delegated token's scope.",
+]
+
+[[control]]
+mutation = "policy.scope_check.remove"
+label = "Remove the scope check from the live policy"
+detail = "Same transform family as 3.3: the real policy with one named condition removed. The broker is untouched."
+
+[[observation]]
+observation = "policy.bundle_state"
+label = "Which policy the engine is loading"
+detail = "Per way of changing it. `scope` is this challenge's."
+
+[[observation]]
+observation = "delegation.status_helper.token_customer"
+label = "a compromised status-helper uses its orders:read token on a customer"
+detail = "It exchanges alice's token for orders:read — exactly what its profile allows — then calls the API directly."
+
+[[observation]]
+observation = "delegation.claims.last_minted"
+label = "The last token the probe obtained"
+detail = "Run it after each attempt. Compare armed with unarmed."
+
+[[observation]]
+observation = "delegation.audit"
+label = "Who the audit trail says acted"
+detail = "The reason column says which rule refused, and the policy version says which rules."
+
+[flag]
+kind = "value"
+label = "the value the read reveals once the scope is no longer checked"
+observation = "delegation.status_helper.token_customer"
+field = "revealed"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [83, 120]
+highlight = [95, 109]
+anchor = "scope_granted if required_scope in input.delegation.scopes"
+caption = "The scope check, in the policy. The armed variant removes one line: scope_granted"
+
+[[source]]
+path = "policy/supportpilot/authz.rego"
+lines = [65, 74]
+highlight = [72, 74]
+anchor = "allow_with(_, _) := deny(delegation_denial) if not delegation_permits"
+caption = "Why one line is enough: every allow in the policy passes through allow_with"
+
+[[source]]
+path = "services/api/src/supportpilot_api/pipeline.py"
+lines = [75, 89]
+highlight = [83, 88]
+anchor = '"scopes": sorted(token.scopes),'
+caption = "Where the verified token's scope reaches the policy. Before this track, nothing sent it anywhere"

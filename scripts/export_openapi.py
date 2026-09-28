@@ -55,6 +55,16 @@ MEMORY_OUTPUT = REPO / "openapi" / "supportpilot-memory-actions.yaml"
 MEMORY_OUTPUT_JSON = REPO / "openapi" / "supportpilot-memory-actions.json"
 MEMORY_APPROVED_OPERATIONS = {"remember", "recall", "forget", "propose_rule"}
 
+# One action document per delegation-broker profile (track 1, 1.5 - 1.8). Each is the main document
+# cut down to the operations the profile's ceiling covers, pointed at the broker instead of the API.
+# Derived, never written by hand: from the audited main document, the policy's scope table, the
+# profiles file, and the broker's own operation table — whose test proves it matches this document.
+# So a profile document can only ever be a subset of what was reviewed above, never an addition.
+PROFILE_OUTPUT_DIR = REPO / "openapi" / "profiles"
+PROFILES_FILE = REPO / "infrastructure" / "local" / "broker" / "profiles.json"
+SCOPES_FILE = REPO / "policy" / "supportpilot" / "scopes.json"
+BROKER_URL = "http://broker:8097"
+
 # Names the server derives from verified identity. A parameter with one of these names would mean
 # the model could propose an identity (SP-PRD-001 section 6).
 FORBIDDEN_PARAMETER_NAMES = {
@@ -326,6 +336,86 @@ def to_yaml(spec: dict) -> str:
     return header + yaml.safe_dump(spec, sort_keys=False, width=100, allow_unicode=True)
 
 
+def _broker_operations() -> dict[str, str]:
+    """operationId -> policy action, from the broker's table rather than a third copy of it."""
+    sys.path.insert(0, str(REPO / "services" / "broker" / "src"))
+    try:
+        from delegation_broker.operations import OPERATIONS
+    finally:
+        sys.path.pop(0)
+    return {operation.operation_id: operation.action for operation in OPERATIONS}
+
+
+def profile_documents(spec: dict) -> dict[str, str]:
+    """Each profile's document, rendered. Raises if any operation cannot be placed."""
+    scopes = json.loads(SCOPES_FILE.read_text(encoding="utf-8"))["scopes"]["actions"]
+    profiles = json.loads(PROFILES_FILE.read_text(encoding="utf-8"))["profiles"]
+    actions = _broker_operations()
+    documents: dict[str, str] = {}
+    for profile in profiles:
+        name, ceiling = profile["name"], set(profile["ceiling"])
+        document = json.loads(json.dumps(spec))
+        for path in list(document.get("paths", {})):
+            for method in list(document["paths"][path]):
+                operation = document["paths"][path][method]
+                if not isinstance(operation, dict) or "operationId" not in operation:
+                    continue
+                action = actions.get(operation["operationId"])
+                if action is None:
+                    raise SystemExit(f"{operation['operationId']} is not in the broker's table")
+                if scopes.get(action) not in ceiling:
+                    del document["paths"][path][method]
+            if not document["paths"][path]:
+                del document["paths"][path]
+        document["servers"] = [{
+            "url": f"{BROKER_URL}/{name}",
+            "description": f"The delegation broker, as the {name} profile. Every call is made with a "
+                           f"token naming the user and {name}, narrowed to the call.",
+        }]
+        document.setdefault("info", {})["title"] = (
+            f"{document.get('info', {}).get('title', 'SupportPilot')} — {name}")
+        _prune_unreferenced_schemas(document)
+        documents[name] = to_json(document)
+    return documents
+
+
+def _prune_unreferenced_schemas(document: dict) -> None:
+    schemas = document.get("components", {}).get("schemas", {})
+    while True:
+        text = json.dumps({k: v for k, v in document.items() if k != "components"}) + json.dumps(
+            schemas)
+        unused = [n for n in schemas if f'"#/components/schemas/{n}"' not in text]
+        if not unused:
+            return
+        for name in unused:
+            schemas.pop(name)
+
+
+def check_profile_documents(spec: dict) -> int:
+    for name, expected in profile_documents(spec).items():
+        path = PROFILE_OUTPUT_DIR / f"{name}.json"
+        if not path.exists() or path.read_text(encoding="utf-8") != expected:
+            print(f"{path.relative_to(REPO)} is out of date with the action document or the profiles.")
+            return 1
+    stale = {p.stem for p in PROFILE_OUTPUT_DIR.glob("*.json")} - set(profile_documents(spec))
+    if stale:
+        print(f"profile documents for unregistered profiles: {sorted(stale)}")
+        return 1
+    print(f"OK: profile action documents match the profiles: {', '.join(sorted(profile_documents(spec)))}")
+    return 0
+
+
+def write_profile_documents(spec: dict) -> None:
+    PROFILE_OUTPUT_DIR.mkdir(exist_ok=True)
+    documents = profile_documents(spec)
+    for stale in PROFILE_OUTPUT_DIR.glob("*.json"):
+        if stale.stem not in documents:
+            stale.unlink()
+    for name, text in documents.items():
+        (PROFILE_OUTPUT_DIR / f"{name}.json").write_text(text, encoding="utf-8")
+        print(f"Wrote {(PROFILE_OUTPUT_DIR / f'{name}.json').relative_to(REPO)}")
+
+
 def main() -> int:
     check_only = "--check" in sys.argv
     spec = generate()
@@ -360,7 +450,7 @@ def main() -> int:
                 print("Regenerate it and review the diff before merging.")
                 return 1
         print(f"OK: action document matches the code. Operations: {', '.join(operations)}")
-        return check_memory_document()
+        return check_profile_documents(spec) or check_memory_document()
 
     OUTPUT.parent.mkdir(exist_ok=True)
     OUTPUT.write_text(rendered, encoding="utf-8")
@@ -368,6 +458,7 @@ def main() -> int:
     print(f"Wrote {OUTPUT.relative_to(REPO)}       (for review and diffs)")
     print(f"Wrote {OUTPUT_JSON.relative_to(REPO)}  (paste this into Onyx)")
     print(f"Registered operations: {', '.join(operations)}")
+    write_profile_documents(spec)
     return write_memory_document()
 
 

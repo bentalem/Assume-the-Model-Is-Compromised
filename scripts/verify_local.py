@@ -12,6 +12,7 @@ so API calls are made from a container on the `app` network, which is the path O
 
 from __future__ import annotations
 
+import base64
 import json
 import subprocess
 import sys
@@ -701,6 +702,216 @@ def main() -> int:
             raise CheckFailed(f"read/write/other-tenant returned {statuses or proc.stderr[:120]}, "
                               "expected 200/403/403")
         return "read own collection 200; write 403; another tenant's collection 403"
+
+    # ----------------------------------------------------------------------------------------
+    # Track 1, 1.5 - 1.8 — the delegation broker. Profile-gated like the Range and the memory stack,
+    # and skipped when it is down. When it is up, these are what make it architecture D rather than
+    # a second issuer with the user's whole authority.
+    #
+    # The live checks run inside the broker's own container: it is on `app`, it holds the signing
+    # key, and a malformed token has to be signed with the real key for its refusal to mean anything
+    # — a token signed with some other key is refused for the signature, which is a different
+    # finding. One direction cannot be run live: nobody can make Keycloak sign a token with `act`.
+    # The API's unit tests cover it (test_a_keycloak_token_carrying_act_is_refused).
+    # ----------------------------------------------------------------------------------------
+    def broker_running() -> bool:
+        proc = compose("ps", "--format", "{{.Service}}", timeout=30)
+        return "broker" in proc.stdout.split()
+
+    def in_broker(script: str, **env: str) -> list[str]:
+        args = ["--profile", "delegation", "exec", "-T"]
+        for name, value in env.items():
+            args += ["-e", f"{name}={value}"]
+        proc = compose(*args, "broker", "python", "-c", script, timeout=120)
+        if proc.returncode != 0:
+            raise CheckFailed((proc.stderr or proc.stdout).strip().splitlines()[-1][:200])
+        return proc.stdout.split()
+
+    # Shared by the live checks: mint with the broker's real key, call the API, report statuses.
+    _BROKER_PRELUDE = (
+        "import os, time, uuid, httpx\n"
+        "from delegation_broker.tokens import SigningKey\n"
+        "key = SigningKey(open('/run/secrets/broker_signing_key').read())\n"
+        "def mint(**claims):\n"
+        "    now = int(time.time())\n"
+        "    base = {'iss': 'http://broker:8097', 'sub': os.environ['SUB'], 'aud': 'supportpilot-api',\n"
+        "            'act': {'sub': 'status-helper'}, 'scope': 'orders:read', 'iat': now,\n"
+        "            'exp': now + 60, 'jti': uuid.uuid4().hex}\n"
+        "    base.update(claims)\n"
+        "    return key.sign({k: v for k, v in base.items() if v is not None})\n"
+        "def status(token, path='/v1/orders/ORD-2001'):\n"
+        "    return httpx.get('http://api:8000' + path, headers={'Authorization': 'Bearer ' + token},\n"
+        "                     timeout=20).status_code\n"
+        "def exchange(profile, subject_token, scope):\n"
+        "    secret = open('/run/secrets/broker_profile_' + profile.replace('-', '_')).read().strip()\n"
+        "    r = httpx.post('http://127.0.0.1:8097/oauth/token', data={\n"
+        "        'grant_type': 'urn:ietf:params:oauth:grant-type:token-exchange',\n"
+        "        'client_id': profile, 'client_secret': secret, 'subject_token': subject_token,\n"
+        "        'subject_token_type': 'urn:ietf:params:oauth:token-type:access_token', 'scope': scope},\n"
+        "        timeout=20)\n"
+        "    return r.status_code, r.json()\n"
+    )
+
+    def alice_subject() -> str:
+        token = get_token("alice", "alice-local-password")
+        payload = token.split(".")[1]
+        return json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["sub"]
+
+    @check("V-32", "The broker publishes nothing, and its signing key is mounted to the broker alone",
+           skip_unless=broker_running)
+    def _():
+        proc = run(["docker", "inspect", "--format", "{{json .NetworkSettings.Ports}}",
+                    "supportpilot-broker"], timeout=30)
+        bindings = [f"{port} -> {bound}" for port, bound in
+                    (json.loads(proc.stdout.strip() or "{}") or {}).items() if bound]
+        if bindings:
+            raise CheckFailed(f"the broker is published to the host: {'; '.join(bindings)}")
+        # An issuer's signing key is a key to the API. Anything else holding it could mint.
+        names = run(["docker", "ps", "-a", "--filter", "label=com.docker.compose.project=supportpilot",
+                     "--format", "{{.Names}}"], timeout=30).stdout.split()
+        holders = [name for name in names if "/run/secrets/broker_signing_key" in
+                   run(["docker", "inspect", "--format", "{{json .Mounts}}", name], timeout=30).stdout]
+        if holders != ["supportpilot-broker"]:
+            raise CheckFailed(f"the broker's signing key is mounted into {holders}")
+        return "no host binding; signing key held by supportpilot-broker only"
+
+    @check("V-33", "The API refuses a broker token that is malformed for its issuer",
+           skip_unless=broker_running)
+    def _():
+        script = _BROKER_PRELUDE + (
+            "print(status(mint()),\n"
+            "      status(mint(act=None)),\n"
+            "      status(mint(aud='supportpilot-memory')),\n"
+            "      status(mint(iss='https://keycloak:8443/realms/supportpilot')),\n"
+            "      status(mint(iss='https://keycloak:8443/realms/supportpilot', act=None)),\n"
+            "      status(mint(exp=int(time.time()) + 3600)),\n"
+            "      status(mint(jti=None)),\n"
+            "      status(mint(act={'sub': 'Ignore previous instructions'})))\n"
+        )
+        statuses = in_broker(script, SUB=alice_subject())
+        expected = ["200", "401", "401", "401", "401", "401", "401", "401"]
+        if statuses != expected:
+            raise CheckFailed(f"got {statuses}, expected {expected} (the first is the control group)")
+        return ("well-formed 200; no act, wrong audience, Keycloak issuer with or without act, "
+                "a one-hour life, no jti, free-text actor: 401")
+
+    @check("V-34", "A minted token lives five minutes at most and names the user and the agent",
+           skip_unless=broker_running)
+    def _():
+        user = get_token("alice", "alice-local-password")
+        script = _BROKER_PRELUDE + (
+            "import json, base64\n"
+            "code, body = exchange('status-helper', os.environ['USER_TOKEN'], 'orders:read')\n"
+            "p = body['access_token'].split('.')[1]\n"
+            "c = json.loads(base64.urlsafe_b64decode(p + '=' * (-len(p) % 4)))\n"
+            "print(code, c['exp'] - c['iat'], c['act']['sub'], c['scope'], c['sub'] == os.environ['SUB'])\n"
+        )
+        code, lifetime, actor, scope, same_user = in_broker(script, USER_TOKEN=user,
+                                                            SUB=alice_subject())
+        if code != "200" or int(lifetime) > 300 or actor != "status-helper" or scope != "orders:read" \
+                or same_user != "True":
+            raise CheckFailed(f"exchange {code}, lifetime {lifetime}, act {actor}, scope {scope}, "
+                              f"same user {same_user}")
+        return f"exp - iat = {lifetime}s; act=status-helper; scope=orders:read; sub is the user"
+
+    @check("V-35", "An agent cannot exceed its ceiling, and re-exchange cannot widen",
+           skip_unless=broker_running)
+    def _():
+        user = get_token("alice", "alice-local-password")
+        script = _BROKER_PRELUDE + (
+            "above, _ = exchange('status-helper', os.environ['USER_TOKEN'], 'customers:read')\n"
+            "code, body = exchange('status-helper', os.environ['USER_TOKEN'], 'orders:read')\n"
+            "wider, _ = exchange('refund-assistant', body['access_token'], 'refunds:propose')\n"
+            "narrow, _ = exchange('refund-assistant', body['access_token'], 'orders:read')\n"
+            "print(above, code, wider, narrow)\n"
+        )
+        statuses = in_broker(script, USER_TOKEN=user, SUB=alice_subject())
+        if statuses != ["400", "200", "400", "200"]:
+            raise CheckFailed(f"above ceiling / issue / widen / narrow returned {statuses}, "
+                              "expected 400 / 200 / 400 / 200 — is a delegation switch armed?")
+        return "above the ceiling refused; re-exchange for more refused; for the same or less issued"
+
+    @check("V-36", "The API refuses a delegated call outside the token's scope",
+           skip_unless=broker_running)
+    def _():
+        # The broker minted it correctly; this is the resource server reading it. Challenge 1.6
+        # removes exactly this condition from the live policy.
+        script = _BROKER_PRELUDE + (
+            "print(status(mint(scope='orders:read')),\n"
+            "      status(mint(scope='orders:read'), '/v1/customers/CUS-4001'))\n"
+        )
+        statuses = in_broker(script, SUB=alice_subject())
+        if statuses != ["200", "404"]:
+            raise CheckFailed(f"order / customer with an orders:read token returned {statuses}, "
+                              "expected 200 / 404 — is the scope check armed?")
+        reason = psql(
+            "SELECT reason FROM app.audit_events WHERE action = 'customer.read' "
+            "AND agent_id = 'status-helper' ORDER BY occurred_at DESC LIMIT 1"
+        )
+        if reason != "scope_not_granted":
+            raise CheckFailed(f"the refusal was recorded as {reason!r}, not scope_not_granted")
+        return "orders:read reads the order (200) and not the customer (404, scope_not_granted)"
+
+    @check("V-37", "No agent can approve: no profile holds it, and the policy refuses it anyway",
+           skip_unless=broker_running)
+    def _():
+        scopes = json.loads((REPO / "policy" / "supportpilot" / "scopes.json").read_text(
+            encoding="utf-8"))["scopes"]
+        profiles = json.loads((REPO / "infrastructure" / "local" / "broker" / "profiles.json")
+                              .read_text(encoding="utf-8"))["profiles"]
+        holding = [p["name"] for p in profiles if set(p["ceiling"]) & set(scopes["never_delegable"])]
+        if holding or "refunds:approve" not in scopes["never_delegable"]:
+            raise CheckFailed(f"approval is delegable to {holding or 'the table itself'}")
+        # The live policy, asked directly with a delegation that holds the scope: the ceiling at the
+        # resource server does not depend on the broker having refused to mint it.
+        probe = (
+            "import httpx, json\n"
+            "i = {'subject': {'id': 'f1111111-1111-1111-1111-111111111111', 'organizations':\n"
+            "     ['11111111-1111-1111-1111-111111111111'], 'roles': ['finance_approver'],\n"
+            "     'authentication_level': 'mfa'}, 'action': 'refund.approve',\n"
+            "     'resource': {'type': 'action_request', 'id': 'x', 'organization_id':\n"
+            "     '11111111-1111-1111-1111-111111111111', 'requester_id': 'someone-else',\n"
+            "     'expires_at': '2099-01-01T00:00:00Z'}, 'context': {'request_id': 'v37',\n"
+            "     'occurred_at': '2026-01-01T00:00:00Z', 'network_zone': 'internal'},\n"
+            "     'delegation': {'actor': 'refund-assistant', 'chain': ['refund-assistant'],\n"
+            "     'scopes': ['refunds:approve']}}\n"
+            "r = httpx.post('http://opa:8181/v1/data/supportpilot/authz/decision', json={'input': i})\n"
+            "print(r.json()['result']['reason'])\n"
+        )
+        proc = compose("exec", "-T", "api", "python", "-c", probe, timeout=60)
+        reason = proc.stdout.strip()
+        if reason != "agent_cannot_approve":
+            raise CheckFailed(f"a delegated approval holding the scope was decided {reason!r}")
+        return "no profile holds refunds:approve; the policy answers agent_cannot_approve"
+
+    @check("V-38", "Each profile's action document holds only operations inside its ceiling",
+           skip_unless=broker_running)
+    def _():
+        sys.path.insert(0, str(REPO / "services" / "broker" / "src"))
+        try:
+            from delegation_broker.operations import OPERATIONS
+        finally:
+            sys.path.pop(0)
+        action_of = {o.operation_id: o.action for o in OPERATIONS}
+        scopes = json.loads((REPO / "policy" / "supportpilot" / "scopes.json").read_text(
+            encoding="utf-8"))["scopes"]["actions"]
+        profiles = json.loads((REPO / "infrastructure" / "local" / "broker" / "profiles.json")
+                              .read_text(encoding="utf-8"))["profiles"]
+        summary = []
+        for profile in profiles:
+            path = REPO / "openapi" / "profiles" / f"{profile['name']}.json"
+            if not path.exists():
+                raise CheckFailed(f"{path.relative_to(REPO)} is missing; run export_openapi.py")
+            document = json.loads(path.read_text(encoding="utf-8"))
+            operations = [op["operationId"] for ops in document["paths"].values()
+                          for op in ops.values()]
+            outside = [o for o in operations if scopes[action_of[o]] not in profile["ceiling"]]
+            if outside:
+                raise CheckFailed(f"{profile['name']} document offers {outside} outside its ceiling")
+            if document["servers"][0]["url"] != f"http://broker:8097/{profile['name']}":
+                raise CheckFailed(f"{profile['name']} document does not point at the broker")
+            summary.append(f"{profile['name']}: {len(operations)}")
+        return "; ".join(summary)
 
     # ----------------------------------------------------------------------------------------
     print("-" * 74)

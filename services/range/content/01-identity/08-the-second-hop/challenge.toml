@@ -1,0 +1,102 @@
+id = "1.8-the-second-hop"
+track = 1
+number = "1.8"
+title = "The second hop"
+points = 40
+
+summary = """
+An agent hands its token to a sub-agent. Each hop is supposed to narrow. Recompute the scope at the \
+second hop from anything other than the token being handed on, and the chain grows instead."""
+
+objective = """
+status-helper holds alice's token narrowed to orders:read and hands it to a sub-agent, \
+refund-assistant, which re-exchanges it for actions:read — a scope in its own ceiling but not in the \
+token it was given. Run it with re-exchange narrowing, then arm the setting that recomputes a \
+re-exchanged scope from the new agent's ceiling, and run it again. Give the value the sub-agent \
+reaches, and read what the trail recorded about the chain."""
+
+skip_test = """
+what must be true of every hop in a delegation chain, and what a token that names only its last \
+holder would hide."""
+
+purpose = """
+You follow one token through two agents and check the rule that makes a chain safe: each hop may \
+keep or drop authority, never add it, and each hop is recorded. The skill is naming what a re-issued \
+token's scope is computed from — the token being presented, or something about the new holder — and \
+reading nested act to reconstruct who handed what to whom. You also apply 1.2's lesson one step \
+further along: a token accepted somewhere it was not meant for, and a token widened on the way, are \
+the same failure at different points in a chain."""
+
+agent_link = """
+Attenuation across delegation hops is established practice in capability systems and in Kerberos. \
+What agents change is how common the second hop has become: an orchestrator spawns sub-agents, a \
+sub-agent calls a tool that calls another service, and each wants a token. If the scope at each hop \
+is taken from the new holder rather than from what it was handed, the least-trusted link in the chain \
+decides how far the whole chain reaches."""
+
+hints = [
+  "Unarmed, the broker refuses the sub-agent. refund-assistant may hold actions:read — so what exactly was it refused?",
+  "Armed, read the act claim of the token that reached the API. How many agents does it name, and in what order?",
+  "Which of the two agents in the chain decided how much the second token could do?",
+]
+
+break_steps = [
+  "Run **The broker's three switches** and check `chain.widen` reads `secure`.",
+  "Run **a sub-agent re-exchanges status-helper's token for a scope it was not given**. Note the status and the error code.",
+  "Arm **Let a re-exchanged token take its scope from the new agent**. Run the switches again.",
+  "Run the request again, then **The last token the probe obtained**. Read the act claim: who acted, and on whose behalf?",
+  "Run **Who the audit trail says acted** and read the agent column on the action read.",
+  "Submit the value the sub-agent reached. Then restore the control — until you do, any re-exchange can grow to the new agent's ceiling.",
+]
+
+[[control]]
+mutation = "delegation.chain.widen"
+label = "Let a re-exchanged token take its scope from the new agent"
+detail = "A real configuration: re-exchange recomputes scope from the new holder. `act` still nests."
+
+[[observation]]
+observation = "delegation.settings"
+label = "The broker's three switches"
+detail = "As the broker reads them, on every request."
+
+[[observation]]
+observation = "delegation.subagent.reexchange_actions"
+label = "a sub-agent re-exchanges status-helper's token for a scope it was not given"
+detail = "status-helper obtains orders:read for alice; refund-assistant exchanges that token for actions:read, then reads a refund's status."
+
+[[observation]]
+observation = "delegation.claims.last_minted"
+label = "The last token the probe obtained"
+detail = "For a chain, the act claim nests. Read it from the outside in."
+
+[[observation]]
+observation = "delegation.audit"
+label = "Who the audit trail says acted"
+detail = "The agent column records the whole chain, in delegation order."
+
+[flag]
+kind = "value"
+label = "the value the sub-agent reaches once the chain can widen"
+observation = "delegation.subagent.reexchange_actions"
+field = "revealed"
+
+[[source]]
+path = "services/broker/src/delegation_broker/exchange.py"
+lines = [101, 110]
+highlight = [105, 109]
+anchor = 'allowed = client.ceiling if settings["chain.widen"] else delegated.scopes'
+caption = "A re-exchange: secure, the new token fits inside the one presented; armed, inside the new agent's ceiling. act nests either way"
+
+[[source]]
+path = "services/broker/src/delegation_broker/tokens.py"
+lines = [103, 121]
+highlight = [115, 119]
+anchor = "# A re-exchanged token may not outlive the one it was made from."
+caption = "The chain narrows in time as well as in scope"
+
+[[source]]
+path = "services/api/src/supportpilot_api/auth/tokens.py"
+lines = [297, 314]
+highlight = [304, 314]
+anchor = "return tuple(reversed(names))"
+caption = "How the API reads nested act into the chain the audit trail records — and refuses one it cannot read"

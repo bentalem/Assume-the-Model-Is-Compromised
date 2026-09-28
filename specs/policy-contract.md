@@ -48,6 +48,13 @@ this input may originate from a model argument.**
 | `action` | Server route → action mapping | Anything the caller sends |
 | `resource.*` | Database lookup performed **before** the policy call | The request payload |
 | `context.*` | Server clock and infrastructure | Client headers |
+| `delegation` | Present **only** for a token minted by the delegation broker: `actor` (the agent acting now), `chain` (every agent, in delegation order), `scopes` (the token's scope). Built by the API from the verified token | The request, a model argument, or a Keycloak token (which may not carry `act`) |
+
+`delegation` is a limit, never a grant. Every allow is built by `allow_with`, which allows a
+delegated request only when the scope the action needs (`policy/supportpilot/scopes.json`) is in
+`delegation.scopes` and the action is not in `never_delegable`. Deny arms are untouched by it, so a
+delegated request refused by tenant or role is refused for that reason. Absent, the policy decides
+exactly as it did before delegation existed (track 1, 1.5 – 1.8).
 
 `resource.requester_id` is populated for approval actions so the policy can enforce separation of
 duty without a second lookup.
@@ -59,7 +66,7 @@ duty without a second lookup.
   "result": {
     "allow": true,
     "reason": "same_organization_and_allowed_role",
-    "policy_version": "2026-09-07.1",
+    "policy_version": "2026-09-28.1",
     "obligations": {
       "allowed_fields": ["order_number", "status", "currency", "total_amount"],
       "max_results": 20
@@ -108,6 +115,8 @@ Stable. Renaming one is a control-plane change — dashboards and alerts key on 
 | `approval_expired` | no | Decision attempted after expiry |
 | `authentication_level_insufficient` | no | MFA required for this action |
 | `membership_inactive` | no | Membership revoked since the token was issued |
+| `scope_not_granted` | no | A delegated token's scope does not cover the action |
+| `agent_cannot_approve` | no | A delegated request for an action that may never be delegated (`refund.approve`) |
 
 ## Rules
 
@@ -116,7 +125,7 @@ package supportpilot.authz
 
 import rego.v1
 
-policy_version := "2026-09-07.1"
+policy_version := "2026-09-28.1"
 
 default decision := {
   "allow": false,

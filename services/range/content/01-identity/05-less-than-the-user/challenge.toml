@@ -1,0 +1,113 @@
+id = "1.5-less-than-the-user"
+track = 1
+number = "1.5"
+title = "Less than the user"
+points = 40
+
+summary = """
+Passthrough gives the agent everything the user can do, whatever the task. There is a fourth \
+architecture: a token that names the user and the agent, and carries only what this call needs."""
+
+objective = """
+Send the same three requests with the delegation broker secure: an order read through status-helper, \
+a customer read through status-helper, and the customer read with alice's own token. Then arm \
+passthrough — the broker forwarding alice's token "so it just works" — and send them again. Give \
+the value the customer read through status-helper reaches once the broker stops narrowing, and say \
+what the audit trail lost."""
+
+skip_test = """
+what an agent's token should contain besides the user, and what disappears from the audit trail \
+when the agent simply carries the user's own token."""
+
+purpose = """
+You compare three calls for the same user — through an agent that holds a token narrowed to one \
+scope, through the same agent holding the user's whole token, and with the user's own token \
+directly — and read both the answers and the audit rows. Two skills come out of it: telling \
+delegation (the token names who acted) from down-scoping (the token carries only what the task \
+needs), and reading an audit row for the second party it should name. A row that says only "alice" \
+cannot tell you whether alice or her agent did it."""
+
+agent_link = """
+Narrowing a token is ordinary identity and access management; nothing here is new to agents. What \
+an agent changes is who holds the token: a process that reads text an attacker wrote and decides \
+its next call from it. Under passthrough a successful injection inherits everything the user can \
+do, for as long as the token lives. A down-scoped token bounds that to the task, and a token that \
+names the agent keeps the trail able to say which of the two acted."""
+
+hints = [
+  "Unarmed, the customer read through status-helper is refused. Which component refused it, and did the request ever reach the API?",
+  "Armed, the same request succeeds. What is different about the token the API received — and what is the same?",
+  "Compare the audit rows for the passthrough read and for alice's own direct read. Could anyone tell them apart afterwards?",
+]
+
+break_steps = [
+  "Run **The broker's three switches** and check every switch reads `secure` and the broker `running`.",
+  "Run **status-helper reads alice's order through the broker**. Note the token column: what was minted, and for which scope.",
+  "Run **status-helper reads a customer through the broker**. Note the status, the error code, and that nothing is revealed.",
+  "Run **alice reads the same customer with her own token**: architecture C, for comparison. Then run **The last token the probe obtained**.",
+  "Arm **Make the broker forward alice's own token**. Run the customer read through status-helper again and read the token column.",
+  "Run **Who the audit trail says acted** and compare the agent column for the passthrough read with the minted order read.",
+  "Submit the value the customer read now reveals. Then restore the control — until you do, every call through the broker carries alice's whole token.",
+]
+
+[[control]]
+mutation = "delegation.broker.passthrough"
+label = "Make the broker forward alice's own token"
+detail = "A real configuration: \"so it just works\". The gateway still takes a profile; it no longer narrows anything."
+
+[[observation]]
+observation = "delegation.settings"
+label = "The broker's three switches"
+detail = "As the broker reads them, on every request. Needs the delegation profile running."
+
+[[observation]]
+observation = "delegation.alice.status_helper.order"
+label = "status-helper reads alice's order through the broker"
+detail = "The task status-helper is registered for. The control group."
+
+[[observation]]
+observation = "delegation.alice.status_helper.customer"
+label = "status-helper reads a customer through the broker"
+detail = "What an injected status-helper would try. alice may read this customer; status-helper may not."
+
+[[observation]]
+observation = "delegation.alice.direct.customer"
+label = "alice reads the same customer with her own token"
+detail = "Architecture C: the agent holds alice's token, so it can do anything alice can."
+
+[[observation]]
+observation = "delegation.claims.last_minted"
+label = "The last token the probe obtained"
+detail = "Claim names and values — never the token itself."
+
+[[observation]]
+observation = "delegation.audit"
+label = "Who the audit trail says acted"
+detail = "The last decisions about orders, customers and actions. Read the agent column."
+
+[flag]
+kind = "value"
+label = "the value the customer read through status-helper reveals once the broker stops narrowing"
+observation = "delegation.alice.status_helper.customer"
+field = "revealed"
+
+[[source]]
+path = "services/broker/src/delegation_broker/main.py"
+lines = [197, 217]
+highlight = [205, 214]
+anchor = "needed = broker.scopes.for_action(operation.action)"
+caption = "The gateway, secure: the scope comes from the operation, the ceiling from the profile, and the token is minted for that one scope"
+
+[[source]]
+path = "services/broker/src/delegation_broker/main.py"
+lines = [197, 203]
+highlight = [198, 201]
+anchor = 'forward_token, delegation = user_token.strip(), "passthrough"'
+caption = "The same gateway, armed: one branch, and the agent disappears"
+
+[[source]]
+path = "database/migrations/0030_audit_agent.sql"
+lines = [1, 33]
+highlight = [30, 32]
+anchor = "ADD COLUMN agent_id text"
+caption = "The column that keeps the agent in the trail. Passthrough leaves it empty"

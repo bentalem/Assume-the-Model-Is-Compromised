@@ -1,7 +1,7 @@
 > **This repository is also a lab.** The system described below runs on one machine — Onyx, Keycloak,
 > a policy engine, PostgreSQL with row-level security, a worker — and every control in it can be
 > removed so you can watch what fails. Install it with **[LAB.md](LAB.md)**, then practise in
-> **The Range**, the browser app that ships with it: 39 challenges in nine tracks — eight that follow
+> **The Range**, the browser app that ships with it: 43 challenges in nine tracks — eight that follow
 > this article, and a ninth on agent memory that goes past it — each one breaking a real control and
 > putting it back. No terminal needed.
 
@@ -80,13 +80,14 @@ here came from removing something and being surprised by what still worked.
 
 This is the first question to ask about any agent, and it constrains everything that comes after it.
 When the agent calls a tool, something goes in the `Authorization` header. There are three
-possibilities.
+common possibilities, and a fourth worth reaching for.
 
 | Architecture | In the header | If the model is steered |
 |---|---|---|
 | **A** Service account | the agent's own credential | reaches the union of everyone's permissions |
 | **B** Service account plus claimed user | the agent's credential, user id as a parameter | the same — but it **looks** like per-user access control |
 | **C** Passthrough | the signed-in user's own token | reaches what that one user already had |
+| **D** Down-scoped delegation | a token naming the user **and** the agent, narrowed to the task | reaches only what the user, the agent and the task all allow |
 
 Architecture A is extremely common, and usually not from carelessness — it is the easy path, and
 sometimes the only one a platform supports. But notice the arithmetic: **one credential answering
@@ -96,6 +97,11 @@ version of it.
 B is the more dangerous one, because it looks safe. The tool takes a `user_id`, so logs show
 per-user access and reviews pass. But the model produces that parameter, and anything the model
 produces is attacker-influenced.
+
+D is C made narrower. The token still carries the user, names the agent acting for them, and holds
+only what this call needs, for minutes — so a steered agent reaches the intersection, and the audit
+trail can still tell the person from the agent. It is only as good as the service that reads the
+scope, and as the rule that decides it: the agent may ask for a scope; trusted code decides.
 
 > **Identity comes only from a verified token. If a tool argument contains `user_id`,
 > `organization_id`, `role` or `approved`, that field should not exist.**
@@ -643,13 +649,13 @@ time.*
 **[LAB.md](LAB.md)** — install the system this article was tested against, prove it is correct, and
 start The Range.
 
-**The Range** — 39 challenges in nine tracks, in your browser at `http://127.0.0.1:8095` once the
+**The Range** — 43 challenges in nine tracks, in your browser at `http://127.0.0.1:8095` once the
 lab is up. Each one explains a control, lets you break it in the running system, and then shows you
 the lab's own source for why it behaved the way it did. Where each part of this article lives there:
 
 | In this article | In the Range |
 |---|---|
-| 01 · Whose identity does the tool call carry? | Track 1 · Identity — start with **1.1** *Whose token is it* |
+| 01 · Whose identity does the tool call carry? | Track 1 · Identity — start with **1.1** *Whose token is it*; architecture D is **1.5** *Less than the user* to **1.8** *The second hop* |
 | 02 · Where does authorization actually happen? | Track 3 · Authorization — **3.1** *Deny by default, proved*, **3.2** *Yes, and only these fields* |
 | 03 · What do your tools actually allow? | Track 4 · Tool authority — **4.1** *The worst legal call*; the opening extraction is **4.3** *Inside every limit* |
 | 04 · What happens when untrusted content reaches the model? | Track 5 · Untrusted content — **5.1** direct, **5.2** indirect, **5.3** second order |

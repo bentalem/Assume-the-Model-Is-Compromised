@@ -45,6 +45,8 @@ not promised here.
 | Track 9: reach into memory-db is a fixed function list | `mem_range_role` owns nothing; `EXECUTE` on `range_mem.*` only | memory-db `permissions_smoke.sql`, `V-23` |
 | Track 9: reads the vector store, never writes it | a read-only token per collection; no API key | `V-28` |
 | Track 9: cannot reach the memory service or the model | `range_memory` only — never `memory_data` | `V-27` |
+| Track 1 (1.5 – 1.8): three broker switches, nothing more | the `broker_settings` volume, read-write to the Range, read-only to the broker; the broker never mints a scope outside the table or `refunds:approve`, whatever the file says | `pytest services/broker` (`test_trusted.py`), `V-35`, `V-37` |
+| Track 1 (1.5 – 1.8): cannot reach the broker | not on `app`; asks the probe whether the broker is running | `V-17` (the Range is not on `app`) |
 | Every action is evidence | writes `app.audit_events` as `actor_type='range'` | `scripts/range_suite.py` |
 
 Two of these were not obvious and are worth stating plainly.
@@ -173,7 +175,7 @@ button. Migration `0013` fixed the policy rather than the test.
 |---|---|
 | `python scripts/range_suite.py` | round trip for **every registered mutation**, read from the service's own `/registry`; probe honesty against the catalogue; reset from an arbitrary armed set; flag unobtainable unarmed; refusal of undeclared ids; and the state the suite leaves behind |
 | `python services/range/tests/test_content.py` | manifest validation, source references resolving, the local-only refusal |
-| `python scripts/verify_local.py` | `V-17`–`V-21`, the Range's boundaries, and `V-22`–`V-31` for the memory stack, each skipped with a count when its profile is not running |
+| `python scripts/verify_local.py` | `V-17`–`V-21`, the Range's boundaries, `V-22`–`V-31` for the memory stack, and `V-32`–`V-38` for the delegation broker, each skipped with a count when its profile is not running |
 
 `range_suite.py` drives the service over HTTP rather than calling the registry in process. A registry
 that works behind a console that cannot reach it is still a broken product.
@@ -251,7 +253,7 @@ proves the flag is unobtainable with either one alone.
 
 ### Absent is a state
 
-The memory stack is a compose profile. When it is not running, memory-db cannot be reached and its
+The memory stack is a compose profile (and so is the delegation broker; see its section below). When it is not running, memory-db cannot be reached and its
 eight controls read **`absent`** — never `correct`, and not `unknown` either, because the Range knows
 exactly why it cannot read them. The banner leaves them out of its count and says how many; reset
 skips them, because there is nothing running to restore; `range_suite.py` skips track 9 and says so.
@@ -263,6 +265,35 @@ shared one — so that arming 9.6 needs no re-indexing. A real deployment would 
 lab artifact, and it is the reason 9.6's observation reads the layout the setting selects rather than
 whatever happens to exist: the shared collection is always populated, and what 9.6 measures is what
 the service's query reaches when that is the layout it uses.
+
+---
+
+## Track 1, 1.5 – 1.8: the delegation broker
+
+Four controls, and each is either a broker setting or a condition removed from the live policy — the
+same two kinds of arming the rest of the Range uses:
+
+| Control | How it is armed | What it means |
+|---|---|---|
+| `delegation.broker.passthrough` | `broker_settings` volume | the gateway forwards the user's own token |
+| `policy.scope_check.remove` | `policy_bundle` variant `scope`, OPA restarted | the policy stops reading a delegated token's scope |
+| `delegation.ceiling.user_only` | `broker_settings` volume | a requested scope is bounded by the user, not the profile |
+| `delegation.chain.widen` | `broker_settings` volume | a re-exchange takes its scope from the new agent |
+
+**The settings file is written atomically** — a temporary file renamed over the real one — because
+the broker reads it on every request and would treat half a file as malformed. That would be safe
+(malformed means every switch secure), but a probe reading `armed` while the broker enforced `secure`
+is the one thing the Range must never report.
+
+**Armed is reported whatever the broker's state; secure is `absent` while it is down.** The file is the
+configuration, and a broker that starts later enforces it — so reset restores an armed switch even
+with the profile down, rather than leaving it to surprise whoever brings it up next. The Range cannot
+reach the broker; it asks the probe, which can.
+
+**The probe plays the agents.** It holds each profile's credential, mounted the way an agent platform
+would hold it, and makes fixed calls: through the gateway, straight to the API, by exchange, and by
+re-exchange. Each may declare one field, `reveal`, returned only when its call succeeded — that field
+is the challenge's flag, and the finding is precisely that the data was reached.
 
 ---
 

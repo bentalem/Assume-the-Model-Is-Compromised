@@ -63,6 +63,9 @@ volumes:
   # repopulated from ./policy/supportpilot on every `compose up` by opa-bundle-init, so editing the
   # policy in the repository still works the way it always did.
   opa_bundle:
+  # The delegation broker's lab switches (track 1, 1.5 - 1.8): read-only to the broker, read-write to
+  # the Range, the same shape as opa_bundle. Empty means every switch at its secure value.
+  broker_settings:
 
 services:
   # --------------------------------------------------------------------------------------------
@@ -302,6 +305,12 @@ services:
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://keycloak:8443/realms/supportpilot}
       KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-https://keycloak:8443/realms/supportpilot/protocol/openid-connect/certs}
       SUPPORTPILOT_AUDIENCE: ${SUPPORTPILOT_AUDIENCE:-supportpilot-api}
+      # The second trusted issuer: the delegation broker (profile `delegation`, track 1 1.5 - 1.8).
+      # Its tokens must carry `act`, ES256 only, five minutes at most. With the profile down the key
+      # set cannot be fetched and every broker token is refused; Keycloak tokens are unaffected.
+      # Trusting an issuer is a privilege grant — docs/architecture/README.md records this one.
+      BROKER_ISSUER: http://broker:8097
+      BROKER_JWKS_URL: http://broker:8097/.well-known/jwks.json
       TOKEN_LEEWAY_SECONDS: ${TOKEN_LEEWAY_SECONDS:-30}
       OPA_URL: ${OPA_URL:-http://opa:8181/v1/data/supportpilot/authz/decision}
       OPA_TIMEOUT_MS: ${OPA_TIMEOUT_MS:-250}
@@ -422,6 +431,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      broker-settings-init:
+        condition: service_completed_successfully
     environment:
       SUPPORTPILOT_ENV: local
       DATABASE_HOST: postgres
@@ -471,6 +482,11 @@ services:
       # And it is a volume, so a container that dies mid-challenge cannot leave a permissive policy
       # in the working tree — `compose up` repopulates it from the repository.
       - opa_bundle:/opa-bundle
+      # The delegation broker's switches, read-write, for challenges 1.5, 1.7 and 1.8. Three
+      # booleans the broker reads on every request; each is a configuration a real deployment might
+      # ship. What the Range can do with it is bounded by what the broker accepts: never a scope
+      # that is not in the table, never refunds:approve, never a ceiling the profiles file lacks.
+      - broker_settings:/broker-settings
     ports:
       - "127.0.0.1:8095:8095"
     networks:
@@ -506,6 +522,9 @@ services:
       SUPPORTPILOT_API_URL: http://api:8000
       # Track 9's fixed scenarios. Reached on `app`, as the seeded users, like the API.
       SUPPORTPILOT_MEMORY_URL: http://memory:8000
+      # Track 1, 1.5 - 1.8. The probe plays the agent platform and the compromised agent, holding a
+      # profile's credential exactly as an agent would.
+      BROKER_URL: http://broker:8097
       KEYCLOAK_URL: ${KEYCLOAK_URL:-https://keycloak:8443}
       KEYCLOAK_REALM: supportpilot
       PROBE_SHARED_SECRET_FILE: /run/secrets/probe_shared_secret
@@ -513,11 +532,83 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     secrets:
       - probe_shared_secret
+      - broker_profile_status_helper
+      - broker_profile_refund_assistant
     volumes:
       - ./.secrets/tls:/etc/ssl/supportpilot:ro
     networks:
       - app
       - control
+
+  # --------------------------------------------------------------------------------------------
+  # The delegation broker — architecture D, down-scoped delegation (track 1, 1.5 - 1.8).
+  #
+  # Onyx keeps calling the API directly with the user's token (architecture C); nothing about that
+  # changes. An agent registered with a profile's action document calls through here instead, and
+  # the API receives a token naming the user *and* the agent, narrowed to what the call needs.
+  #
+  # It holds a signing key, so it is an issuer the API trusts: a privilege grant, recorded as one in
+  # docs/architecture/README.md. It holds no database credential and no user password. On `app`
+  # only, because it must reach Keycloak's key set and the API, and the API and the probe must reach
+  # it. Not published.
+  # --------------------------------------------------------------------------------------------
+  broker:
+    <<: *python-base
+    profiles: ["delegation"]
+    build:
+      context: .
+      dockerfile: services/broker/Dockerfile
+    image: supportpilot/broker:local
+    container_name: supportpilot-broker
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      broker-settings-init:
+        condition: service_completed_successfully
+    environment:
+      SUPPORTPILOT_ENV: local
+      BROKER_ISSUER: http://broker:8097
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://keycloak:8443/realms/supportpilot}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-https://keycloak:8443/realms/supportpilot/protocol/openid-connect/certs}
+      SUPPORTPILOT_AUDIENCE: ${SUPPORTPILOT_AUDIENCE:-supportpilot-api}
+      SUPPORTPILOT_API_URL: http://api:8000
+      BROKER_SCOPES_FILE: /etc/broker/scopes.json
+      BROKER_PROFILES_FILE: /etc/broker/profiles.json
+      BROKER_SIGNING_KEY_FILE: /run/secrets/broker_signing_key
+      BROKER_SETTINGS_FILE: /broker-settings/settings.json
+      SSL_CERT_FILE: /etc/ssl/supportpilot/ca-bundle.crt
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - broker_signing_key
+      - broker_profile_status_helper
+      - broker_profile_refund_assistant
+    volumes:
+      - ./.secrets/tls:/etc/ssl/supportpilot:ro
+      # The scope table is the policy's own file, so the broker and the policy cannot disagree.
+      - ./policy/supportpilot/scopes.json:/etc/broker/scopes.json:ro
+      - ./infrastructure/local/broker/profiles.json:/etc/broker/profiles.json:ro
+      - broker_settings:/broker-settings:ro
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8097/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  # Hands the settings volume to the Range's uid, once, the way opa-bundle-init hands it the policy
+  # bundle: ownership rather than a world-writable mode. In both profiles, because either the Range
+  # or the broker may be the first to mount it.
+  broker-settings-init:
+    image: alpine:3.20
+    profiles: ["range", "delegation"]
+    container_name: supportpilot-broker-settings-init
+    restart: "no"
+    command: ["sh", "-c", "chown 10004:10004 /broker-settings && chmod 0755 /broker-settings"]
+    volumes:
+      - broker_settings:/broker-settings
+    network_mode: none
 
   # The only thing else on `control`. See infrastructure/local/docker-proxy/README.md for why the Range
   # does not get the Docker socket itself: a service holding that socket is root on the host, which
@@ -783,5 +874,13 @@ secrets:
     file: ./.secrets/range_qdrant_shared_ro
   probe_shared_secret:
     file: ./.secrets/probe_shared_secret
+  # Track 1, 1.5 - 1.8. The signing key to the broker alone; each profile credential to the broker
+  # and the probe, which plays the agent that holds it.
+  broker_signing_key:
+    file: ./.secrets/broker_signing_key
+  broker_profile_status_helper:
+    file: ./.secrets/broker_profile_status_helper
+  broker_profile_refund_assistant:
+    file: ./.secrets/broker_profile_refund_assistant
   keycloak_admin_password:
     file: ./.secrets/keycloak_admin_password

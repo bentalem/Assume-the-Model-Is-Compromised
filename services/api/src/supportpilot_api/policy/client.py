@@ -68,15 +68,19 @@ class PolicyClient:
         action: str,
         resource: dict[str, Any],
         context: dict[str, Any],
+        delegation: dict[str, Any] | None = None,
     ) -> Decision:
-        payload = {
-            "input": {
-                "subject": subject,
-                "action": action,
-                "resource": resource,
-                "context": context,
-            }
+        policy_input: dict[str, Any] = {
+            "subject": subject,
+            "action": action,
+            "resource": resource,
+            "context": context,
         }
+        # Only for a delegated token, and built by the pipeline from the verified token — never
+        # from a request. Absent, the policy decides exactly as it did before delegation existed.
+        if delegation is not None:
+            policy_input["delegation"] = delegation
+        payload = {"input": policy_input}
 
         try:
             response = self._client.post(self._url, json=payload)
