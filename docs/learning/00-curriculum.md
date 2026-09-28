@@ -11,6 +11,15 @@ each module can point at a real enforcement point rather than a principle.
 [`handbook.md`](handbook.md) is the thing to open before a review. This file is the order to work
 through; the handbook holds the material each module establishes.
 
+The architecture lesson that opens each Range track is also kept here, so it can be read without
+the Range running: [identity and tokens](01-identity-and-tokens.md) ·
+[tenant isolation](02-tenant-isolation.md) · [authorization](03-authorization.md) ·
+[tool authority](04-tool-authority.md) · [untrusted content](05-untrusted-content.md) ·
+[irreversible actions](06-irreversible-actions.md) · [evidence and audit](07-evidence.md) ·
+[the control plane](08-control-plane.md) · [memory and context](11-memory-and-context.md).
+Each one mirrors the `00-*` tabs of the track's first challenge; when they differ, the tabs are
+the source.
+
 ## The one idea (module 0)
 
 The model is **untrusted input** — the same status as a form field filled in by an anonymous user.

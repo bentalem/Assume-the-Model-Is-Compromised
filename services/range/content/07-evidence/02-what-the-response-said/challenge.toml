@@ -39,6 +39,15 @@ hints = [
   "Is the response wrong, or is it correct and insufficient — and does the difference change who you would raise this with?",
 ]
 
+break_steps = [
+  "Run **Which policy the engine is loading** and **alice asks for an order she owns**. Write down the status she gets on a healthy system.",
+  "Arm **Make the policy engine answer without a decision**. Run the bundle observation again: it should read `armed`.",
+  "Run **alice asks for an order she owns** again. Write down exactly what the caller is told.",
+  "Run **What was recorded about that same request** and read the newest row: the decision, the reason, and the policy version column.",
+  "Write the one-line incident report the response alone would produce, and mark which part of it is wrong.",
+  "Submit what the response said, what the record said, and which one an account would be built from. Then restore the control — until you do, the engine answers without decisions.",
+]
+
 [[control]]
 mutation = "policy.bundle.undefined"
 label = "Make the policy engine answer without a decision"
@@ -71,12 +80,14 @@ rubric = ["not_found", "policy_malformed", "audit"]
 
 [[source]]
 path = "services/api/src/supportpilot_api/pipeline.py"
-lines = [146, 156]
-highlight = [152, 152]
+lines = [172, 182]
+highlight = [178, 178]
+anchor = "raise unavailable() if decision.unavailable else not_found()"
 caption = "The branch that chooses which of two true things the caller is told"
 
 [[source]]
 path = "services/api/src/supportpilot_api/errors.py"
-lines = [40, 52]
-highlight = [47, 52]
-caption = "The vocabulary available to a response. Note how much smaller it is than the audit reasons"
+lines = [22, 52]
+highlight = [34, 36]
+anchor = 'return ApiError(404, "not_found")'
+caption = "The whole vocabulary a response has: eight codes. The trail records reasons from an open-ended list"

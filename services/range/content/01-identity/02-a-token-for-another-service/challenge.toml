@@ -37,6 +37,14 @@ hints = [
   "If forty services trust one identity provider and none of them check this, how many of them can a token from any one of them reach?"
 ]
 
+break_steps = [
+  "Run **A token minted for this API** first. It is the control group: the same user and request, succeeding.",
+  "Run **A token minted for another service in the same realm**. Read the `intent` column — it prints the one claim that differs.",
+  "Run **For contrast: a token that really is forged**. Compare its status and error code with the previous row.",
+  "Both refused tokens got the same answer. Decide which check stopped each one, using the order of checks from 1.1's Part 1 tab.",
+  "Submit the name of the claim that caused the genuine token to be refused. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only. The token is genuine; only its intended recipient is wrong.
 
 [[observation]]
@@ -61,12 +69,14 @@ rubric = ["aud"]
 
 [[source]]
 path = "infrastructure/local/keycloak/supportpilot-realm.json"
-lines = [159, 177]
-highlight = [160, 168]
-caption = "The realm declares four clients and three of them mint tokens, but only two attach this API's audience. This one attaches nothing"
+lines = [191, 209]
+highlight = [192, 200]
+anchor = '"protocolMappers": [],'
+caption = "The realm declares five clients and three of them mint tokens, but only two attach this API's audience. This one attaches nothing"
 
 [[source]]
-path = "services/api/src/supportpilot_api/dependencies.py"
-lines = [44, 66]
-highlight = [61, 64]
-caption = "Where the token becomes a subject — and what it has to satisfy first"
+path = "services/api/src/supportpilot_api/auth/tokens.py"
+lines = [191, 217]
+highlight = [197, 202]
+anchor = '"require_aud": True,'
+caption = "The audience check: the value must name this API, and since the lab's own finding it must also be present"

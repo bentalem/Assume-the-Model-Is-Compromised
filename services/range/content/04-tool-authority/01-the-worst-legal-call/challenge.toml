@@ -29,13 +29,21 @@ This is the closest thing in the lab to a genuinely agent-specific subject. The 
 unremarkable behind a web form, where a person decides to call one, once, with the arguments the \
 form allows; registering them as tools turns each into a standing grant to a caller that picks its \
 own arguments and can be steered by the text it just read. The challenge also shows where a bound \
-stops being one: AGENT_MAX_TOOL_CALLS is 8 in the environment and no service in this repository \
-reads it, so the per-call cap is enforced and the per-session cap is only requested."""
+stops being one: the API enforces a cap on every call, a cap on one turn exists only if someone sets \
+it in Onyx by hand, and nothing in this repository counts calls across a session."""
 
 hints = [
   "Six of the seven take an identifier. What does the seventh take, and who chooses the set it returns?",
   "Look at the parameters column for that tool. Which of them decides how much comes back, and who supplies it?",
   "Is there anything in the surface that bounds a session rather than a single call?"
+]
+
+break_steps = [
+  "Run **Every registered operation** and read the parameters column for all seven tools.",
+  "For each tool, write down whether its main argument names one record or describes a set of them.",
+  "Run **One tool, called normally** for scale, and **The modules behind those operations** to check that the document and the code agree about what exists.",
+  "For the one tool that takes a query, find the argument that decides how much comes back and who supplies it — and whether anything bounds a whole session.",
+  "Submit the tool's name and one sentence on what one legal call can do, mentioning the `cursor` and the page size of 25. Nothing was armed.",
 ]
 
 # Read-only. Nothing needs breaking: the authority is in the schema, visible, working as designed.
@@ -62,12 +70,14 @@ rubric = ["search_customers", "cursor", "25"]
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
-lines = [102, 127]
-highlight = [108, 115]
+lines = [146, 171]
+highlight = [152, 159]
+anchor = '"max_results": 25'
 caption = "Where the page size is actually decided — note that it is not the caller"
 
 [[source]]
 path = "services/api/src/supportpilot_api/tools/customers.py"
 lines = [95, 115]
 highlight = [103, 108]
+anchor = "clamp_limit(limit, auth.decision.max_results)"
 caption = "The line that applies the obligation. A returned limit nobody enforces is a comment"

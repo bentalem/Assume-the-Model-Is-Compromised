@@ -8,7 +8,7 @@ places, kept in step by three different mechanisms. One of those mechanisms is a
 | | Copy | What it is | Kept in step by |
 |---|---|---|---|
 | 1 | **the code** | the modules that register each operation | it *is* the source of truth |
-| 2 | **the exported document** | `openapi/supportpilot-actions.json` | a check on every commit |
+| 2 | **the exported document** | `openapi/supportpilot-actions.json` | `export_openapi.py --check`, when somebody runs it |
 | 3 | **the agent's registered actions** | whatever the agent platform holds | ? |
 
 Two of the observations in the next stage show you copies 1 and 2. There is no observation for copy
@@ -16,8 +16,9 @@ Two of the observations in the next stage show you copies 1 and 2. There is no o
 
 ## The check that exists, and what it says
 
-Every commit runs a check that regenerates the document from the code and compares the two. When it
-passes it prints:
+A check regenerates the document from the code and compares the two. It runs by hand, inside the
+abuse suite, and from a pre-commit hook on any machine where one was installed — the hook is not
+part of the published repository. When it passes it prints:
 
 ```
 OK: action document matches the code. Operations: add_internal_note, get_action_status, ...

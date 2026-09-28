@@ -39,6 +39,15 @@ hints = [
   "For the one that was prevented: does its row carry a policy version, and what does the answer tell you about which layer refused?",
 ]
 
+break_steps = [
+  "Run **Request A — alice reads ORD-3001** and **Request B — alice proposes a refund with an invalid reason**. Note the status of each.",
+  "Run **Every recorded decision about ORD-3001**. Find the row for request A and read its reason and policy version.",
+  "Run **Every recorded decision about ORD-2001** to see what an ordinary, permitted row looks like.",
+  "Run **The last 30 decisions from the API and the worker** and look for request B. Decide what its absence means.",
+  "Decide which request was prevented by a control and which merely failed, and which layer acted on the prevented one.",
+  "Submit the reason code the control recorded. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only, like the rest of track 7. The trail already holds what this challenge is about; arming
 # something would be answering a different question.
 
@@ -74,12 +83,14 @@ reason_code = "resource_not_visible"
 
 [[source]]
 path = "services/api/src/supportpilot_api/main.py"
-lines = [149, 173]
-highlight = [165, 173]
+lines = [174, 198]
+highlight = [190, 198]
+anchor = '"request_rejected",'
 caption = "Where a malformed request is refused — it names the offending fields in the log and the response, and writes no audit row"
 
 [[source]]
 path = "database/migrations/0004_audit_events.sql"
 lines = [1, 30]
 highlight = [22, 27]
+anchor = "policy_version       text,"
 caption = "The audit row itself. A decision, a reason, and a policy version that is nullable"

@@ -21,6 +21,8 @@ And when passthrough is genuinely impossible, in order of value:
    enforcement is bad; losing the ability to say who asked is worse.
 5. Volume caps, approval for anything high-impact, monitoring per initiating user.
 
+And where passthrough *is* possible, it is the floor rather than the ceiling: the agent still holds everything the user can do. Challenges 1.5 to 1.8 build the step beyond it.
+
 ## What you are about to run
 
 Four requests, twice. alice asking for her own order and for the other tenant's; the agent's own

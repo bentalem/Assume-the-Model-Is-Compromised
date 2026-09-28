@@ -9,3 +9,5 @@ that system.
 | **A** Service account | the agent's own credential | the union of every user's permissions |
 | **B** Service account plus claimed user | the agent's credential, user id as a parameter | the same, and it *looks* like per-user access control |
 | **C** Passthrough | the signed-in user's own token | what that one user already had |
+
+There is a fourth architecture, down-scoped delegation, in which the token names both the user and the agent and carries only what the task needs. It is challenge 1.5.

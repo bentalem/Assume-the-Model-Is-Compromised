@@ -30,7 +30,7 @@ agent_link = """
 There is no agent-specific mechanism in this challenge at all. Reading a test for what it actually \
 asserts is the same work on a payments API, and the case you examine is a pagination test. The \
 connection is only in what the missing control would have bounded: nothing in this repository \
-counts a session's calls — `AGENT_MAX_TOOL_CALLS` is set in `.env` and no service source reads it, \
+counts a session's calls — `AGENT_MAX_TOOL_CALLS` is set in `.env.example` and no service source reads it, \
 and `rate_limited()` is defined and raised nowhere — so a per-request cap is exactly the control \
 that a caller willing to make many requests walks straight past."""
 
@@ -38,6 +38,14 @@ hints = [
   "Read the names first, with the bodies covered. Which one is a statement about the world rather than about a request?",
   "For that case: write down, line by line, what it would take for it to fail. Is the claim in the name on that list?",
   "One of its assertions checks that a mechanism works correctly. What is that mechanism for?",
+]
+
+break_steps = [
+  "Open the source panels and read only the case's name. Is it a claim about a request, or about the world?",
+  "Read the body and list what would make each assertion fail.",
+  "Check whether the property in the name is on that list. Then find the assertion that verifies a mechanism, and ask what that mechanism is for.",
+  "Run **Do the thing TS7-09's name says is impossible**. Note the number of calls, the distinct records, and whether any call was refused.",
+  "Submit which case, and what it actually proves. Nothing was armed, so there is nothing to reset.",
 ]
 
 # No controls. This challenge is read-only on purpose: the failure is in the instrument, not the
@@ -62,10 +70,12 @@ rubric = ["TS7-09", "cursor", "cap"]
 path = "scripts/abuse_suite.py"
 lines = [256, 279]
 highlight = [256, 256]
+anchor = '@check("TS7-09"'
 caption = "One case from the abuse suite. Read the name, then read what it checks."
 
 [[source]]
 path = "scripts/abuse_suite.py"
-lines = [271, 279]
-highlight = [273, 278]
-caption = "The second half of the same case"
+lines = [270, 279]
+highlight = [275, 278]
+anchor = "if first & second:"
+caption = "The second half of the same case: it proves the cursor can be followed without repeating"

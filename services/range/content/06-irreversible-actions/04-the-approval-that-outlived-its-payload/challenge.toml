@@ -39,6 +39,14 @@ hints = [
   "Why would a queued action still be sitting there hours later — and what are the ordinary reasons, before the malicious one?",
 ]
 
+break_steps = [
+  "Run **The approval window against the server's clock** and **What the approval is bound to**.",
+  "Arm **Move the approval window two hours into the past**. Run both observations again: only the window changed.",
+  "Run **Every reason the worker can refuse, in the order it checks them** and find the one condition your arming made true.",
+  "Note whose clock that condition compares against, and whose clock the approval row policy uses.",
+  "Submit the reason code. Then restore the control — until you do, the window is in the past.",
+]
+
 [[control]]
 mutation = "action.approval.expire"
 label = "Move the approval window two hours into the past"
@@ -68,10 +76,12 @@ reason_code = "approval_expired"
 path = "services/worker/src/supportpilot_worker/jobs/processor.py"
 lines = [218, 237]
 highlight = [226, 227]
+anchor = 'raise RefusedToExecute("approval_expired")'
 caption = "The expiry check, in the same block as separation of duty and payload integrity"
 
 [[source]]
 path = "database/migrations/0008_actions.sql"
 lines = [180, 195]
 highlight = [186, 190]
+anchor = "AND r.expires_at > now()"
 caption = "The window is also in the query that decides what an approver may act on"

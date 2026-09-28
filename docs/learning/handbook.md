@@ -100,7 +100,7 @@ token works on B as well — and every service that can issue a token becomes a 
 
 **Demonstrate it.** `python scripts/learn_identity.py token | forge | audience | demote bob`
 
-### 2.3 Agent identity — the three architectures
+### 2.3 Agent identity — four architectures
 
 The whole difference is one header value.
 
@@ -109,6 +109,7 @@ The whole difference is one header value.
 | **A** service account | the agent's own credential | the union of every user's permissions |
 | **B** service account + claimed user | the agent's credential; user id as a parameter | the same, and it *looks* like per-user authorization |
 | **C** passthrough | the user's own token | what that one user could already do |
+| **D** down-scoped delegation | a token naming the user **and** the agent, narrowed to the task | only what the user, the agent's ceiling and the task all allow |
 
 **Why A needs such wide permissions.** Not carelessness — arithmetic. One credential answering for
 every user must reach everything any of them could. There is no narrower version of it.
@@ -131,6 +132,20 @@ user data; user identity for everything that does.*
    user.
 
 **Demonstrate it.** `python scripts/learn_service_account.py build | compare | audit | remove`
+
+**D is C made narrower.** Passthrough still hands the agent everything the user can do, whatever the
+task. Down-scoped delegation gives it a token with `sub` (the user), `act` (the agent, RFC 8693) and
+a `scope` for this task only, for minutes. It fails in four ordinary ways, one per challenge:
+
+| Failure | What to ask | Range |
+|---|---|---|
+| a broad default — "give it what the user has, so it works" | *is there a passthrough mode, and is it on?* | 1.5 |
+| a scope nobody checks | *show me the line that refuses a valid token used outside its scope* | 1.6 |
+| the agent sets its own scope | *who decides the scope — trusted code, or the agent's request?* | 1.7 |
+| a chain that widens | *is a re-issued token's scope computed from the token presented, or from the new holder?* | 1.8 |
+
+The rule underneath: `effective permission = user ∩ agent ceiling ∩ task`, and the model may propose
+a scope but never decide one.
 
 ### 2.4 Authorization
 
@@ -668,7 +683,7 @@ now.
 its policy version, the query result, the audit row, the diff that shows the control, and the run
 where you removed it and it broke.
 
-**The lab.** `verify_local.py` (16 environment checks) · `abuse_suite.py` · `action_suite.py` ·
+**The lab.** `verify_local.py` (38 environment checks) · `abuse_suite.py` · `action_suite.py` ·
 `contract_suite.py` · the `learn_*.py` scripts. Each proves something narrow. Knowing exactly what
 each does **not** prove is the more valuable half.
 

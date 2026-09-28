@@ -83,6 +83,16 @@ def main() -> int:
                     f"{challenge.number}: highlight inside its range — {ref.path}",
                     ref.lines[0] <= ref.highlight[0] <= ref.highlight[1] <= ref.lines[1],
                 )
+            # The range being inside the file says nothing about whether it still shows the code the
+            # caption describes. The anchor does: when a file above the reference grows, this fails.
+            if ref.anchor:
+                span = ref.highlight or ref.lines
+                shown = chr(10).join(path.read_text(encoding="utf-8").splitlines()[span[0] - 1:span[1]])
+                check(
+                    f"{challenge.number}: reference still shows its anchor — {ref.path}",
+                    ref.anchor in shown,
+                    f"{ref.anchor!r} not in lines {span[0]}–{span[1]}",
+                )
 
         page = render.challenge_page(challenge)
         check(f"{challenge.number}: all three stages render", all(

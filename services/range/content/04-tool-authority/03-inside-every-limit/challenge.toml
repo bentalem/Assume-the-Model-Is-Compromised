@@ -39,6 +39,14 @@ hints = [
   "How many customers does this tenant have, and how many did two calls reach?",
 ]
 
+break_steps = [
+  "Run **A single, ordinary customer read** for scale: one permitted request for one record.",
+  "Run **The operation being used, as registered** and note which of its parameters bound one call, and which bound anything across calls.",
+  "Run **One two-character query, paged to exhaustion**. Read `calls`, `distinct_records`, `every_call_allowed` and `more_pages_remaining`.",
+  "Run **What the trail recorded while you did it** and look at the decision column for the search calls you just made.",
+  "Submit the number of distinct records one session reached. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only, and nothing is armed. Every request this challenge makes is one the system is supposed
 # to permit — that is the entire point, and arming a control would answer a different question.
 
@@ -49,8 +57,8 @@ detail = "Counts only. The probe never returns the records, which is the rule th
 
 [[observation]]
 observation = "api.alice.restricted_customer"
-label = "A single, ordinary search call"
-detail = "For scale: one permitted request, the kind nobody would look at twice."
+label = "A single, ordinary customer read"
+detail = "For scale: one permitted request for one record, the kind nobody would look at twice."
 
 [[observation]]
 observation = "tools.surface"
@@ -70,12 +78,14 @@ field = "distinct_records"
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
-lines = [104, 116]
-highlight = [108, 111]
+lines = [148, 160]
+highlight = [152, 155]
+anchor = '"max_results": 25'
 caption = "The page size is decided by policy, not by the caller. It is a real control, and it is per call"
 
 [[source]]
 path = "services/api/src/supportpilot_api/repositories/pagination.py"
 lines = [30, 41]
 highlight = [36, 40]
+anchor = "limit = min(limit, policy_max)"
 caption = "Where the cap is applied. Count the things bounded here, and note that none of them is a session"

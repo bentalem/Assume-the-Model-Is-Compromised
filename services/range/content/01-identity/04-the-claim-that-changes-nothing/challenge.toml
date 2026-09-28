@@ -39,6 +39,14 @@ hints = [
   "Suppose the signature had been perfect. What would the rewritten organization_id have changed?",
 ]
 
+break_steps = [
+  "Run **A genuine token, unmodified** first. You need to see the request succeed before a refusal means anything.",
+  "Run **The same claims, with alg=none and no signature**. Note the status and the error code.",
+  "Run **The same claims, re-signed with an attacker's key**, then **organization_id rewritten, then re-signed**.",
+  "All three tampered tokens get the same answer. Using the order of checks in 1.1's Part 1 tab, find the one step where all three were already refused.",
+  "Submit the error code the API returns for every tampered token. Nothing was armed: the tokens were built wrong on the way out, and the lab is untouched.",
+]
+
 # Read-only. Nothing is armed: the tokens are built wrong on the way out, and the lab is untouched.
 
 [[observation]]
@@ -68,13 +76,22 @@ observation = "token.unsigned"
 field = "error_code"
 
 [[source]]
+path = "services/api/src/supportpilot_api/auth/tokens.py"
+lines = [166, 190]
+highlight = [176, 180]
+anchor = "if algorithm not in self._algorithms:"
+caption = "The algorithm allowlist, checked before any key is looked up. All three tampered tokens stop here"
+
+[[source]]
 path = "services/api/src/supportpilot_api/dependencies.py"
 lines = [44, 66]
 highlight = [61, 64]
+anchor = "token = services.verifier.verify(raw_token)"
 caption = "Three lines take a string, verify it, and load a subject. Everything above them is untrusted"
 
 [[source]]
 path = "database/migrations/0002_core_tenancy.sql"
-lines = [1, 24]
-highlight = [1, 10]
+lines = [27, 37]
+highlight = [27, 35]
+anchor = "CREATE TABLE app.memberships ("
 caption = "Where the tenant actually comes from — not from any claim"

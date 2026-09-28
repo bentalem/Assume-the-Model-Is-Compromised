@@ -36,6 +36,14 @@ hints = [
   "The control group inserts a row too. If it were also refused, what would that tell you about the first result?",
 ]
 
+break_steps = [
+  "Run **What has actually executed**: one row per effect, each under its own idempotency key.",
+  "Run **Record the same effect again, under the same key** — exactly what a retry after a timeout would do. Read the `refused_by` column.",
+  "Run **The same insert under a fresh key**: the control group. It is accepted, then removed.",
+  "Decide which of the schema's three \"once\" constraints stood in the path of the retry, and why the other two could not.",
+  "Submit the constraint's name. Both attempts rolled themselves back, so there is nothing to reset.",
+]
+
 [[observation]]
 observation = "execution.evidence"
 label = "What has actually executed"
@@ -61,10 +69,12 @@ field = "refused_by"
 path = "database/migrations/0008_actions.sql"
 lines = [118, 136]
 highlight = [131, 133]
+anchor = "CONSTRAINT one_effect_per_key UNIQUE (idempotency_key)"
 caption = "The constraint, and the comment that calls it the most important one in the schema"
 
 [[source]]
 path = "services/worker/src/supportpilot_worker/jobs/processor.py"
 lines = [104, 120]
 highlight = [104, 108]
+anchor = "'ambiguous', 'reserved before provider call'"
 caption = "The key is reserved as 'ambiguous' before the provider is called, not after"

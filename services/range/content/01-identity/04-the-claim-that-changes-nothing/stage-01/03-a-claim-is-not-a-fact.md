@@ -15,9 +15,10 @@ identity provider and forty services, that is a very large graph.
 
 The last case you will run rewrites `organization_id` inside the token before re-signing it.
 
-Think about what that would have achieved with a *perfect* signature. In this lab, nothing: the API
-takes the `sub` claim and nothing else, then loads the tenant and the roles from `app.memberships`.
-A rewritten tenant claim is a string nobody reads.
+Think about what that would have achieved with a *perfect* signature. In this lab, nothing: from a
+user's token the API takes the `sub` claim and nothing else, then loads the tenant and the roles from
+`app.memberships`. A rewritten tenant claim is a string nobody reads. (A delegated token, from 1.5 on,
+adds `act` and `scope` — and both can only narrow what `app.memberships` allows.)
 
 That is the difference between a system where a token says **who** and one where it says **what**.
 

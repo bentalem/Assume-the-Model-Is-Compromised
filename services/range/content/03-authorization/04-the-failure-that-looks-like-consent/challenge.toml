@@ -40,6 +40,14 @@ hints = [
   "An undefined decision is not an empty decision. What does the client do with a response that has no result in it at all?",
 ]
 
+break_steps = [
+  "Unarmed, run **An entirely ordinary, permitted read**, then **Every decision recorded about that order**. This is the baseline.",
+  "Arm **Stop the engine entirely**. Run the read and the audit observation, and note the status and the reason. Restore it, and wait until **Whether the engine is running at all** says running.",
+  "Arm **Make evaluation error**. Check the bundle state and the engine state, run the read and the audit observation again, then restore.",
+  "Arm **Make the decision not exist** and repeat the same observations. Of your three rows, which one would an alert on outages never see?",
+  "Submit the reason code of that quietest failure. Restore, and confirm the bundle state reads `correct`.",
+]
+
 [[control]]
 mutation = "policy.opa.stop"
 label = "Stop the engine entirely"
@@ -84,10 +92,12 @@ reason_code = "policy_malformed"
 path = "services/api/src/supportpilot_api/policy/client.py"
 lines = [82, 110]
 highlight = [83, 90]
+anchor = "except httpx.TimeoutException"
 caption = "Five ways the engine can fail to answer. Count the return statements, and their reasons"
 
 [[source]]
 path = "services/api/src/supportpilot_api/pipeline.py"
-lines = [146, 156]
-highlight = [152, 152]
+lines = [172, 182]
+highlight = [178, 178]
+anchor = "raise unavailable() if decision.unavailable else not_found()"
 caption = "The one line that decides whether a failure is visible to whoever is watching"

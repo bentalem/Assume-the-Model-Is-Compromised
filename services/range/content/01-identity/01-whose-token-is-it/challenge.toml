@@ -38,6 +38,14 @@ hints = [
   "Why does a service account need membership in every tenant — is that carelessness, or arithmetic?"
 ]
 
+break_steps = [
+  "Before arming anything, run the four read observations in order: **alice reads her own tenant's order**, **alice reads the other tenant's order**, then both **service account** reads. Write down the four status codes.",
+  "Run **What the service account can reach**. Note that it belongs to no tenant yet — which is why its two reads failed.",
+  "Arm **Configure the agent as a service account**. Run **What the service account can reach** again: one credential now belongs to every tenant.",
+  "Run all four reads again and compare row by row. Which rows changed, and which did not move at all?",
+  "Submit the status the service account now gets for the other tenant's order. Then reset: the credential keeps a manager's membership in both tenants until you do.",
+]
+
 [[control]]
 mutation = "identity.service_account.grant"
 label = "Configure the agent as a service account"
@@ -78,10 +86,12 @@ field = "status"
 path = "services/api/src/supportpilot_api/dependencies.py"
 lines = [44, 66]
 highlight = [61, 64]
+anchor = "token = services.verifier.verify(raw_token)"
 caption = "The trust boundary. Whatever is in the header becomes the subject"
 
 [[source]]
 path = "database/migrations/0002_core_tenancy.sql"
-lines = [1, 24]
-highlight = [1, 10]
+lines = [27, 37]
+highlight = [27, 35]
+anchor = "CREATE TABLE app.memberships ("
 caption = "Tenancy is a membership row, which is why breadth has to be granted rather than claimed"

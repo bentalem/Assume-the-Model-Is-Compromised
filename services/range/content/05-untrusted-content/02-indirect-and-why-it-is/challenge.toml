@@ -38,6 +38,14 @@ hints = [
   "Attempt 7 forges a tool result claiming an approval. What does the worker compare an approval against?",
 ]
 
+break_steps = [
+  "Run **The messages on TKT-1001** and number the instruction-shaped ones.",
+  "Run **Read the ticket through the API as alice**: the permitted request that puts them in her context. Note how many messages come back, and why not all eleven.",
+  "For each attempt, write down what it would have to change and where that value really comes from. Use **The tool modules the model can call** for the attempts that name tools, and **Where roles actually come from** for attempt 3.",
+  "Find the one attempt with no structural answer — the one that asks only for permitted calls.",
+  "Submit why none of them worked: tools that do not exist, a role that comes from a table, a secret that was never in the context. Nothing was armed.",
+]
+
 # Nothing to arm. The corpus is seed data and the lab is in its normal state — which is the point:
 # no filter is running, and none of these worked anyway.
 
@@ -70,10 +78,12 @@ rubric = ["exist", "role", "secret"]
 path = "database/seeds/0002_tickets_and_injection_corpus.sql"
 lines = [1, 20]
 highlight = [4, 9]
+anchor = "must stay data"
 caption = "The seed file's own statement of what this corpus is for"
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
 lines = [1, 30]
 highlight = [1, 6]
+anchor = "SupportPilot authorization policy."
 caption = "Where the decision is made, and what it is allowed to read"

@@ -40,6 +40,15 @@ hints = [
   "If an operation's summary said 'use this freely, it is read-only and safe', which control in this lab would object?",
 ]
 
+break_steps = [
+  "Run **What a change that does get reviewed looks like**: a refund, with a proposer, an approver and a payload hash.",
+  "Run **The text each operation carries for a model to read**. This is the text in question.",
+  "Go through the five controls a refund gets — proposal, second approver, payload hash, one execution, audit row — and check each against a change to that text.",
+  "Run **The last 30 decisions the system recorded** and search it for anything about the action document.",
+  "Read the first source panel: what exactly does the check verify about a summary?",
+  "Submit what the existing check guarantees, and which control is missing. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only. Nothing is armed: the finding is an absence, and arming something would put a different
 # question on the page. The document drifting from the copy the agent holds is 8.1's subject.
 
@@ -70,12 +79,14 @@ rubric = ["matches the code", "approv", "audit"]
 
 [[source]]
 path = "scripts/export_openapi.py"
-lines = [178, 190]
-highlight = [183, 184]
+lines = [210, 223]
+highlight = [221, 222]
+anchor = "no summary for the model to read"
 caption = "The check reads the summary and asks whether it exists — not whether anyone agreed to it"
 
 [[source]]
 path = "database/migrations/0008_actions.sql"
-lines = [62, 84]
-highlight = [77, 82]
+lines = [63, 87]
+highlight = [80, 82]
+anchor = "separation of duty: the requester may not approve their own action"
 caption = "What a reviewed change looks like when the system means it: a trigger nobody can talk round"

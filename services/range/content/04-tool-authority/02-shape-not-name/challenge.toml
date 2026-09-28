@@ -39,6 +39,14 @@ hints = [
   "`scripts/export_openapi.py` refuses to publish a document that breaks its rules. Is a property typed `object` with no properties one of the things it refuses?"
 ]
 
+break_steps = [
+  "Run **The same seven, by the prose beside them** first, and write down what you expect each tool's arguments to be.",
+  "Run **Every registered operation, and the type of every parameter**. Count every parameter and every body field, and note each one's type.",
+  "For each `?` in the type column, decide whether it is a gap in the listing or a gap in the document.",
+  "Open Stage 03's `export_openapi.py` panels. List which rules look at a parameter's name and which at its shape, then decide whether an `object` property with no properties would be refused.",
+  "Submit your audit: whether any parameter is an `object` with no schema, what `additionalProperties` does here, and what `export_openapi` would and would not catch.",
+]
+
 # Read-only. Nothing is armed: the finding this challenge teaches is an absence, and the only way to
 # establish an absence is to read the whole surface.
 
@@ -66,22 +74,26 @@ rubric = ["object", "additionalProperties", "export_openapi"]
 path = "services/api/src/supportpilot_api/tools/actions.py"
 lines = [40, 64]
 highlight = [48, 64]
+anchor = 'model_config = ConfigDict(extra="forbid")'
 caption = "A body that is genuinely typed object. Every field inside it names a pattern, a length or a value set"
 
 [[source]]
 path = "scripts/export_openapi.py"
-lines = [186, 219]
-highlight = [199, 219]
-caption = "Every rule this audit applies to a parameter. Two are about the name, two about the shape"
+lines = [214, 247]
+highlight = [216, 246]
+anchor = "if name.lower() in FORBIDDEN_PARAMETER_NAMES:"
+caption = "Every rule this audit applies to a parameter: where it is, what it is called, and two about its shape"
 
 [[source]]
 path = "scripts/export_openapi.py"
-lines = [232, 246]
-highlight = [243, 246]
+lines = [260, 274]
+highlight = [260, 274]
+anchor = 'for property_name, prop in (schema.get("properties") or {}).items():'
 caption = "Every rule it applies to a schema property. Read it for the rule that is not here"
 
 [[source]]
 path = "database/migrations/0011_range_mutations_rls.sql"
 lines = [1, 32]
 highlight = [3, 9]
+anchor = "set_row_security(table, enabled, forced)"
 caption = "The same finding, applied to the service that teaches it. One function per mutation, no target parameter"

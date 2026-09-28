@@ -81,6 +81,10 @@ class SourceRef:
     lines: tuple[int, int]
     highlight: tuple[int, int] | None
     caption: str
+    # Text that must appear inside the highlighted lines (or the whole range, with no highlight).
+    # Line numbers go stale silently whenever a file above them grows; an anchor turns that into a
+    # failing test instead of a caption describing code that is no longer there.
+    anchor: str = ""
 
 
 @dataclass(frozen=True)
@@ -202,6 +206,7 @@ def _parse_sources(rows: list, where: str) -> tuple[SourceRef, ...]:
                 lines=(lines[0], lines[1]),
                 highlight=highlight,
                 caption=row.get("caption", ""),
+                anchor=row.get("anchor", ""),
             )
         )
     return tuple(sources)

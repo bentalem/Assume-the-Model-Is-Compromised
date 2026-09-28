@@ -38,6 +38,14 @@ hints = [
   "Two of the seven entries in the refusal list are about the hash. Which of those two fires first, and what is the other one for?",
 ]
 
+break_steps = [
+  "Run **What the pending approval is bound to** and **Action requests and their state**. Note the amount, the hash, and the state.",
+  "Arm **Change the approved amount from 45.00 to 4500.00**. Run the binding observation again: the amount changed, and the hash did not.",
+  "Run **Every reason the worker can refuse, in the order it checks them**. Seven entries, read from the worker's own source.",
+  "Match the state you armed against the conditions. When the worker recomputes the hash of the payload it is about to send, which check fails first?",
+  "Submit that reason code. Then restore the control — until you do, the pending payload says 4500.00.",
+]
+
 [[control]]
 mutation = "action.payload.tamper"
 label = "Change the approved amount from 45.00 to 4500.00"
@@ -67,10 +75,12 @@ reason_code = "payload_hash_mismatch_stored"
 path = "services/worker/src/supportpilot_worker/jobs/processor.py"
 lines = [222, 237]
 highlight = [229, 235]
+anchor = 'raise RefusedToExecute("payload_hash_mismatch_stored")'
 caption = "The integrity check, immediately before the provider is called"
 
 [[source]]
 path = "database/migrations/0008_actions.sql"
 lines = [45, 60]
 highlight = [51, 53]
+anchor = "approved_hash      text NOT NULL"
 caption = "Why the approval stores the hash again rather than pointing at it"

@@ -40,6 +40,15 @@ hints = [
   "The Range stops and starts containers, which is as dangerous as it sounds. Why is its allowlist a separate process rather than a check in its own code?",
 ]
 
+break_steps = [
+  "Run **Every parameter the model is allowed to supply** and confirm that no operation takes a URL, a host, a port or a path.",
+  "Use the network table in Stage 01 to list everything a process inside the API container can open a socket to.",
+  "Do the same for the Range, and check your answer against V-17 in the source panels.",
+  "Of the services the API can reach, find the one that answers with no credential at all.",
+  "Run **Container state, fetched through the one dangerous path the Range has** and read how that path is narrowed, and where.",
+  "Submit what a URL-taking tool in the API container would have reached, and which control decides that. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only, and nothing is armed. The capability this challenge is about — a tool that takes a URL
 # — is the unrestricted HTTP tool this lab refuses to give the model. It is not built here, it is
 # not built anywhere in this repository, and the absence is the teaching material. The dangerous
@@ -67,30 +76,35 @@ rubric = ["network", "opa", "postgres"]
 
 [[source]]
 path = "scripts/verify_local.py"
-lines = [431, 445]
-highlight = [442, 445]
+lines = [460, 474]
+highlight = [464, 473]
+anchor = 'proc = compose("exec", "-T", "range", "python", "-c", probe, timeout=60)'
 caption = "V-17 does not read the compose file. It opens a socket from inside the Range and fails if either host answers"
 
 [[source]]
 path = "scripts/verify_local.py"
-lines = [186, 200]
-highlight = [197, 199]
+lines = [215, 229]
+highlight = [219, 228]
+anchor = 'proc = compose("exec", "-T", "approval-portal", "python", "-c", probe, timeout=60)'
 caption = "V-02 asks the same question from the edge network, where the browser-facing service lives"
 
 [[source]]
 path = "services/api/src/supportpilot_api/policy/client.py"
 lines = [54, 60]
 highlight = [55, 57]
+anchor = "self._url = url"
 caption = "The one outbound destination the API has is fixed when the client is constructed. No caller supplies it, so there is no URL to validate"
 
 [[source]]
 path = "services/range/src/range_service/containers.py"
 lines = [1, 14]
 highlight = [8, 13]
+anchor = "permits three verbs on four container names"
 caption = "Why the Range does not hold the Docker socket. The narrowing lives in a separate process with its own configuration"
 
 [[source]]
 path = "services/range/src/range_service/containers.py"
-lines = [35, 43]
-highlight = [36, 36]
+lines = [36, 44]
+highlight = [37, 37]
+anchor = 'urllib.request.Request(f"{PROXY}{path}", method=method)'
 caption = "Every request this module makes is the proxy address plus a path built from a literal — and the proxy would refuse anything else regardless, which is the point of having both"

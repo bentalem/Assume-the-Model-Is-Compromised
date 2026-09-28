@@ -39,6 +39,14 @@ hints = [
   "The check makes twelve requests and then asks a question with no context set at all. Why twelve, and why no context?",
 ]
 
+break_steps = [
+  "Run **A read that establishes tenant context, then uses it**. The context is set inside the transaction that needs it, and ends with it.",
+  "Run **alice's request**, then immediately **A different user, probably on the same connection**. Note what mallory gets, straight after alice, from the same pool.",
+  "Run **What the trail says about both**: two people, two decisions, and no sign that either affected the other.",
+  "Open Stage 03's first source panel and find the `true` in `set_config`. Then read the V-12 panel and decide what its last query can and cannot see.",
+  "Submit a short answer that covers the **transaction**, the **pool** and the request **context**. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only, deliberately. Session-scoped context rather than transaction-scoped is not a control at
 # its wrong setting — it is a code path that leaks request context between users, and adding one to
 # the API would be shipping the vulnerability this lab exists to warn about.
@@ -72,10 +80,19 @@ rubric = ["transaction", "pool", "context"]
 path = "services/api/src/supportpilot_api/db.py"
 lines = [66, 82]
 highlight = [71, 80]
+anchor = "set_config('app.organization_id', %s, true)"
 caption = "The whole control. `is_local => true` is SET LOCAL, and it is inside an explicit transaction"
 
 [[source]]
 path = "scripts/verify_local.py"
-lines = [364, 373]
-highlight = [366, 372]
+lines = [393, 401]
+highlight = [395, 400]
+anchor = 'psql("SELECT count(*) FROM app.orders", "sp_api_role")'
 caption = "V-12 — note that it asks its final question with no context at all"
+
+[[source]]
+path = "services/api/src/supportpilot_api/db.py"
+lines = [107, 124]
+highlight = [118, 124]
+anchor = 'conn.execute("RESET ALL")'
+caption = "The second line of defence: whatever a connection still holds is reset before the pool hands it out again"

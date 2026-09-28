@@ -39,6 +39,14 @@ hints = [
   "The API loads the resource before it builds the policy input. What is left to decide if that load already returned nothing?",
 ]
 
+break_steps = [
+  "Before arming anything, run **A cross-tenant read** and **A read by someone whose role does not permit it**, then both audit observations. For each, note the status, the reason and the policy version.",
+  "Arm **Remove the tenant check from order.read**. Check **Which policy OPA is loading**, then run the cross-tenant read and its audit observation again. Did anything change? Is there a policy version?",
+  "Restore it. Arm **Remove the role check from order.read**, check the bundle state, then run fiona's read and **Every decision recorded about the order in her own tenant**.",
+  "Put the two results side by side. One removal changed nothing and the other returned data: which layer was holding each property?",
+  "Submit your explanation — name `resource_not_visible`, the `policy_version` column and the role check. Then restore, and confirm the bundle state reads `correct`.",
+]
+
 [[control]]
 mutation = "policy.tenant_check.remove"
 label = "Remove the tenant check from order.read"
@@ -81,12 +89,14 @@ rubric = ["resource_not_visible", "policy_version", "role"]
 
 [[source]]
 path = "services/api/src/supportpilot_api/pipeline.py"
-lines = [112, 124]
-highlight = [116, 120]
+lines = [134, 146]
+highlight = [138, 142]
+anchor = 'deny("resource_not_visible", None)'
 caption = "The resource is loaded before the policy is asked. If it is not visible, nothing is asked"
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
-lines = [78, 101]
-highlight = [85, 95]
+lines = [122, 145]
+highlight = [129, 139]
+anchor = "not_a_member_of_resource_organization"
 caption = "The three arms of order.read. One of these conditions has a second layer underneath it"

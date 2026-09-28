@@ -48,12 +48,13 @@ there.
 CONSOLE = """
 ## The console, and what it actually sends
 
-Stage 02 has two panels. On the left, the environment: the controls this challenge can break, and
-the observations it can run. On the right, the result of whatever you last pressed.
+Stage 02 has two panels, one above the other. First the environment: the controls this challenge
+can break, and the observations it can run. Below it, the result of whatever you last pressed.
+Where a challenge has them, numbered steps above both say what to press, in what order.
 
 - **Arm** puts one named control into its wrong setting. The console says loudly that it is armed.
 - **Restore** puts that one control back.
-- **Observe** runs a named, fixed query or request and shows you what came back.
+- **Run**, on an observation, runs a named, fixed query or request and shows you what came back.
 - **Reset the environment** asserts *every* control in the lab, not just this challenge's, and
   tells you which ones it had to put back.
 

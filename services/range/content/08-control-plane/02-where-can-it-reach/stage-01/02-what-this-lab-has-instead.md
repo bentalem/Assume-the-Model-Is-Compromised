@@ -24,7 +24,7 @@ to supply.
 ## The map, quoted
 
 `compose.yaml` is not one of the directories the Range can read, so it is quoted here rather than
-shown in a source panel. Six networks are declared, and **exactly one of them is not `internal`**:
+shown in a source panel. Eight networks are declared, and **exactly one of them is not `internal`**:
 
 ```yaml
 networks:
@@ -34,19 +34,26 @@ networks:
   data:         { driver: bridge, internal: true }
   control:      { driver: bridge, internal: true }
   range_data:   { driver: bridge, internal: true }
+  memory_data:  { driver: bridge, internal: true }     # track 9
+  range_memory: { driver: bridge, internal: true }     # track 9
 ```
 
 And every service names the networks it joins. Collected, that is the whole topology of this lab in
-six rows:
+eight rows:
 
 | Network | internal | Members |
 |---|---|---|
 | `edge` | no | keycloak, approval-portal, range |
-| `app` | yes | keycloak, api, approval-portal, probe |
+| `app` | yes | keycloak, api, approval-portal, probe, memory |
 | `policy` | yes | opa-bundle-init, opa, api |
-| `data` | yes | postgres, migrate, api, worker |
+| `data` | yes | postgres, migrate, api, worker, memory |
 | `control` | yes | range, probe, docker-proxy |
 | `range_data` | yes | postgres, range |
+| `memory_data` | yes | memory, memory-db, qdrant, embeddings, memory-init |
+| `range_memory` | yes | range, memory-db, qdrant |
+
+The last two rows, and `memory` on `app` and `data`, exist only while the `memory` profile is running
+(track 9). Stage 03 reads the map both ways.
 
 Two containers can open a socket to each other if and only if they share a row. That is the entire
 rule, and everything in Stage 03 is derived from this table and nothing else.

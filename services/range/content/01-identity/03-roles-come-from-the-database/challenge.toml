@@ -39,6 +39,14 @@ hints = [
   "If the roles had been claims inside the token instead, how long would the demotion have taken to have any effect?",
 ]
 
+break_steps = [
+  "Run **What the server believes about each person**. Find bob: cedar, `support_manager`.",
+  "Run **Read CUS-4003 as bob** and write down the full `fields` list. You will need it — the result of this challenge is a difference, not a refusal.",
+  "Run **Read CUS-4003 as alice, who is not a manager**. This is the field set bob is about to get.",
+  "Arm **Demote the manager to a support agent**. Run the memberships observation again, then **Read CUS-4003 as bob** again. No token was reissued.",
+  "Compare bob's two field lists and submit the field that stopped coming back. Then restore the control: bob stays demoted until you do.",
+]
+
 [[control]]
 mutation = "identity.bob.revoke_manager"
 label = "Demote the manager to a support agent"
@@ -68,10 +76,12 @@ rubric = ["email"]
 path = "services/api/src/supportpilot_api/dependencies.py"
 lines = [44, 66]
 highlight = [61, 64]
+anchor = "token = services.verifier.verify(raw_token)"
 caption = "The trust boundary: a token becomes a subject, and the subject is loaded"
 
 [[source]]
 path = "database/migrations/0002_core_tenancy.sql"
-lines = [1, 24]
-highlight = [1, 10]
+lines = [27, 37]
+highlight = [27, 35]
+anchor = "CREATE TABLE app.memberships ("
 caption = "Where the roles actually live"

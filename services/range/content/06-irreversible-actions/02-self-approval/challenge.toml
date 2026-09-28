@@ -37,6 +37,14 @@ hints = [
   "If the policy engine were bypassed and the portal were replaced by a script, which of the three would still be in the way?",
 ]
 
+break_steps = [
+  "Run **Action requests and their state** and find the pending request and the hash an approval would bind to.",
+  "Run **Approve the request as the person who raised it** — a direct insert, bypassing the API and the portal. Read the error and the `refused_by` column.",
+  "Run **The same approval by a different person**: the control group. It is accepted, then removed.",
+  "Compare the two attempts. The only thing that changed is who approved. What kind of component raised the first refusal?",
+  "Submit what refused the self-approval. Both attempts rolled themselves back, so there is nothing to reset.",
+]
+
 # No controls. Attempting the write is the exercise, and both attempts undo themselves.
 
 [[observation]]
@@ -64,10 +72,12 @@ field = "refused_by"
 path = "database/migrations/0008_actions.sql"
 lines = [62, 86]
 highlight = [80, 83]
+anchor = "separation of duty: the requester may not approve their own action"
 caption = "The third refusal, and the comment explaining why a CHECK constraint could not do it"
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
-lines = [319, 342]
-highlight = [325, 328]
+lines = [363, 386]
+highlight = [369, 372]
+anchor = 'deny("self_approval_not_permitted")'
 caption = "The first refusal — the same rule, expressed where business rules live"

@@ -185,6 +185,12 @@ _SCRIPT = """
 
 def page(title: str, body: str, *, wide: bool = False, solved_now: str = "") -> str:
     stamp = f' data-solved-now="{E(solved_now)}"' if solved_now else ""
+    # Every page body opens with the masthead. It is lifted out of the content column into a
+    # full-width top bar here, in one place, rather than every page function composing two regions.
+    topbar = ""
+    if body.startswith('<header class="masthead">'):
+        cut = body.index("</header>") + len("</header>")
+        topbar, body = f'<div class="topbar">{body[:cut]}</div>', body[cut:]
     return (
         "<!doctype html>"
         f'<html lang="en"{stamp}><head><meta charset="utf-8">'
@@ -195,6 +201,7 @@ def page(title: str, body: str, *, wide: bool = False, solved_now: str = "") -> 
         f"<script>{_THEME_SCRIPT}</script>"
         "</head><body>"
         '<a class="skiplink" href="#content">Skip to content</a>'
+        f"{topbar}"
         f'<div class="wrap{" wide" if wide else ""}"><main id="content" tabindex="-1">{body}</main></div>'
         f"<script>{_SCRIPT}</script>"
         "</body></html>"
@@ -213,7 +220,12 @@ def masthead(current: str = "") -> str:
 
     return (
         '<header class="masthead">'
-        '<p class="mark"><a href="/">The Range</a></p>'
+        '<p class="mark"><a href="/">'
+        # A target: the mark of a range. Inline, so the page still needs nothing from the network.
+        '<span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" '
+        'stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/>'
+        '<circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg></span>'
+        "The Range</a></p>"
         '<span class="sep" aria-hidden="true"></span>'
         '<span class="lab">SupportPilot lab</span>'
         '<span class="spacer"></span>'
@@ -253,8 +265,11 @@ def _summarise(state: dict[str, str] | None) -> tuple[str, str, str]:
             ", ".join(armed),
         )
     if absent:
+        stacks = sorted({"the memory stack" if mid.startswith("memory.") else "the delegation broker"
+                         for mid in absent})
+        verb = "is" if len(stacks) == 1 else "are"
         return ("held", f"Correct · all {len(state)} running controls at their designed setting",
-                f"{plural(len(absent), 'control')} not running: the memory stack is down")
+                f"{plural(len(absent), 'control')} not running: {' and '.join(stacks)} {verb} down")
     return ("held", f"Correct · all {len(state)} controls at their designed setting", "")
 
 
@@ -833,7 +848,7 @@ def _stage_02(
             f'<pre class="out" data-result tabindex="0" role="region" '
             f'aria-label="Observation output">{E(result)}</pre>'
             if result
-            else '<p class="out idle" data-result>Nothing run yet. Press an observation on the left and the '
+            else '<p class="out idle" data-result>Nothing run yet. Press Run on an observation above and the '
                  "output appears here, exactly as the lab returned it.</p>"
         )
         + "</div>"
@@ -847,7 +862,7 @@ def _stage_02(
 
     return (
         f'<section class="stage" id="stage-02" data-state="{E(data_state)}">'
-        + _stage_head(2, f"{len(challenge.controls)} controls · {len(challenge.observations)} probes")
+        + _stage_head(2, f"{plural(len(challenge.controls), 'control')} · {plural(len(challenge.observations), 'probe')}")
         + banner
         + '<div class="body">'
         + f'<p class="objective"><b>Objective</b>{E(challenge.objective)}</p>'

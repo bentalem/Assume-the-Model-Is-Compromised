@@ -42,6 +42,14 @@ hints = [
   "You have two switches. Four combinations. Which of the four does a schema dump look identical in?",
 ]
 
+break_steps = [
+  "Before arming anything, run **Read app.orders as the role that owns it**. A cedar context is set first; note that only cedar's orders come back — even for the table's owner.",
+  "Run **Show owner, enabled and forced for every table** and find `orders`: its owner, and both flags. Then run **Show superuser and BYPASSRLS for every lab role**.",
+  "Arm **Drop FORCE from app.orders**. Run the owner read again. The policy did not change; compare what came back.",
+  "Restore it, arm **Disable row security on app.orders** instead, and run both observations again. Same leak — but which of the two would a schema dump show?",
+  "Submit northwind's order total from the armed result. Then restore both controls.",
+]
+
 # ------------------------------------------------------------------------------------------------
 # Stage 02 — the console.
 #
@@ -92,16 +100,19 @@ field = "total_amount"
 path = "database/migrations/0003_customers_orders.sql"
 lines = [42, 52]
 highlight = [45, 45]
+anchor = "ALTER TABLE app.orders    FORCE"
 caption = "Both flags, then the policy. One line here is the whole challenge."
 
 [[source]]
 path = "database/migrations/0001_roles_and_schema.sql"
 lines = [63, 74]
 highlight = [67, 69]
+anchor = "app.current_org()"
 caption = "Why an unset context returns nothing rather than everything"
 
 [[source]]
 path = "services/api/src/supportpilot_api/db.py"
 lines = [66, 86]
 highlight = [74, 81]
+anchor = "set_config('app.organization_id', %s, true)"
 caption = "The context the policy reads, set transaction-locally on every request"

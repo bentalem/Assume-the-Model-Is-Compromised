@@ -39,6 +39,14 @@ hints = [
   "Once you have the table — would this one have been caught by a review of the tenant logic? Why not?",
 ]
 
+break_steps = [
+  "Before arming anything, run **Owner, enabled and forced for every table**. Fifteen rows agree. One does not, and it is not a finding — which is it, and why?",
+  "Run **Only the tables that are not fully protected**. Empty is the correct answer.",
+  "Arm **Break one table in the schema**. You are not told which table it changes.",
+  "Run the full catalogue again and find the one row where enabled and forced now disagree. Then run **Superuser and BYPASSRLS for every lab role** — the other half of the audit.",
+  "Submit the table's name. Then restore the control.",
+]
+
 [[control]]
 mutation = "rls.order_items.force_off"
 label = "Break one table in the schema"
@@ -69,10 +77,12 @@ field = "table_name"
 path = "database/migrations/0003_customers_orders.sql"
 lines = [42, 46]
 highlight = [44, 45]
+anchor = "ALTER TABLE app.orders    ENABLE"
 caption = "How the correct tables were configured — two lines, easy to copy and easy to half-copy"
 
 [[source]]
 path = "database/tests/permissions_smoke.sql"
-lines = [1, 22]
-highlight = [14, 22]
-caption = "The lab checks its own roles on every migration; this is what that looks like"
+lines = [37, 49]
+highlight = [40, 48]
+anchor = "table without ENABLE+FORCE"
+caption = "The same audit, run by the lab on itself on every migration — which is why this defect could only be armed, never shipped"

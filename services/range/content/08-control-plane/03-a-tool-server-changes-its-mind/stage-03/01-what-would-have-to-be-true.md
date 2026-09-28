@@ -1,6 +1,8 @@
 # What would have to be true
 
-## The moment the list is decided
+## What your result proves
+
+### The moment the list is decided
 
 Three artefacts, and all three are files somebody merged:
 
@@ -17,7 +19,7 @@ is worth naming exactly: **the registered set cannot change without a diff.**
 
 Not "should not". Cannot — there is no path from a running process to that list.
 
-## What a runtime tool source changes
+### What a runtime tool source changes
 
 Two things, and they fail differently.
 
@@ -33,14 +35,19 @@ Nobody proposes it, so nothing approves it; there is no transaction, so rule 9's
 transaction has nothing to attach to.
 
 The one check that is about the tool set — the export — runs against code in the image, on a
-developer's machine or in CI, before anything is deployed. It cannot see a list that arrives at
+developer's machine, before anything is deployed. It cannot see a list that arrives at
 connection time, and it would not be wrong to say so: it is a consistency check between two
 artefacts you control, and a third party is not one of them.
 
-## What holds anyway, and why that is the interesting half
+## Where the control lives
+
+Not in anything that watches the tool list. In what the authorization decision is made from.
+
+### What holds anyway, and why that is the interesting half
 
 Read the policy client panel. The authorization input is four members: subject, action, resource,
-context. A description is not one of them, and nothing further down reads one. Neither does
+context — and, for a token minted for an agent, a fifth: the delegation, built from that verified
+token. A description is not one of them, and nothing further down reads one. Neither does
 row-level security, which is a `USING` clause on a table, nor the separation-of-duty trigger, which
 compares two identities.
 
@@ -58,7 +65,11 @@ harmless:
 That last one is where this challenge meets 8.2. A tool server is a process, it sits somewhere, and
 what it can reach is a property of where you put it and not of what it claims to do.
 
-## What would have to be true before this lab could contain one
+## What this check does not cover
+
+Nothing was armed, so there is nothing to restore. Everything above describes a lab whose tool list cannot change at runtime; none of it says a runtime list would be safe.
+
+### What would have to be true before this lab could contain one
 
 Mechanically, not as intentions. Each of these is a thing you could fail a test on.
 
@@ -73,7 +84,7 @@ Note what is not on that list: validating the description text. You cannot patte
 out of prose, and a check that tried would be a test named for a larger claim than it makes — which
 is 7.4's subject. The control is the pin, not the reading.
 
-## Where this stops, and why
+### Where this stops, and why
 
 This lab does not have a mutable tool source, and it is not being given one today.
 

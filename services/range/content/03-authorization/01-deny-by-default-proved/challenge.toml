@@ -36,6 +36,14 @@ hints = [
   "Is the reason code the same one a normal refusal produces, and what does the policy_version column say?",
 ]
 
+break_steps = [
+  "Run **Is the policy engine running?**, then **Read an order alice is entitled to read**. Note the status: this is what a working request looks like.",
+  "Arm **Stop the policy decision point**. Run the engine-state observation again and confirm it is stopped.",
+  "Run alice's read again. Note the status, and whether any data came back.",
+  "Run **The last 30 decisions recorded** and find the newest `order.read` row: its decision, its reason, and its policy version.",
+  "Submit the reason code. Then restore the control — it waits until the engine is running again before it reports success.",
+]
+
 [[control]]
 mutation = "policy.opa.stop"
 label = "Stop the policy decision point"
@@ -65,10 +73,19 @@ reason_code = "policy_unavailable"
 path = "policy/supportpilot/authz.rego"
 lines = [1, 30]
 highlight = [16, 26]
+anchor = "default decision := {"
 caption = "Default deny, written as a rule rather than assumed"
 
 [[source]]
+path = "services/api/src/supportpilot_api/policy/client.py"
+lines = [81, 88]
+highlight = [83, 88]
+anchor = "except httpx.TimeoutException"
+caption = "The outage path: a timeout or an unreachable engine becomes a deny, marked as a dependency failure"
+
+[[source]]
 path = "services/api/src/supportpilot_api/pipeline.py"
-lines = [146, 156]
-highlight = [152, 152]
+lines = [172, 182]
+highlight = [178, 178]
+anchor = "raise unavailable() if decision.unavailable else not_found()"
 caption = "Where the refusal is turned into a status — and note which one an outage gets"

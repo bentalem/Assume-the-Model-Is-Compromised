@@ -30,7 +30,8 @@ recipient, and what would have to be built for the content."""
 agent_link = """
 The recipient half is classical access control and this lab already has layers for it; the content \
 half is agent-specific and structural. The policy input has four keys — subject, action, resource, \
-context — and the request body is not one of them, so no rule can relate what a call sends to what \
+context — and a fifth, the delegation, only when an agent's token names one. The request body is \
+not one of them, so no rule can relate what a call sends to what \
 the session read a moment earlier. That is why a tool that reads a ticket written outside the \
 organisation and a tool that sends are each defensible alone: composition happens across calls, \
 and a per-call decision is never given the thing that differs."""
@@ -39,6 +40,14 @@ hints = [
   "Read the parameters column for all seven operations. Which of them names a place that is not this database?",
   "OPA is told four things about a call. Is the body of the request one of them?",
   "One component here is built to reach outside the system, and it is not a tool. Where does it live, and what stands between the model and it?"
+]
+
+break_steps = [
+  "Run **Every registered operation, and every argument it accepts**. Read the parameters and body columns end to end, looking for anything that names a destination.",
+  "Run **What each of the seven is advertised as doing** and check the prose against the shapes — not instead of them.",
+  "Run **One permitted read that puts outside text into context**: the left-hand side of the composition table.",
+  "Open Stage 03's source panels: what OPA is told about a call, the refund body, the note's audit row, and the worker's refund adapter.",
+  "Submit what leaves this system today and what a delivery tool would need first — name the destination, who must approve it, and what the audit must keep.",
 ]
 
 # Read-only, and deliberately so. The subject is a capability this lab does not have, and the only
@@ -66,24 +75,28 @@ rubric = ["destination", "approve", "audit"]
 
 [[source]]
 path = "services/api/src/supportpilot_api/pipeline.py"
-lines = [114, 134]
-highlight = [120, 134]
-caption = "Everything OPA is told about a call. Four keys, and the request body is not one of them"
+lines = [140, 159]
+highlight = [142, 159]
+anchor = "context={"
+caption = "Everything OPA is told about a call. Four keys, a fifth only for a delegated token, and the request body is not one of them"
 
 [[source]]
 path = "services/api/src/supportpilot_api/tools/actions.py"
 lines = [40, 50]
 highlight = [41, 46]
+anchor = "Absent by design"
 caption = "The one body here that could plausibly have carried a destination, and the sentence saying why it does not"
 
 [[source]]
 path = "services/api/src/supportpilot_api/repositories/notes.py"
-lines = [92, 109]
-highlight = [95, 108]
+lines = [95, 112]
+highlight = [98, 111]
+anchor = 'result_reference=row["id"]'
 caption = "The nearest thing to a delivery tool, and what its evidence keeps: the note id, not the note"
 
 [[source]]
 path = "services/worker/src/supportpilot_worker/adapters/refund.py"
 lines = [94, 119]
 highlight = [104, 113]
+anchor = "if host not in allowed_hosts:"
 caption = "The only component built to reach outside. Refused at construction rather than at call time"

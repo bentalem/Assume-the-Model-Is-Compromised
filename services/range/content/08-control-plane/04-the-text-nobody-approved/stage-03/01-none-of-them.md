@@ -1,5 +1,7 @@
 # None of them
 
+## What your result proves
+
 That is the answer to the question in Stage 01, and it is worth being exact about it rather than
 dramatic.
 
@@ -22,7 +24,11 @@ arrives through the same door as any other source change, and it is reviewed exa
 whoever opened that pull request was reviewed — which may be thoroughly, or may be not at all, and
 in neither case does the system know.
 
-## What the check actually guarantees
+## Where the control lives
+
+For this text: in code review, if the text is in code, and nowhere else. The one automated check is a consistency check.
+
+### What the check actually guarantees
 
 There is a check, and it does run, and it is worth reading precisely because it is easy to mistake
 for more than it is:
@@ -49,7 +55,11 @@ reading *"use freely, read-only and safe"* on a tool that is neither passes this
 > A consistency check tells you the document and the code agree. It cannot tell you the document is
 > **right**, and the two get confused constantly, because passing feels like approval.
 
-## Why this is the normal state, not a lab defect
+## What this check does not cover
+
+Nothing was armed, so there is nothing to restore — the finding is an absence.
+
+### Why this is the normal state, not a lab defect
 
 Nobody decided to leave the text unguarded. It happened the way these things always happen: the
 controls were designed around the dangerous *operations*, and the prose describing them was treated
@@ -62,7 +72,7 @@ anyone's process noticed the change, because nothing had visibly happened.
 This is the shape of most agent-security findings worth reporting. Not a broken control. **A
 control boundary drawn before the system had this component, never redrawn afterwards.**
 
-## What to actually recommend
+### What to actually recommend
 
 Be specific, and be proportionate — "put the system prompt behind an approval workflow" gets
 nodded at and never done.

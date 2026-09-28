@@ -31,7 +31,8 @@ This one is genuinely agent-specific rather than classical work made sharper. A 
 control surface older systems do not have: a library does not renegotiate its exported functions \
 on every import, and a tool server computes its answer on every connection. What keeps it \
 tractable is that the authorization input here has four members — subject, action, resource, \
-context — and prose is not one of them, so a description can change what is attempted and not what \
+context, and a delegation built from a verified token when an agent acts — and prose is not one of \
+them, so a description can change what is attempted and not what \
 is permitted. Attempts still cost: they reach the third party, they fill your logs, and people \
 read descriptions too."""
 
@@ -39,6 +40,15 @@ hints = [
   "The tool modules are named in a migration and the routers are named in create_app. At what moment is that list decided, and by whom?",
   "If the list arrived over the network at the start of every conversation, which control in this lab would notice that it had changed?",
   "A tool description is text a model reads in order to decide what to call. If a third party writes it, whose instruction is it?",
+]
+
+break_steps = [
+  "Run **The five tool modules, as a fixed list** and **The same operations, read from the published action document**. Check that they agree.",
+  "Read the source panels in order: where the routers are mounted, the approved list, and the two refusals in the export.",
+  "Establish at what moment the tool list is decided, and which files would have to change to change it.",
+  "Run **The text each operation carries, and where it came from**. Note that every answer so far came from a file already on disk.",
+  "Name the two things a runtime tool source would put outside your review, and which control in this lab covers each today.",
+  "Submit those two things, and what would have to hold before this repository could connect one. Nothing was armed, so there is nothing to reset.",
 ]
 
 # Read-only, and nothing is armed. Building the capability this challenge is about — a component
@@ -72,36 +82,42 @@ rubric = ["descript", "review", "regist"]
 
 [[source]]
 path = "services/api/src/supportpilot_api/main.py"
-lines = [110, 119]
-highlight = [112, 116]
+lines = [135, 144]
+highlight = [137, 141]
+anchor = "app.include_router(actions_tool.router)"
 caption = "The tool set is decided here, when the process starts, from code that is already in the image. Nothing outside the image contributes a router"
 
 [[source]]
 path = "scripts/export_openapi.py"
-lines = [33, 43]
-highlight = [35, 43]
+lines = [38, 48]
+highlight = [40, 48]
+anchor = '"propose_refund",'
 caption = "The approved operation set is a literal in a reviewed file. Adding to it is a change somebody has to open a pull request for"
 
 [[source]]
 path = "scripts/export_openapi.py"
-lines = [170, 182]
-highlight = [178, 182]
+lines = [210, 220]
+highlight = [216, 220]
+anchor = "if operation_id not in approved:"
 caption = "What the export says when the running code has grown an operation nobody approved. It refuses to write the document at all"
 
 [[source]]
 path = "scripts/export_openapi.py"
-lines = [246, 252]
-highlight = [248, 250]
+lines = [307, 311]
+highlight = [307, 309]
+anchor = "missing = approved - seen"
 caption = "The check runs in both directions: an approved operation that has vanished from the document is a finding too"
 
 [[source]]
 path = "services/api/src/supportpilot_api/policy/client.py"
-lines = [64, 79]
-highlight = [67, 70]
-caption = "What the authorization decision is made from. Four members, and prose is not one of them — which is why a description cannot grant anything, whoever wrote it"
+lines = [64, 83]
+highlight = [67, 71]
+anchor = "context: dict[str, Any],"
+caption = "What the authorization decision is made from. Four members, a fifth built from a delegated token, and prose is not one of them — which is why a description cannot grant anything, whoever wrote it"
 
 [[source]]
 path = "services/range/src/range_service/probe.py"
 lines = [1, 10]
 highlight = [7, 9]
+anchor = "neither of which can extend it"
 caption = "The same principle in a second place: an id from a declared list, checked in two services, neither of which can extend it"

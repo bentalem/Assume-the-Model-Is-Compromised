@@ -38,6 +38,14 @@ hints = [
   "Where would you put the decision to omit that field — the query, the response model, or somewhere neither of those can see?",
 ]
 
+break_steps = [
+  "Run **Read CUS-4003 as alice, a support agent** and write down the `fields` list.",
+  "Run **Read CUS-4003 as bob, a manager** — the same record, through the same endpoint.",
+  "Compare the two field lists name by name. Note that both requests returned `200`: nothing was refused.",
+  "Run **Read an order as fiona, who approves refunds** for contrast: this is what a refusal looks like, as opposed to a narrowing.",
+  "Submit the field bob gets and alice does not. Nothing was armed, so there is nothing to reset.",
+]
+
 # Read-only. Both requests are permitted; nothing needs breaking to show the difference.
 
 [[observation]]
@@ -64,12 +72,21 @@ rubric = ["email"]
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
-lines = [128, 160]
-highlight = [134, 142]
+lines = [172, 204]
+highlight = [178, 186]
+anchor = "restricted_customer_minimal_fields"
 caption = "The obligation: an allow that carries a narrower field list"
 
 [[source]]
 path = "policy/supportpilot/authz.rego"
 lines = [46, 58]
 highlight = [53, 57]
+anchor = "customer_fields_restricted := ["
 caption = "The two field sets, and what is absent from the restricted one"
+
+[[source]]
+path = "services/api/src/supportpilot_api/pipeline.py"
+lines = [63, 72]
+highlight = [69, 72]
+anchor = "if key in allowed"
+caption = "Where the obligation is carried out: an allowlist, between the query and the response"

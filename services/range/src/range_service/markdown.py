@@ -72,6 +72,21 @@ def _table(rows: list[str]) -> str:
     return "".join(out)
 
 
+def _continuation(lines: list[str], i: int, block: list[str]) -> int:
+    """Join indented lines that continue the list item just read, as Markdown does.
+
+    Without this, a bullet wrapped onto a second, indented line rendered its tail as a separate
+    paragraph under the list — which 142 lines of the course content did, across 40 files, before
+    anybody noticed. Returns the index of the first line that is not a continuation.
+    """
+    while i < len(lines) and re.match(r"^ {2,}\S", lines[i]) and not re.match(
+        r"^\s*([-*+]|\d+[.)])\s+", lines[i]
+    ):
+        block[-1] = block[-1].rstrip() + " " + lines[i].strip()
+        i += 1
+    return i
+
+
 def render(text: str) -> str:
     """Render a Markdown subset to HTML."""
     lines = text.replace("\r\n", "\n").split("\n")
@@ -131,7 +146,7 @@ def render(text: str) -> str:
             block = []
             while i < len(lines) and re.match(r"^\s*[-*+]\s+", lines[i]):
                 block.append(re.sub(r"^\s*[-*+]\s+", "", lines[i]))
-                i += 1
+                i = _continuation(lines, i + 1, block)
             out.append("<ul>" + "".join(f"<li>{_inline(item)}</li>" for item in block) + "</ul>")
             continue
 
@@ -139,7 +154,7 @@ def render(text: str) -> str:
             block = []
             while i < len(lines) and re.match(r"^\s*\d+[.)]\s+", lines[i]):
                 block.append(re.sub(r"^\s*\d+[.)]\s+", "", lines[i]))
-                i += 1
+                i = _continuation(lines, i + 1, block)
             out.append("<ol>" + "".join(f"<li>{_inline(item)}</li>" for item in block) + "</ol>")
             continue
 

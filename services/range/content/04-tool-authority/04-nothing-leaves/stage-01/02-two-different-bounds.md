@@ -23,7 +23,9 @@ call.
 
 Open the first source panel. It is the complete policy input: subject, action, resource, context.
 Four keys. The subject is the verified user, the resource is the trusted row the API loaded, the
-context is a request id, a timestamp and a network zone.
+context is a request id, a timestamp and a network zone. A fifth, `delegation`, is added only when
+the token was minted for an agent (challenges 1.5 - 1.8), and it is built from that verified
+token: who is acting, and the scope they were given.
 
 The request body is not there. Neither is anything the caller read a moment ago.
 
